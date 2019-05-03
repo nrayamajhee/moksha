@@ -1,0 +1,58 @@
+[package]
+authors = ["nrayamajhee <nishan@rayamajhee.com>"]
+edition = "2018"
+name = "webshell"
+version = "0.1.0"
+[dependencies]
+fixedbitset = "0.1.9"
+js-sys = "0.3"
+wasm-bindgen = "0.2"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+  'Window',
+  'Document',
+  'HtmlBodyElement',
+  'CssStyleDeclaration',
+  'HtmlElement',
+  'Node',
+  'console',
+  'HtmlCanvasElement',
+  'Element',
+  'CanvasRenderingContext2d',
+]
+
+[dependencies.console_error_panic_hook]
+optional = true
+version = "0.1.1"
+
+[dependencies.wee_alloc]
+optional = true
+version = "0.4.2"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.2"
+
+[features]
+default = ["console_error_panic_hook"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile]
+[profile.release]
+opt-level = "s"
+
+[profile.release.console_error_panic_hook]
+optional = true
+version = "0.1.1"
+
+[profile.release.wee_alloc]
+optional = true
+version = "0.4.2"
+# compared to the default allocator's ~10K. It is slower than the default
+# allocator, however.
+#
+# Unfortunately, `wee_alloc` requires nightly Rust when targeting wasm for now.
+wee_alloc = { version = "0.4.2", optional = true }
