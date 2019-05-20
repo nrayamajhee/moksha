@@ -3,8 +3,10 @@ image: node:current-alpine
 pages:
   stage: deploy
   script:
+  - cd www
   - npm ci
   - npm run build
+  - mv dist ../public
   artifacts:
     paths:
     - public
