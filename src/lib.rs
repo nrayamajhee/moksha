@@ -27,14 +27,21 @@ mod universe;
 pub use universe::Universe;
 
 mod game;
-pub use game::Game;
+pub mod dom_factory;
+pub use game::{Game, Controller};
+
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub fn main() {
     set_panic_hook();
-    let mut game = Game::new();
-    game.update();
+    let game = Game::new();
+    let g = Rc::new(RefCell::new(game));
+    let controller = Controller::new(g);
+    controller.attach_events();
+    controller.update();
 }
 

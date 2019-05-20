@@ -4,6 +4,7 @@ edition = "2018"
 name = "webshell"
 version = "0.1.0"
 [dependencies]
+eval = "^0.4"
 fixedbitset = "0.1.9"
 js-sys = "0.3"
 wasm-bindgen = "0.2"
@@ -14,7 +15,10 @@ features = [
   'Window',
   'Document',
   'HtmlBodyElement',
+  'EventTarget',
   'CssStyleDeclaration',
+  'HtmlStyleElement',
+  'HtmlHeadElement',
   'HtmlElement',
   'Node',
   'console',
