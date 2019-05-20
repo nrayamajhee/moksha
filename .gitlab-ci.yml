@@ -1,0 +1,12 @@
+image: node:current-alpine
+
+pages:
+  stage: deploy
+  script:
+  - npm ci
+  - npm run build
+  artifacts:
+    paths:
+    - public
+  only:
+  - master
