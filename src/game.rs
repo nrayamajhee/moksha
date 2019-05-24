@@ -1,147 +1,17 @@
 use crate::dom_factory::{
-    add_event, add_style, body, button, cancel_animation_frame, document, min_max_input,
-    request_animation_frame, set_timeout, window,
+    add_event, add_style, body, cancel_animation_frame, document, get_el_id, query,
+    request_animation_frame, set_timeout, window, get_css_var,
 };
 use crate::{Pattern, Universe};
 use js_sys::Math;
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::{prelude::*, JsCast, JsValue};
-use web_sys::{
-    CanvasRenderingContext2d, Element, HtmlCanvasElement, HtmlElement, HtmlInputElement, MouseEvent,
-};
+use web_sys::{CanvasRenderingContext2d, Event, HtmlCanvasElement, HtmlInputElement, MouseEvent};
 
-const CELL_SIZE: u32 = 5; // px
-const GRID_COLOR: &'static str = "#222";
-const DEAD_COLOR: &'static str = "#333";
-const ALIVE_COLOR: &'static str = "#DDD";
+use maud::html;
 
-pub fn get_root_style() -> String {
-    format!(
-        "
-@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
-:root {{
-    --bg: {};
-    --bg-light: {};
-    --fg: {};
-    --bg-lighter: #444;
-    --radius: 10px;
-    --pad: 10px;
-    --gap: 20px;
-}}",
-        GRID_COLOR, DEAD_COLOR, ALIVE_COLOR
-    )
-}
-
-const layout: &'static str = "
-    <button id='pause'></button>
-    <input type='number'></input>
-    <button id='write'></button>
-";
-
-const STYLE: &'static str = "
-body {
-    background: var(--bg);
-    font: 16px/1.5 sans-serif;
-}
-button {
-    background: var(--bg-light);
-    border-radius: var(--radius);
-    border: 1px solid var(--bg-lighter);
-    padding: var(--pad);
-    line-height: 1;
-    margin: var(--pad);
-}
-button i {
-    color: var(--fg);
-    line-height: 1;
-    display: block;
-}
-button::-moz-focus-inner {
-    border: 0;
-}
-section.draw canvas {
-    cursor: crosshair;
-}
-section.erase canvas {
-    cursor: cell;
-}
-canvas {
-    display: block;
-}
-input[type=number] {
-    background: var(--fg);
-    color: var(--bg);
-    width: 2.5em;
-    padding: var(--pad);
-    margin: 0;
-    border: 0;
-    border-radius: var(--radius) 0 0 var(--radius);
-}
-input[type=number]:last-of-type::before {
-    content: \"×\";
-    color: red;
-}
-input[type=number]:last-of-type{
-    border-radius: 0;
-}
-input::-webkit-outer-spin-button,
-input::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-}
-input[type=number] {
-    -moz-appearance: textfield;
-}
-";
-
-pub fn get_rangle_stype() -> String {
-    let style: &'static str = "
-        input[type=range] {
-            -webkit-appearance: none;
-            width: 10em;
-            background: transparent;
-        }
-        input[type=range]:focus {
-            outline: none;
-        }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            margin-top: -8px;
-        }
-        input[type=range]::-moz-range-thumb {
-            border: 0;
-        }
-    ";
-    let track: &'static str = " {
-        width: 100%;
-        height: 4px;
-        cursor: pointer;
-        animate: 1.0s;
-        background: var(--bg-light);
-        border-radius: 20px;
-        box-sizing: content-box;
-        border: 1px solid var(--bg-lighter);
-    }";
-    let thumb: &'static str = "{
-        background: var(--fg);
-        height: 20px;
-        width: 20px;
-        border-radius: 50%;
-        cursor: pointer;
-    }";
-    format!(
-        "{}{}{}",
-        format!("
-            input[type=range]::-moz-range-track{}
-            input[type=range]::-webkit-slider-runnable-track{}",
-        track, track),
-        format!("
-            input[type=range]::-moz-range-thumb{} 
-            input[type=range]::-webkit-slider-thumb{}",
-        thumb, thumb),
-        style
-    )
-}
+const CELL_SIZE: u32 = 8; // px
 
 #[derive(PartialEq)]
 pub enum DrawState {
@@ -149,16 +19,6 @@ pub enum DrawState {
     ERASE,
     PLACE(Pattern),
     NONE,
-}
-
-#[derive(PartialEq)]
-pub enum GameEvents {
-    PAUSE,
-    DRAW(DrawState),
-    RANDOM,
-    DELAY,
-    CLEAR,
-    DUMMY,
 }
 
 pub struct Game {
@@ -171,24 +31,47 @@ pub struct Game {
     canvas: HtmlCanvasElement,
     animation_id: Option<i32>,
     timeout_id: Option<i32>,
-    root: Element,
-    ui_elements: Vec<(GameEvents, HtmlElement)>,
 }
 
 impl Game {
     pub fn new() -> Self {
-        let width = 64;
+        let width = 128;
         let height = 64;
         let mut universe = Universe::new(width, height);
         universe.randomize_cells();
 
-        let document = document();
-        document.set_title("Conway's Game of Life!");
+        let markup = html! {
+            section {
+                div.topbar {
+                    button#play title="play/pause" {i.material-icons {"pause"}}
+                    button#random title="randomize universe" {i.material-icons {"grain"}}
+                    button#shrink title="shrink universe" {i.material-icons {"remove"}}
+                    input#width title="specify width to resize" type="number" value="64" min="0" max="1000" step="100" {}
+                    span {"×"}
+                    input#height title="specify width to resize" type="number" value="64" min="0" max="1000" step="100" {}
+                    button#resize title="resize universe to given dimensions" {i.material-icons {"launch"}}
+                    button#expand title="expand universe" {i.material-icons {"add"}}
+                    button#clear title="clear universe" {i.material-icons {"delete_forever"}}
+                }
+                div.center {
+                    canvas{}
+                }
+                div.bottombar {
+                    button#glider title="insert glider" {i.material-icons {"scatter_plot"}}
+                    button#gun title="insert glider gun" {i.material-icons {"send"}}
+                    button#pulsar title="insert pulsar" {i.material-icons {"flare"}}
+                    input#delay title="change speed" type="range" value="0" min="0" max="1000" {}
+                    button#draw title="draw universe" {i.material-icons {"create"}}
+                    button#erase title="erase universe" {i.material-icons {"border_color"}}
+                }
+            }
+        };
 
-        add_style(format!("{}{}{}", get_root_style().as_str(), STYLE, get_rangle_stype()).as_str());
+        body().set_inner_html(&markup.into_string().as_str());
 
-        let c = document.create_element("canvas").unwrap();
-        let canvas = c.clone().dyn_into::<HtmlCanvasElement>().unwrap();
+        let canvas = query("canvas")
+            .dyn_into::<HtmlCanvasElement>()
+            .unwrap();
         let canvas_rect = ((CELL_SIZE + 1) * width + 1, (CELL_SIZE + 1) * height + 1);
         canvas.set_width(canvas_rect.0);
         canvas.set_height(canvas_rect.1);
@@ -200,70 +83,18 @@ impl Game {
             .dyn_into::<CanvasRenderingContext2d>()
             .unwrap();
 
-        let button_pause = button("pause", "material_icon");
-        let button_random = button("grain", "material_icon");
-        let button_draw = button("create", "material_icon");
-        let button_erase = button("border_color", "material_icon");
-        let button_clear = button("delete_forever", "material_icon");
-        let button_glider = button("scatter_plot", "material_icon");
-        let button_gun = button("send", "material_icon");
-        let delay: u32 = 0;
-        let button_expand = button("fullscreen", "material_icon");
-        let button_shrink = button("fullscreen_exit", "material_icon");
-        let input_delay = min_max_input("range", 0, 1000, delay as i32, None);
-        let input_width = min_max_input("number", 0, 1000, delay as i32, Some(100));
-        let padding = span("×");
-        let input_height = min_max_input("number", 0, 1000, delay as i32,Some(100));
-
-        let mut ui_elements = Vec::new();
-        ui_elements.push((GameEvents::PAUSE, button_pause));
-        ui_elements.push((GameEvents::DELAY, input_delay));
-        ui_elements.push((GameEvents::DRAW(DrawState::DRAW), button_draw));
-        ui_elements.push((GameEvents::DRAW(DrawState::ERASE), button_erase));
-        ui_elements.push((GameEvents::DUMMY, button_shrink));
-        ui_elements.push((GameEvents::DUMMY, input_width));
-        ui_elements.push((GameEvents::DUMMY, input_height));
-        ui_elements.push((GameEvents::DUMMY, button_expand));
-        ui_elements.push((GameEvents::RANDOM, button_random));
-        ui_elements.push((GameEvents::CLEAR, button_clear));
-        ui_elements.push((
-            GameEvents::DRAW(DrawState::NONE),
-            c.dyn_into::<HtmlElement>().unwrap(),
-        ));
-        ui_elements.push((
-            GameEvents::DRAW(DrawState::PLACE(Pattern::GLIDER)),
-            button_glider,
-        ));
-        ui_elements.push((
-            GameEvents::DRAW(DrawState::PLACE(Pattern::GLIDER)),
-            button_gun,
-        ));
-
-        // let ui_elements = Rc::new(RefCell::new(ui_elements));
-        let root = document.create_element("section").unwrap();
-        body().append_child(&root).unwrap();
-
         let draw_state = DrawState::NONE;
 
         Self {
             universe,
             paused: false,
             should_draw: false,
-            delay,
+            delay: 0,
             context,
-            ui_elements,
-            root,
             draw_state,
             canvas,
             animation_id: None,
             timeout_id: None,
-        }
-    }
-    pub fn attach_ui_elements(&self) {
-        for (_, element) in self.ui_elements.iter() {
-            self.root
-                .append_child(&element)
-                .expect(format!("Can't append the element {:?} to body!", element).as_str());
         }
     }
     pub fn render(&mut self) {
@@ -289,9 +120,6 @@ impl Game {
     }
     pub fn is_paused(&self) -> bool {
         self.paused
-    }
-    pub fn ui_elements(&self) -> &[(GameEvents, HtmlElement)] {
-        &self.ui_elements[..]
     }
     pub fn set_animation_id(&mut self, id: i32) {
         self.animation_id = Some(id);
@@ -334,13 +162,13 @@ impl Game {
         (row, col)
     }
     pub fn set_draw_state(&mut self, draw_state: DrawState) {
-        self.root.class_list().remove_2("draw", "erase").unwrap();
+        self.canvas.class_list().remove_2("draw", "erase").unwrap();
         match draw_state {
             DrawState::DRAW | DrawState::PLACE(_) => {
-                self.root.class_list().add_1("draw").unwrap();
+                self.canvas.class_list().add_1("draw").unwrap();
             }
             DrawState::ERASE => {
-                self.root.class_list().add_1("erase").unwrap();
+                self.canvas.class_list().add_1("erase").unwrap();
             }
             _ => (),
         }
@@ -371,8 +199,8 @@ impl Game {
         for row in 0..self.universe.height() {
             for col in 0..self.universe.width() {
                 let alive = self.universe.is_alive(row, col);
-                let alive_color = JsValue::from_str(&ALIVE_COLOR);
-                let dead_color = JsValue::from_str(&DEAD_COLOR);
+                let alive_color = JsValue::from_str(get_css_var("--fg").as_str());
+                let dead_color = JsValue::from_str(get_css_var("--bg-light").as_str());
                 self.context
                     .set_fill_style(if alive { &alive_color } else { &dead_color });
                 self.context.fill_rect(
@@ -388,7 +216,7 @@ impl Game {
     fn draw_grid(&self) {
         self.context.begin_path();
         self.context
-            .set_stroke_style(&JsValue::from_str(GRID_COLOR));
+            .set_stroke_style(&JsValue::from_str(get_css_var("--bg").as_str()));
 
         for i in 0..self.universe.width() {
             self.context.move_to((i * (CELL_SIZE + 1) + 1) as f64, 0.);
@@ -442,104 +270,94 @@ impl Controller {
         Self::start_animation(self.game.clone());
     }
     pub fn attach_events(&self) {
-        let game = self.game.borrow();
-        let els = game.ui_elements();
-        for (event, element) in els.iter() {
-            match event {
-                GameEvents::PAUSE => {
-                    let s = self.game.clone();
-                    add_event(element, "click", move |_| {
-                        let mut game = s.borrow_mut();
-                        if game.is_paused() {
-                            Self::start_animation(s.clone());
-                        } else {
-                            game.pause();
-                        }
-                    });
-                }
-                GameEvents::RANDOM => {
-                    let s = self.game.clone();
-                    add_event(element, "click", move |_| {
-                        let mut game = s.borrow_mut();
-                        game.randomize();
-                    });
-                }
-                GameEvents::CLEAR => {
-                    let s = self.game.clone();
-                    add_event(element, "click", move |_| {
-                        let mut game = s.borrow_mut();
-                        game.clear();
-                    });
-                }
-                GameEvents::DELAY => {
-                    let s = self.game.clone();
-                    let input = element.clone().dyn_into::<HtmlInputElement>().unwrap();
-                    add_event(element, "input", move |_| {
-                        let mut game = s.borrow_mut();
-                        let time = input.value().parse::<u32>().unwrap();
-                        game.change_speed(time);
-                    });
-                }
-                GameEvents::DRAW(draw) => match draw {
-                    DrawState::DRAW => {
-                        let s = self.game.clone();
-                        add_event(element, "click", move |_| {
-                            let mut game = s.borrow_mut();
-                            game.set_draw_state(DrawState::DRAW);
-                        });
-                    }
-                    DrawState::ERASE => {
-                        let s = self.game.clone();
-                        add_event(element, "click", move |_| {
-                            let mut game = s.borrow_mut();
-                            game.set_draw_state(DrawState::ERASE);
-                        });
-                    }
-                    DrawState::NONE => {
-                        add_event(element, "contextmenu", move |e| {
-                            e.prevent_default();
-                        });
-
-                        let s = self.game.clone();
-                        add_event(element, "mousemove", move |e| {
-                            let me = e.dyn_into::<MouseEvent>().unwrap();
-                            let mut game = s.borrow_mut();
-                            game.draw_cell(me.client_x(), me.client_y());
-                        });
-
-                        let s = self.game.clone();
-                        add_event(element, "mousedown", move |e| {
-                            let mut game = s.borrow_mut();
-                            let me = e.dyn_into::<MouseEvent>().unwrap();
-                            let btn = me.button();
-                            if btn == 0 {
-                                game.enable_drawing();
-                                game.draw_cell(me.client_x(), me.client_y());
-                            } else if btn == 2 {
-                                game.set_draw_state(DrawState::NONE);
-                            }
-                        });
-
-                        let s = self.game.clone();
-                        add_event(element, "mouseup", move |_| {
-                            let mut game = s.borrow_mut();
-                            game.disable_drawing();
-                        });
-                    }
-                    DrawState::PLACE(pattern) => match pattern {
-                        Pattern::GLIDER => {
-                            log!("Glider clicked");
-                            let s = self.game.clone();
-                            add_event(element, "click", move |_| {
-                                let mut game = s.borrow_mut();
-                                game.set_draw_state(DrawState::PLACE(Pattern::GLIDER));
-                            });
-                        }
-                        Pattern::GUN => {}
-                    },
-                },
-                GameEvents::DUMMY => (),
+        let s = self.game.clone();
+        add_event(&get_el_id("play"), "click", move |_| {
+            let mut game = s.borrow_mut();
+            if game.is_paused() {
+                Self::start_animation(s.clone());
+            } else {
+                game.pause();
             }
-        }
+        });
+        let s = self.game.clone();
+        add_event(&get_el_id("delay"), "input", move |e| {
+            let mut game = s.borrow_mut();
+            let time = e
+                .target()
+                .unwrap()
+                .dyn_into::<HtmlInputElement>()
+                .unwrap()
+                .value()
+                .parse::<u32>()
+                .unwrap();
+            game.change_speed(time);
+        });
+        let s = self.game.clone();
+        add_event(&get_el_id("random"), "click", move |_| {
+            let mut game = s.borrow_mut();
+            game.randomize();
+        });
+        let s = self.game.clone();
+        add_event(&get_el_id("clear"), "click", move |_| {
+            let mut game = s.borrow_mut();
+            game.clear();
+        });
+        let s = self.game.clone();
+        add_event(&get_el_id("draw"), "click", move |_| {
+            let mut game = s.borrow_mut();
+            game.set_draw_state(DrawState::DRAW);
+        });
+        let s = self.game.clone();
+        add_event(&get_el_id("erase"), "click", move |_| {
+            let mut game = s.borrow_mut();
+            game.set_draw_state(DrawState::ERASE);
+        });
+        let s = self.game.clone();
+        add_event(&get_el_id("erase"), "click", move |_| {
+            let mut game = s.borrow_mut();
+            game.set_draw_state(DrawState::ERASE);
+        });
+        let canvas = query("canvas");
+        add_event(&canvas, "contextmenu", move |e| {
+            e.prevent_default();
+        });
+        let s = self.game.clone();
+        add_event(&canvas, "mousemove", move |e| {
+            let me = e.dyn_into::<MouseEvent>().unwrap();
+            let mut game = s.borrow_mut();
+            game.draw_cell(me.client_x(), me.client_y());
+        });
+        let s = self.game.clone();
+        add_event(&canvas, "mousedown", move |e| {
+            let mut game = s.borrow_mut();
+            let me = e.dyn_into::<MouseEvent>().unwrap();
+            let btn = me.button();
+            if btn == 0 {
+                game.enable_drawing();
+                game.draw_cell(me.client_x(), me.client_y());
+            } else if btn == 2 {
+                game.set_draw_state(DrawState::NONE);
+            }
+        });
+        let s = self.game.clone();
+        add_event(&canvas, "mouseup", move |_| {
+            let mut game = s.borrow_mut();
+            game.disable_drawing();
+        });
+        let s = self.game.clone();
+        add_event(&get_el_id("glider"), "click", move |_| {
+            let mut game = s.borrow_mut();
+            game.set_draw_state(DrawState::PLACE(Pattern::GLIDER));
+        });
+        let s = self.game.clone();
+        add_event(&get_el_id("gun"), "click", move |_| {
+            let mut game = s.borrow_mut();
+            game.set_draw_state(DrawState::PLACE(Pattern::GUN));
+        });
+        let s = self.game.clone();
+        add_event(&get_el_id("pulsar"), "click", move |_| {
+            let mut game = s.borrow_mut();
+            game.set_draw_state(DrawState::PLACE(Pattern::PULSAR));
+        });
     }
 }

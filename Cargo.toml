@@ -6,6 +6,7 @@ version = "0.1.0"
 
 [dependencies]
 fixedbitset = "0.1.9"
+maud = "0.20.0"
 js-sys = "0.3.22"
 wasm-bindgen = "0.2.45"
 

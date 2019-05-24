@@ -4,9 +4,7 @@ pages:
   stage: deploy
   script:
   - cd www
-  - npm ci
-  - npm run build
-  - mv dist ../public
+  - echo "nothing works right now"
   artifacts:
     paths:
     - public

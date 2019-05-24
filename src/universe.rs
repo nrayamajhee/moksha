@@ -7,8 +7,8 @@ use wasm_bindgen::prelude::*;
 pub enum Pattern {
     GLIDER,
     GUN,
+    PULSAR,
 }
-
 
 #[wasm_bindgen]
 pub struct Universe {
@@ -25,7 +25,6 @@ impl Universe {
             width,
             height,
             cells,
-            
         }
     }
 
@@ -143,12 +142,120 @@ impl Universe {
     pub fn cells(&self) -> *const u32 {
         self.cells.as_slice().as_ptr()
     }
-    pub fn insert(&mut self, pattern: Pattern, x: u32, y: u32) {
+    pub fn insert(&mut self, pattern: Pattern, c: u32, r: u32) {
         match pattern {
-            Pattern::GLIDER =>{
-                self.set_cells(&[(y, x+1), (y+1, x+2), (y+2, x), (y+2, x+1), (y+2, x+2)]);
+            Pattern::GLIDER => {
+                self.set_cells(&[
+                    (r, c + 1),
+                    (r + 1, c + 2),
+                    (r + 2, c),
+                    (r + 2, c + 1),
+                    (r + 2, c + 2),
+                ]);
+            },
+            Pattern::GUN => {
+                self.set_cells(&[
+                    (r + 1, c),
+                    (r, c - 1),
+                    (r + 1, c - 1),
+                    (r + 2, c - 1),
+                    (r - 1, c - 2),
+                    (r + 3, c - 2),
+                    (r + 1, c - 3),
+
+                    (r - 2, c - 4),
+                    (r + 4, c - 4),
+                    (r - 2, c - 5),
+                    (r + 4, c - 5),
+                    (r - 1, c - 6),
+                    (r + 3, c - 6),
+                    (r, c - 7),
+                    (r + 1, c - 7),
+                    (r + 2, c - 7),
+
+                    (r, c - 16),
+                    (r, c - 17),
+                    (r + 1, c - 16),
+                    (r + 1, c - 17),
+
+                    (r, c + 3),
+                    (r - 1, c + 3),
+                    (r - 2, c + 3),
+                    (r, c + 4),
+                    (r - 1, c + 4),
+                    (r - 2, c + 4),
+                    (r + 1, c + 5),
+                    (r - 3, c + 5),
+                    (r - 3, c + 7),
+                    (r - 4, c + 7),
+                    (r + 1, c + 7),
+                    (r + 2, c + 7),
+
+                    (r - 1, c + 17),
+                    (r - 2, c + 17),
+                    (r - 1, c + 18),
+                    (r - 2, c + 18),
+                ]);
+            },
+            Pattern::PULSAR => {
+                self.set_cells(&[
+                    (r - 2, c + 1),
+                    (r - 3, c + 1),
+                    (r - 4, c + 1),
+                    (r - 2, c - 1),
+                    (r - 3, c - 1),
+                    (r - 4, c - 1),
+
+                    (r - 1, c + 2),
+                    (r - 1, c + 3),
+                    (r - 1, c + 4),
+                    (r + 1, c + 2),
+                    (r + 1, c + 3),
+                    (r + 1, c + 4),
+
+                    (r + 2, c - 1),
+                    (r + 3, c - 1),
+                    (r + 4, c - 1),
+                    (r + 2, c + 1),
+                    (r + 3, c + 1),
+                    (r + 4, c + 1),
+
+                    (r - 1, c - 2),
+                    (r - 1, c - 3),
+                    (r - 1, c - 4),
+                    (r + 1, c - 2),
+                    (r + 1, c - 3),
+                    (r + 1, c - 4),
+
+                    (r - 6, c - 2),
+                    (r - 6, c - 3),
+                    (r - 6, c - 4),
+                    (r - 6, c + 2),
+                    (r - 6, c + 3),
+                    (r - 6, c + 4),
+
+                    (r + 6, c - 2),
+                    (r + 6, c - 3),
+                    (r + 6, c - 4),
+                    (r + 6, c + 2),
+                    (r + 6, c + 3),
+                    (r + 6, c + 4),
+
+                    (r - 2, c + 6),
+                    (r - 3, c + 6),
+                    (r - 4, c + 6),
+                    (r + 2, c + 6),
+                    (r + 3, c + 6),
+                    (r + 4, c + 6),
+
+                    (r - 2, c - 6),
+                    (r - 3, c - 6),
+                    (r - 4, c - 6),
+                    (r + 2, c - 6),
+                    (r + 3, c - 6),
+                    (r + 4, c - 6),
+                ]);
             }
-            _ => {}
         }
     }
 }

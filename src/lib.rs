@@ -1,3 +1,5 @@
+#![feature(proc_macro_hygiene)]
+
 #[allow(unused_macros)]
 macro_rules! log {
     ( $( $t:tt )* ) => {
@@ -16,7 +18,7 @@ pub use universe::{Universe, Pattern};
 
 mod game;
 pub mod dom_factory;
-pub use game::{Game, DrawState, GameEvents, Controller};
+pub use game::{Game, DrawState, Controller};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -28,9 +30,7 @@ pub fn start() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
     let game = Game::new();
-    game.attach_ui_elements();
-    let g = Rc::new(RefCell::new(game));
-    let controller = Controller::new(g);
+    let controller = Controller::new(Rc::new(RefCell::new(game)));
     controller.attach_events();
     controller.render_loop();
 }
