@@ -1,3 +1,1 @@
-import {main} from "webshell";
-
-main();
+import {} from "webshell";

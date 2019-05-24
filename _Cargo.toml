@@ -22,7 +22,6 @@ features = [
   'MouseEvent',
   'Event',
   'HtmlHeadElement',
-  'HtmlInputElement',
   'HtmlElement',
   'Node',
   'console',

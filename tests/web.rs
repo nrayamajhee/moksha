@@ -4,6 +4,7 @@
 use wasm_bindgen_test::*;
 
 use webshell::Universe;
+use webshell::Pattern;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -17,18 +18,14 @@ fn test_tick() {
 
 #[cfg(test)]
 pub fn input_spaceship() -> Universe {
-    let mut universe = Universe::new();
-    universe.set_width(6);
-    universe.set_height(6);
-    universe.set_cells(&[(1, 2), (2, 3), (3, 1), (3, 2), (3, 3)]);
+    let mut universe = Universe::new(6, 6);
+    universe.insert(Pattern::GLIDER,1,1);
     universe
 }
 
 #[cfg(test)]
 pub fn expected_spaceship() -> Universe {
-    let mut universe = Universe::new();
-    universe.set_width(6);
-    universe.set_height(6);
+    let mut universe = Universe::new(6, 6);
     universe.set_cells(&[(2, 1), (2, 3), (3, 2), (3, 3), (4, 2)]);
     universe
 }

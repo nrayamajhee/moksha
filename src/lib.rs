@@ -5,18 +5,6 @@ macro_rules! log {
     }
 }
 
-#[allow(dead_code)]
-pub fn set_panic_hook() {
-    // When the `console_error_panic_hook` feature is enabled, we can call the
-    // `set_panic_hook` function at least once during initialization, and then
-    // we will get better error messages if our code ever panics.
-    //
-    // For more details see
-    // https://github.com/rustwasm/console_error_panic_hook#readme
-    #[cfg(feature = "console_error_panic_hook")]
-    console_error_panic_hook::set_once();
-}
-
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
 #[cfg(feature = "wee_alloc")]
@@ -24,24 +12,26 @@ pub fn set_panic_hook() {
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 mod universe;
-pub use universe::Universe;
+pub use universe::{Universe, Pattern};
 
 mod game;
 pub mod dom_factory;
-pub use game::{Game, Controller};
+pub use game::{Game, DrawState, GameEvents, Controller};
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
-pub fn main() {
-    set_panic_hook();
+#[wasm_bindgen(start)]
+pub fn start() {
+    #[cfg(feature = "console_error_panic_hook")]
+    console_error_panic_hook::set_once();
     let game = Game::new();
+    game.attach_ui_elements();
     let g = Rc::new(RefCell::new(game));
     let controller = Controller::new(g);
     controller.attach_events();
-    controller.update();
+    controller.render_loop();
 }
 
