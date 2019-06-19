@@ -1,15 +1,19 @@
-image: rust:latest
+image: archlinux/base
 
 pages:
   stage: deploy
   script:
-  - apt update && apt install nodejs
+  - pacman -Sy
+  - pacman -S --noconfirm --needed base-devel
+  - pacman -S --noconfirm rustup nodejs npm
+  - rustup install nightly
+  - rustup default nightly
   - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
   - wasm-pack build
   - cd www
   - npm ci
-  - npm install
   - npm run build
+  - mv dist ../public
   artifacts:
     paths:
     - public
