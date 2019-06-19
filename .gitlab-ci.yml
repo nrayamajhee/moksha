@@ -1,10 +1,15 @@
-image: node:current-alpine
+image: rust:latest
 
 pages:
   stage: deploy
   script:
+  - apt update && apt install nodejs
+  - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+  - wasm-pack build
   - cd www
-  - echo "nothing works right now"
+  - npm ci
+  - npm install
+  - npm run build
   artifacts:
     paths:
     - public
