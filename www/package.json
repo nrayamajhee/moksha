@@ -30,9 +30,7 @@
     "wasm-webgl-chess": "file:../pkg"
   },
   "devDependencies": {
-    "copy-webpack-plugin": "^5.0.0",
-    "css-loader": "^3.0.0",
-    "style-loader": "^0.23.1",
+    "copy-webpack-plugin": "^5.0.3",
     "webpack": "^4.29.3",
     "webpack-cli": "^3.1.0",
     "webpack-dev-server": "^3.1.5"

@@ -7,16 +7,8 @@ module.exports = {
     path: path.resolve(__dirname, "dist"),
     filename: "bootstrap.js",
   },
-  module: {
-    rules: [
-      {
-        test: /\.css$/,
-        use: [{ loader: 'style-loader' }, { loader: 'css-loader' }],
-      },
-    ],
-  },
   mode: "development",
   plugins: [
-    new CopyWebpackPlugin(['index.html'])
+    new CopyWebpackPlugin(['index.html', {from: '../src/assets/img', to:'assets/img'}, {from: '../src/style.css', to:'.'}])
   ],
 };
