@@ -4,9 +4,13 @@ use js_sys::{Float32Array, Uint16Array, Uint8Array};
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::JsValue;
-use web_sys::{HtmlImageElement, WebGlProgram, WebGlRenderingContext as GL, WebGlShader, WebGlTexture};
+use web_sys::{
+    HtmlImageElement, WebGl2RenderingContext as GL, WebGlProgram, WebGlShader, WebGlTexture,
+};
 
-#[derive(Copy, Clone, Debug)]
+use strum_macros::{Display, EnumIter};
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Display, EnumIter)]
 pub enum ShaderType {
     Color,
     VertexColor,
@@ -20,120 +24,126 @@ pub fn create_program(gl: &GL, vertex: &str, fragment: &str) -> Result<WebGlProg
     Ok(program)
 }
 
-pub fn color_program(gl: &GL) -> Result<WebGlProgram, String> {
+pub fn create_color_program(gl: &GL) -> Result<WebGlProgram, String> {
     let shader = create_program(
         gl,
-        r#"
-            attribute vec4 position;
-			attribute vec3  normal;
+        r#" #version 300 es
+            in vec4 position;
+			in vec3  normal;
 
             uniform mat4 model, view, proj, normalMatrix;
-            uniform lowp vec4 color;
+            uniform vec4 color;
 
-			varying lowp vec3 lighting;
-            varying lowp vec4 f_color;
+			out vec3 lighting;
+            out vec4 f_color;
 
             void main() {
                 gl_Position = proj * view * model * position;
                 f_color = color;
 
-				highp vec3 ambientLight = vec3(0.1, 0.1, 0.1);
-				highp vec3 directionalLightColor = vec3(1, 1, 1);
-				highp vec3 directionalVector = normalize(vec3(5.0, 5.0, 0.0));
+				vec3 ambientLight = vec3(0.1, 0.1, 0.1);
+				vec3 directionalLightColor = vec3(1, 1, 1);
+				vec3 directionalVector = normalize(vec3(5.0, 5.0, 0.0));
 
-				highp vec4 transformedNormal = normalMatrix * vec4(normal, 1.0);
+				vec4 transformedNormal = normalMatrix * vec4(normal, 1.0);
 
-				highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
-				lighting = ambientLight + (directionalLightColor * directional);
+				float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
+				lighting = ambientLight + directionalLightColor * directional;
             }
         "#,
-        r#"
-			varying lowp vec3 lighting;
-            varying lowp vec4 f_color;
+        r#" #version 300 es
+            precision mediump float;
+			in vec3 lighting;
+            in vec4 f_color;
+            out vec4 outputColor;
 
             void main() {
-				gl_FragColor = vec4(f_color.xyz * lighting, 1.0);
+				outputColor = vec4(f_color.xyz * lighting, 1.0);
             }
         "#,
     )?;
     Ok(shader)
 }
 
-pub fn vertex_color_program(gl: &GL) -> Result<WebGlProgram, String> {
+pub fn create_vertex_color_program(gl: &GL) -> Result<WebGlProgram, String> {
     let shader = create_program(
         gl,
-        r#"
-            attribute vec4 position;
-			attribute vec3  normal;
-            attribute vec4 color;
+        r#" #version 300 es
+            in vec4 position;
+			in vec3  normal;
+            in vec4 color;
 
             uniform mat4 model, view, proj, normalMatrix;
 
-            varying lowp vec4 f_color;
-			varying lowp vec3 lighting;
+            out vec4 f_color;
+			out vec3 lighting;
 
             void main() {
                 gl_Position = proj * view * model * position;
                 f_color = color;
 
-				highp vec3 ambientLight = vec3(0.1, 0.1, 0.1);
-				highp vec3 directionalLightColor = vec3(1, 1, 1);
-				highp vec3 directionalVector = normalize(vec3(5.0, 5.0, 0.0));
+				vec3 ambientLight = vec3(0.1, 0.1, 0.1);
+				vec3 directionalLightColor = vec3(1, 1, 1);
+				vec3 directionalVector = normalize(vec3(5.0, 5.0, 0.0));
 
-				highp vec4 transformedNormal = normalMatrix * vec4(normal, 1.0);
+				vec4 transformedNormal = normalMatrix * vec4(normal, 1.0);
 
-				highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
-				lighting = ambientLight + (directionalLightColor * directional);
+				float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
+				lighting = ambientLight + directionalLightColor * directional;
             }
         "#,
-        r#"
-            varying lowp vec4 f_color;
-			varying lowp vec3 lighting;
+        r#" #version 300 es
+            precision mediump float;
+            in vec4 f_color;
+			in vec3 lighting;
+            out vec4 outputColor;
 
             void main() {
-				gl_FragColor =vec4(f_color.xyz * lighting, 1.0);
+				outputColor =vec4(f_color.xyz * lighting, 1.0);
             }
         "#,
     )?;
     Ok(shader)
 }
 
-pub fn texture_program(gl: &GL) -> Result<WebGlProgram, String> {
+pub fn create_texture_program(gl: &GL) -> Result<WebGlProgram, String> {
     let shader = create_program(
         gl,
-        r#"
-            attribute vec4 position;
-			attribute vec3 normal;
-            attribute vec2 texCoord;
+        r#" #version 300 es
+            in vec4 position;
+			in vec3 normal;
+            in vec2 texCoord;
 
             uniform mat4 model, view, proj, normalMatrix;
 
-            varying lowp vec2 f_texCoord;
-			varying lowp vec3 lighting;
+            out vec2 f_texCoord;
+			out vec3 lighting;
 
             void main() {
                 gl_Position = proj * view * model * position;
                 f_texCoord = texCoord;
 
-				highp vec3 ambientLight = vec3(0.1, 0.1, 0.1);
-				highp vec3 directionalLightColor = vec3(1, 1, 1);
-				highp vec3 directionalVector = normalize(vec3(5.0, 5.0, 0.0));
+				vec3 ambientLight = vec3(0.1, 0.1, 0.1);
+				vec3 directionalLightColor = vec3(1, 1, 1);
+				vec3 directionalVector = normalize(vec3(5.0, 5.0, 0.0));
 
-				highp vec4 transformedNormal = normalMatrix * vec4(normal, 1.0);
+				vec4 transformedNormal = normalMatrix * vec4(normal, 1.0);
 
-				highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
-				lighting = ambientLight + (directionalLightColor * directional);
+				float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
+				lighting = ambientLight + directionalLightColor * directional;
             }
         "#,
-        r#"
-            varying lowp vec2 f_texCoord;
-			varying lowp vec3 lighting;
+        r#" #version 300 es
+            precision mediump float;
+            in vec2 f_texCoord;
+			in vec3 lighting;
 
 			uniform sampler2D sampler;
+            out vec4 outputColor;
 
             void main() {
-				highp vec4 texelColor = texture2D(sampler, f_texCoord);
-				gl_FragColor = vec4(texelColor.rgb * lighting, texelColor.a);
+				vec4 texelColor = texture(sampler, f_texCoord);
+				outputColor = vec4(texelColor.rgb * lighting, texelColor.a);
             }
         "#,
     )?;
@@ -227,7 +237,7 @@ pub fn bind_texture(gl: &GL, url: &str) -> Result<(), JsValue> {
     add_event(&img.borrow(), "load", move |_| {
         let image = a_img.borrow();
         gl.bind_texture(GL::TEXTURE_2D, Some(&texture));
-        gl.tex_image_2d_with_u32_and_u32_and_image(
+        gl.tex_image_2d_with_u32_and_u32_and_html_image_element(
             GL::TEXTURE_2D,
             0,
             GL::RGBA as i32,
@@ -248,16 +258,25 @@ pub fn bind_texture(gl: &GL, url: &str) -> Result<(), JsValue> {
     img.borrow_mut().set_src(url);
     Ok(())
 }
-
-pub fn bind_matrix(gl: &GL, program: &WebGlProgram, attribute: &str, matrix: &Matrix4<f32>) {
+pub fn bind_uniform_mat4(gl: &GL, program: &WebGlProgram, attribute: &str, matrix: &Matrix4<f32>) {
     let mat: &[f32; 16] = matrix.as_ref();
     let mat_attrib = gl
         .get_uniform_location(program, attribute)
         .expect(format!("Can't bind uniform: {}", attribute).as_str());
     gl.uniform_matrix4fv_with_f32_array(Some(&mat_attrib), false, mat);
 }
-
-pub fn bind_vector(gl: &GL, program: &WebGlProgram, attribute: &str, vector: &[f32]) {
+pub fn bind_buffer_and_attribute(
+    gl: &GL,
+    program: &WebGlProgram,
+    attribute: &str,
+    data: &[f32],
+    size: i32,
+) -> Result<(), JsValue> {
+    bind_buffer_f32(gl, data)?;
+    bind_attribute(gl, program, attribute, size);
+    Ok(())
+}
+pub fn bind_uniform_vec4(gl: &GL, program: &WebGlProgram, attribute: &str, vector: &[f32]) {
     let mat_attrib = gl
         .get_uniform_location(program, attribute)
         .expect(format!("Can't bind uniform: {}", attribute).as_str());
@@ -269,7 +288,6 @@ pub fn bind_vector(gl: &GL, program: &WebGlProgram, attribute: &str, vector: &[f
         vector[3],
     );
 }
-
 pub fn bind_buffer_f32(gl: &GL, data: &[f32]) -> Result<(), JsValue> {
     let buffer = gl.create_buffer().ok_or("failed to create buffer")?;
     gl.bind_buffer(GL::ARRAY_BUFFER, Some(&buffer));
@@ -289,8 +307,7 @@ pub fn bind_attribute(gl: &GL, program: &WebGlProgram, name: &str, size: i32) {
     gl.vertex_attrib_pointer_with_i32(attribute as u32, size, GL::FLOAT, false, 0, 0);
     gl.enable_vertex_attrib_array(attribute as u32);
 }
-
-pub fn bind_uniform_1i(gl: &GL, program: &WebGlProgram, name: &str, value: i32) {
+pub fn bind_uniform_i32(gl: &GL, program: &WebGlProgram, name: &str, value: i32) {
     let attrib = gl
         .get_uniform_location(program, name)
         .expect(format!("Can't bind uniform: {}", name).as_str());

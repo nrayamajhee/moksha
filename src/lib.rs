@@ -7,8 +7,8 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 use cgmath::{
     perspective, Decomposed, Deg, InnerSpace, Matrix4, Quaternion, Rad, Rotation3, Vector3,
 };
-pub use genmesh::{
-    generators::{Cube, IcoSphere, IndexedPolygon, SharedVertex},
+use genmesh::{
+    generators::{Cone, Cube, Cylinder, IcoSphere, IndexedPolygon, SharedVertex, SphereUv, Torus},
     Triangulate, Vertex as GenVertex,
 };
 use maud::html;
@@ -23,8 +23,8 @@ use dom_factory::{add_event, body, document, request_animation_frame, window};
 
 macro_rules! log {
     ( $( $t:tt )* ) => {
-        use web_sys::console;
         use crate::dom_factory::document;
+        use web_sys::console;
         use wasm_bindgen::JsValue;
 		let document = document();
 		let console_el = document.get_element_by_id("console");
@@ -50,8 +50,13 @@ macro_rules! log {
     }
 }
 
+pub mod controller;
+pub mod mesh;
 pub mod renderer;
-pub use renderer::{Viewport, Config, Renderer, ShaderType, Geometry, Material};
+
+use controller::Viewport;
+use mesh::{Geometry, Material, Object, Storage, Mesh};
+use renderer::{Renderer, ShaderType};
 
 pub fn toggle_console(show: bool) {
     let console_el = document().get_element_by_id("console");
@@ -82,14 +87,12 @@ pub fn start() -> Result<(), JsValue> {
     document().set_title("Webshell | Rayamajhee");
     body().set_inner_html(dom.into_string().as_str());
 
-    let mut renderer = Renderer::new(Config {
+    let mut renderer = Renderer::new(renderer::Config {
         selector: "#gl-canvas",
         pixel_ratio: 1.,
-    })
-    .expect("Can't create a webgl renderer! Make sure your browser supports it!");
+    });
 
     let cube_geometry = Geometry::from_genmesh(&Cube::new());
-    let sphere_geometry = Geometry::from_genmesh(&IcoSphere::subdivide(2));
 
     let mut colors = Vec::new();
     let face_colors = vec![
@@ -116,63 +119,104 @@ pub fn start() -> Result<(), JsValue> {
         0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Left
         0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
     ];
-    
-    // let cube_material = Material::from_image_texture(renderer.get_context(), "/assets/img/box_tex.png", tex_coords)?;
-    let cube_material = Material::color(renderer.get_context(), [1.0,1.0,0.0,1.0]);
 
-    let mut r = 0.;
-    let mut axis = Vector3::new(0.0, 1.0, 0.0);
-    let mut transform: Decomposed<Vector3<f32>, Quaternion<f32>> = Decomposed {
-        scale: 1.0,
-        rot: Quaternion::from_axis_angle(axis, Rad::from(Deg(r))),
-        disp: [-1.0, 0.0, 0.0].into(),
-    };
-    let model = Matrix4::from(transform);
+    let cube_tex = Material::from_image_texture(
+        renderer.get_context(),
+        "/assets/img/box_tex.png",
+        tex_coords,
+    )?;
+
+
+    let mesh_storage = Storage::new();
+    let ms = Rc::new(RefCell::new(mesh_storage));
+
+    let cube = Object::new(ms.clone(), cube_geometry.clone(), cube_tex);
+    cube.set_position([-2.0, 0.0, 0.0]);
+    
+    let cube2 = Object::new(ms.clone(), cube_geometry.clone(), Material::vertex_colors(colors));
+    cube2.set_position([2.0, 0.0, 0.0]);
+
+
+    let sphere = Object::new(
+        ms.clone(),
+        Geometry::from_genmesh(&IcoSphere::subdivide(3)),
+        Material::single_color([1.0, 0.0, 0.0, 1.0]),
+    );
+    sphere.set_position([0.0, 0.0, 5.0]);
+    sphere.set_scale(2.0);
+
+    let cone = Object::new(
+        ms.clone(),
+        Geometry::from_genmesh(&Cone::new(8)),
+        Material::single_color([1.0, 1.0, 0.0, 1.0]),
+    );
+    cone.set_position([0.0, 0.0, -5.0]);
+
+    let cylinder = Object::new(
+        ms.clone(),
+        Geometry::from_genmesh(&Cylinder::subdivide(8, 2)),
+        Material::single_color([1.0, 0.0, 1.0, 1.0]),
+    );
+    cylinder.set_position([0.0, 0.0, -10.0]);
+
+    let uv_sphere = Object::new(
+        ms.clone(),
+        Geometry::from_genmesh(&SphereUv::new(8, 16)),
+        Material::single_color([0.0, 1.0, 1.0, 1.0]),
+    );
+    uv_sphere.set_position([5.0, 0.0, 0.0]);
+
+    let torus = Object::new(
+        ms.clone(),
+        Geometry::from_genmesh(&Torus::new(2., 0.5, 8 , 8)),
+        Material::single_color([0.0, 1.0, 1.0, 0.0]),
+    );
+    torus.set_position([-10.0, 0.0, 0.0]);
+
 
     let proj = perspective(Rad::from(Deg(60.)), renderer.aspect_ratio(), 0.1, 100.);
     let view = Matrix4::look_at(
-        [0.0, 3.0, 3.0].into(),
+        [10.0, 10.0, 12.0].into(),
         [0.0, 0.0, 0.0].into(),
         Vector3::unit_y(),
     );
-    let viewport = Viewport {
-        proj,
-        view,
-    };
-    renderer.bind_geometry(&cube_geometry)?;
-    renderer.bind_material(&cube_material)?;
-    renderer.update_transform(&model);
-    renderer.update_viewport(&viewport);
-    renderer.prepare_renderer();
+    let viewport = Viewport { proj, view };
+    {
+        let ms = ms.clone();
+        let storage = ms.borrow();
+        renderer.setup_renderer(&storage);
+        renderer.update_viewport(&viewport);
+    }
 
+    let window = window();
     let a_rndr = Rc::new(RefCell::new(renderer));
     let b_rndr = a_rndr.clone();
+    let a_ms = ms.clone();
+    let a_view = Rc::new(RefCell::new(viewport));
+    let b_view = a_view.clone();
+    let a_cube = Rc::new(RefCell::new(cube2));
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
+
+    let mut r = 0.;
+    let mut axis: Vector3<f32> = Vector3::unit_y();
+
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
         let mut renderer = a_rndr.borrow_mut();
         r = (r + 1.) % 360.;
-        axis.x = axis.x + 1.;
-        axis.y = axis.y + 2.;
-        transform.rot = Quaternion::from_axis_angle(axis.normalize(), Rad::from(Deg(r)));
-        let model = Matrix4::from(transform);
-        // let buffers = a_buff.borrow();
-        // let uniforms = a_unifs.borrow();
-        // for (buffer, uniform) in buffers.iter().zip(uniforms.iter()) {
-            // renderer
-            //     .bind_buffers(buffer, uniform, "/assets/img/box_tex.png")
-            //     .expect("Couldn't setup renderer");
-            renderer
-                .update_transform(&model);
-            renderer.render().expect("Couldn't render!");
-        // }
+        axis.x += 1.;
+        axis.y += 2.;
+        let cube = a_cube.borrow_mut();
+        cube.set_rotation(Quaternion::from_axis_angle(axis.normalize(), Rad::from(Deg(r))));
+        renderer.render(&a_ms.borrow());
+        renderer.update_viewport(&a_view.borrow());
         request_animation_frame(f.borrow().as_ref().unwrap());
     }) as Box<dyn FnMut()>));
     request_animation_frame(g.borrow().as_ref().unwrap());
-    let window = window();
     add_event(&window, "resize", move |_| {
         let mut renderer = b_rndr.borrow_mut();
-        renderer.resize();
+        let mut viewport = b_view.borrow_mut();
+        renderer.resize(&mut viewport);
     });
     add_event(
         &document().get_element_by_id("close-console").unwrap(),
@@ -197,39 +241,3 @@ pub fn start() -> Result<(), JsValue> {
     });
     Ok(())
 }
-
-    // let buffer = BufferObject {
-    //     shader_type: ShaderType::Texture,
-    //     vertices,
-    //     indices,
-    //     normals,
-    //     color: Some([1.0, 0.0, 0.0, 1.0]),
-    //     vertex_colors: Some(colors),
-    //     tex_coords: Some(tex_coord),
-    // };
-    // let mut transform: Decomposed<Vector3<f32>, Quaternion<f32>> = Decomposed {
-    //     scale: 1.0,
-    //     rot: Quaternion::from_axis_angle(axis, Rad::from(Deg(r))),
-    //     disp: [1.0, 0.0, 0.0].into(),
-    // };
-    // let model = Matrix4::from(transform);
-    // let uniforms2 = UniformObject { model, view, proj };
-    // let buffer2 = BufferObject {
-    //     shader_type: ShaderType::Color,
-    //     vertices,
-    //     indices,
-    //     normals,
-    //     color: Some([1.0, 0.0, 0.0, 1.0]),
-    //     vertex_colors: None,
-    //     tex_coords: None,
-    // };
-    // let buffers = vec![buffer];
-    // let uniforms = vec![uniforms];
-    // // let buffers = vec![buffer, buffer2];
-    // // let uniforms = vec![uniforms, uniforms2];
-
-    // let buff = Rc::new(RefCell::new(buffers));
-    // let unifs = Rc::new(RefCell::new(uniforms));
-    // let a_buff = buff.clone();
-    // let a_unifs = unifs.clone();
-    // let b_unifs = unifs.clone();
