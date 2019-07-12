@@ -1,6 +1,6 @@
 use crate::dom_factory::add_event;
-use cgmath::Matrix4;
 use js_sys::{Float32Array, Uint16Array, Uint8Array};
+use nalgebra::Matrix4;
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::JsValue;
@@ -12,6 +12,7 @@ use strum_macros::{Display, EnumIter};
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Display, EnumIter)]
 pub enum ShaderType {
+    Simple,
     Color,
     VertexColor,
     Texture,
@@ -22,6 +23,35 @@ pub fn create_program(gl: &GL, vertex: &str, fragment: &str) -> Result<WebGlProg
     let frag_shader = compile_shader(gl, GL::FRAGMENT_SHADER, fragment)?;
     let program = link_program(gl, &vert_shader, &frag_shader, true)?;
     Ok(program)
+}
+
+pub fn create_simple_program(gl: &GL) -> Result<WebGlProgram, String> {
+    let shader = create_program(
+        gl,
+        r#" #version 300 es
+            in vec4 position;
+
+            uniform mat4 model, view, proj;
+            uniform vec4 color;
+
+            out vec4 f_color;
+
+            void main() {
+                gl_Position = proj * view * model * position;
+                f_color = color;
+            }
+        "#,
+        r#" #version 300 es
+            precision mediump float;
+            in vec4 f_color;
+            out vec4 outputColor;
+
+            void main() {
+				outputColor = f_color;
+            }
+        "#,
+    )?;
+    Ok(shader)
 }
 
 pub fn create_color_program(gl: &GL) -> Result<WebGlProgram, String> {
@@ -259,11 +289,11 @@ pub fn bind_texture(gl: &GL, url: &str) -> Result<(), JsValue> {
     Ok(())
 }
 pub fn bind_uniform_mat4(gl: &GL, program: &WebGlProgram, attribute: &str, matrix: &Matrix4<f32>) {
-    let mat: &[f32; 16] = matrix.as_ref();
+    let mat = matrix.as_slice();
     let mat_attrib = gl
         .get_uniform_location(program, attribute)
         .expect(format!("Can't bind uniform: {}", attribute).as_str());
-    gl.uniform_matrix4fv_with_f32_array(Some(&mat_attrib), false, mat);
+    gl.uniform_matrix4fv_with_f32_array(Some(&mat_attrib), false, &mat);
 }
 pub fn bind_buffer_and_attribute(
     gl: &GL,

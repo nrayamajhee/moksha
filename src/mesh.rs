@@ -1,61 +1,100 @@
-use crate::renderer::{bind_texture, ShaderType};
-use cgmath::{Decomposed, One, Quaternion, Vector3, Zero};
+use crate::renderer::{bind_texture, DrawMode, ShaderType};
 use genmesh::{
     generators::{IndexedPolygon, SharedVertex},
     EmitTriangles, Triangulate, Vertex,
 };
+use nalgebra::{Similarity3, UnitQuaternion, Vector3, one, zero};
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
-use strum::IntoEnumIterator;
 use wasm_bindgen::JsValue;
 use web_sys::WebGl2RenderingContext as GL;
 
-type Transform = Decomposed<Vector3<f32>, Quaternion<f32>>;
+pub type Transform = Similarity3<f32>;
 
-pub struct Object {
-    shader_type: ShaderType,
+pub struct Node {
     index: usize,
     storage: Rc<RefCell<Storage>>,
+    children: Option<Vec<Node>>,
 }
 
-impl Object {
-    pub fn new_with_transform(
-        storage: Rc<RefCell<Storage>>,
-        mesh: Mesh,
-        transform: Transform,
-    ) -> Self {
-        let storage = storage.clone();
-        let mut mesh_storage = storage.borrow_mut();
-        let (shader_type, index) = mesh_storage.add(mesh, transform);
-        Self {
-            shader_type,
-            index,
-            storage: storage.clone(),
-        }
-    }
-    pub fn new(storage: Rc<RefCell<Storage>>, geometry: Geometry, material: Material) -> Self {
-        let transform: Decomposed<Vector3<f32>, Quaternion<f32>> = Decomposed {
-            disp: Vector3::zero(),
-            rot: Quaternion::one(),
-            scale: 1.0,
-        };
-        Self::new_with_transform(storage, Mesh { geometry, material }, transform)
-    }
+impl Node {
     pub fn set_position(&self, pos: [f32; 3]) {
         let mut storage = self.storage.borrow_mut();
-        let transform = storage.get_mut_transform(self.shader_type, self.index);
-        transform.disp = Vector3::from(pos);
+        let transform = storage.get_mut_transform(self.index);
+        transform.isometry.translation.vector = Vector3::new(pos[0], -pos[1], pos[2]);
     }
-    pub fn set_rotation(&self, rot: Quaternion<f32>) {
+    pub fn rotate(&self, rot: UnitQuaternion<f32>) {
         let mut storage = self.storage.borrow_mut();
-        let transform = storage.get_mut_transform(self.shader_type, self.index);
-        transform.rot = rot;
+        let transform = storage.get_mut_transform(self.index);
+        transform.append_rotation_mut(&rot);
+    }
+    pub fn get_position(&self) -> Vector3<f32> {
+        let mut storage = self.storage.borrow_mut();
+        let transform = storage.get_mut_transform(self.index);
+        transform.isometry.translation.vector
+    }
+    pub fn rotation(&self) -> UnitQuaternion<f32> {
+        let mut storage = self.storage.borrow_mut();
+        let transform = storage.get_mut_transform(self.index);
+        transform.isometry.rotation
     }
     pub fn set_scale(&self, scale: f32) {
         let mut storage = self.storage.borrow_mut();
-        let transform = storage.get_mut_transform(self.shader_type, self.index);
-        transform.scale = scale;
+        let transform = storage.get_mut_transform(self.index);
+        transform.set_scaling(1. / scale);
+    }
+    pub fn scale(&self) -> f32 {
+        let mut storage = self.storage.borrow_mut();
+        let transform = storage.get_mut_transform(self.index);
+        transform.scaling()
+    }
+}
+
+pub struct Scene {
+    root: Node,
+}
+
+impl Scene {
+    pub fn new() -> Self {
+        let storage = Rc::new(RefCell::new(Storage::new()));
+        Self {
+            root: Self::object_default(storage.clone()),
+        }
+    }
+    pub fn get_storage(&self) -> Rc<RefCell<Storage>> {
+        self.root.storage.clone()
+    }
+    pub fn add(&self, node: &Node) {
+        self.add_with_mode(node, DrawMode::Triangle);
+    }
+    pub fn add_with_mode(&self, node: &Node, mode: DrawMode) {
+        let storage = self.get_storage();
+        let mut storage = storage.borrow_mut();
+        let info = storage.get_mut_info(node.index);
+        info.draw_mode = mode;
+    }
+    fn object_default(storage: Rc<RefCell<Storage>>) -> Node {
+        Self::object(storage, None, one())
+    }
+    pub fn object(storage: Rc<RefCell<Storage>>, mesh: Option<Mesh>, transform: Transform) -> Node {
+        let sto = storage.clone();
+        let mut a_storage = sto.borrow_mut();
+        let index = a_storage.add(mesh, transform, "node");
+        Node {
+            index,
+            storage,
+            children: None,
+        }
+    }
+    pub fn empty(&self) -> Node {
+        Self::object_default(self.get_storage())
+    }
+    pub fn object_from_mesh(&self, geometry: Geometry, material: Material) -> Node {
+        Self::object(
+            self.get_storage(),
+            Some(Mesh { geometry, material }),
+            one(),
+        )
     }
 }
 
@@ -65,60 +104,53 @@ pub struct Mesh {
     pub material: Material,
 }
 
+#[derive(Debug, Clone)]
+pub struct ObjectInfo {
+    pub name: String,
+    pub draw_mode: DrawMode,
+}
+
 #[derive(Debug)]
 pub struct Storage {
-    meshes: HashMap<ShaderType, Vec<Mesh>>,
-    transforms: HashMap<ShaderType, Vec<Transform>>,
+    info: Vec<ObjectInfo>,
+    meshes: Vec<Option<Mesh>>,
+    transforms: Vec<Transform>,
 }
 
 impl Storage {
     pub fn new() -> Self {
         Self {
-            meshes: HashMap::new(),
-            transforms: HashMap::new(),
+            info: Vec::new(),
+            meshes: Vec::new(),
+            transforms: Vec::new(),
         }
     }
-    pub fn add(&mut self, mesh: Mesh, transform: Transform) -> (ShaderType, usize) {
-        let mut index = 0;
-        let shader_type = mesh.material.shader_type;
-        if let Some(meshes) = self.meshes.get_mut(&shader_type) {
-            index = meshes.len();
-            meshes.push(mesh);
-        } else {
-            self.meshes.insert(shader_type, vec![mesh]);
-        }
-        if let Some(transforms) = self.transforms.get_mut(&shader_type) {
-            transforms.push(transform);
-        } else {
-            self.transforms.insert(shader_type, vec![transform]);
-        }
-        (shader_type, index)
+    pub fn add(&mut self, mesh: Option<Mesh>, transform: Transform, name: &str) -> usize {
+        let index = self.meshes.len();
+        self.meshes.push(mesh);
+        self.transforms.push(transform);
+        self.info.push(ObjectInfo {
+            name: String::from(name),
+            draw_mode: DrawMode::None,
+        });
+        index
     }
-    pub fn get_mut_transform(&mut self, shader_type: ShaderType, indx: usize) -> &mut Transform {
-        let target = self
-            .transforms
-            .get_mut(&shader_type)
-            .expect("There is no transform storage for this mesh!");
-        let target = target
+    pub fn get_mut_transform(&mut self, indx: usize) -> &mut Transform {
+        self.transforms
             .get_mut(indx)
-            .expect(format!("No transform found at index: {}", indx).as_str());
-        target
+            .expect("No such transform found!")
     }
-    pub fn get_transform(&self, shader_type: ShaderType, indx: usize) -> Transform {
-        let target = self
-            .transforms
-            .get(&shader_type)
-            .expect("There is no transform storage for this mesh!");
-        let transform = target
-            .get(indx)
-            .expect(format!("No transform found at index: {}", indx).as_str());
-        *transform
+    pub fn get_transform(&self, indx: usize) -> Transform {
+        *self.transforms.get(indx).expect("No such transform found!")
     }
-    pub fn get_meshes(&self, shader_type: &ShaderType) -> Option<&Vec<Mesh>> {
-        self.meshes.get(&shader_type)
+    pub fn meshes(&self) -> &Vec<Option<Mesh>> {
+        &self.meshes
     }
-    pub fn get_transforms(&self, shader_type: &ShaderType) -> Option<&Vec<Transform>> {
-        self.transforms.get(&shader_type)
+    pub fn get_info(&self, indx: usize) -> ObjectInfo {
+        self.info.get(indx).expect("No node info found!").clone()
+    }
+    pub fn get_mut_info(&mut self, indx: usize) -> &mut ObjectInfo {
+        self.info.get_mut(indx).expect("No node info found!")
     }
 }
 
@@ -181,6 +213,14 @@ impl Material {
     pub fn single_color(color: [f32; 4]) -> Self {
         Self {
             shader_type: ShaderType::Color,
+            color: Some(color),
+            vertex_colors: None,
+            tex_coords: None,
+        }
+    }
+    pub fn single_color_no_shade(color: [f32; 4]) -> Self {
+        Self {
+            shader_type: ShaderType::Simple,
             color: Some(color),
             vertex_colors: None,
             tex_coords: None,

@@ -1,19 +1,28 @@
 use super::shader::{
-    bind_attribute, bind_buffer_and_attribute, bind_buffer_f32, bind_index_buffer,
-    bind_uniform_i32, bind_uniform_mat4, bind_uniform_vec4, create_color_program,
-    create_texture_program, create_vertex_color_program, ShaderType,
+    bind_buffer_and_attribute, bind_index_buffer, bind_uniform_i32, bind_uniform_mat4,
+    bind_uniform_vec4, create_color_program, create_simple_program, create_texture_program,
+    create_vertex_color_program, ShaderType,
 };
 use crate::dom_factory::{get_canvas, resize_canvas};
-use crate::{controller::Viewport, mesh::Storage};
-use cgmath::{prelude::*, Matrix4, SquareMatrix};
-use std::cell::RefCell;
+use crate::mesh::{Geometry, Material};
+use crate::{controller::Viewport, mesh::{Scene, Node}};
+use genmesh::generators::Plane;
+use nalgebra::UnitQuaternion;
 use std::collections::HashMap;
-use std::rc::Rc;
-use strum::IntoEnumIterator;
-use wasm_bindgen::{prelude::*, JsCast, JsValue};
+use std::f32::consts::PI;
+use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{
     HtmlCanvasElement, WebGl2RenderingContext as GL, WebGlProgram, WebGlVertexArrayObject,
 };
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum DrawMode {
+    Points,
+    Lines,
+    PointyLines,
+    Triangle,
+    None,
+}
 
 pub struct Config {
     pub selector: &'static str,
@@ -25,8 +34,8 @@ pub struct Renderer {
     canvas: HtmlCanvasElement,
     ctx: GL,
     aspect_ratio: f32,
+    vaos: Vec<Option<WebGlVertexArrayObject>>,
     shaders: HashMap<ShaderType, WebGlProgram>,
-    vaos: HashMap<ShaderType, Vec<WebGlVertexArrayObject>>,
     config: Config,
 }
 
@@ -34,41 +43,60 @@ impl Renderer {
     pub fn new(config: Config) -> Self {
         let mut canvas = get_canvas(config.selector);
         let aspect_ratio = resize_canvas(&mut canvas, config.pixel_ratio);
-        let ctx = canvas.get_context("webgl2").expect("Can't create webgl2 context. Make sure your browser supports WebGL2").unwrap().dyn_into::<GL>().unwrap();
+        let ctx = canvas
+            .get_context("webgl2")
+            .expect("Can't create webgl2 context. Make sure your browser supports WebGL2")
+            .unwrap()
+            .dyn_into::<GL>()
+            .unwrap();
 
         let mut shaders = HashMap::new();
-        shaders.insert(ShaderType::Color, create_color_program(&ctx).expect("Can't create color shader!"));
-        shaders.insert(ShaderType::VertexColor, create_vertex_color_program(&ctx).expect("Can't create vertex color shader!"));
-        shaders.insert(ShaderType::Texture, create_texture_program(&ctx).expect("can't create texture shader!"));
-        let vaos = HashMap::new();
+        shaders.insert(
+            ShaderType::Simple,
+            create_simple_program(&ctx).expect("Can't create color shader!"),
+        );
+        shaders.insert(
+            ShaderType::Color,
+            create_color_program(&ctx).expect("Can't create color shader!"),
+        );
+        shaders.insert(
+            ShaderType::VertexColor,
+            create_vertex_color_program(&ctx).expect("Can't create vertex color shader!"),
+        );
+        shaders.insert(
+            ShaderType::Texture,
+            create_texture_program(&ctx).expect("can't create texture shader!"),
+        );
         Self {
             canvas,
             ctx,
+            vaos: Vec::new(),
             aspect_ratio,
-            vaos,
             shaders,
             config,
         }
     }
-    pub fn setup_renderer(&mut self, storage: &Storage) {
-        for each_type in ShaderType::iter() {
-            if let Some(meshes) = storage.get_meshes(&each_type) {
+    pub fn setup_renderer(&mut self, scene: &Scene) {
+        let storage = scene.get_storage();
+        let storage = storage.borrow();
+        for mesh in storage.meshes() {
+            if let Some(mesh) = mesh {
                 let program = self
                     .shaders
-                    .get(&each_type)
+                    .get(&mesh.material.shader_type)
                     .expect("Can't find the program!");
-                let mut vaos = Vec::new();
-                for mesh in meshes {
-                    let vao = self.ctx.create_vertex_array().expect("Can't creat VAO");
-                    self.ctx.bind_vertex_array(Some(&vao));
-                    bind_buffer_and_attribute(
-                        &self.ctx,
-                        &program,
-                        "position",
-                        &mesh.geometry.vertices,
-                        3,
-                    )
-                    .expect("Can't bind postion");
+                let shader_type = mesh.material.shader_type;
+                let vao = self.ctx.create_vertex_array().expect("Can't creat VAO");
+                self.ctx.bind_vertex_array(Some(&vao));
+                bind_buffer_and_attribute(
+                    &self.ctx,
+                    &program,
+                    "position",
+                    &mesh.geometry.vertices,
+                    3,
+                )
+                .expect("Can't bind postion");
+                if shader_type != ShaderType::Simple {
                     bind_buffer_and_attribute(
                         &self.ctx,
                         &program,
@@ -77,36 +105,38 @@ impl Renderer {
                         3,
                     )
                     .expect("Can't bind normals");
-                    if mesh.material.shader_type == ShaderType::VertexColor {
-                        bind_buffer_and_attribute(
-                            &self.ctx,
-                            &program,
-                            "color",
-                            mesh.material
-                                .vertex_colors
-                                .as_ref()
-                                .expect("Expected vertex color, found nothing!"),
-                            4,
-                        )
-                        .expect("Couldn't bind vertex colors.");
-                    } else if mesh.material.shader_type == ShaderType::Texture {
-                        bind_buffer_and_attribute(
-                            &self.ctx,
-                            &program,
-                            "texCoord",
-                            mesh.material
-                                .tex_coords
-                                .as_ref()
-                                .expect("Expected texture coordinates, found nothing!"),
-                            2,
-                        )
-                        .expect("Couldn't bind tex coordinates");
-                    }
-                    self.ctx.bind_vertex_array(None);
-                    self.ctx.bind_buffer(GL::ARRAY_BUFFER, None);
-                    vaos.push(vao);
                 }
-                self.vaos.insert(each_type, vaos);
+                if shader_type == ShaderType::VertexColor {
+                    bind_buffer_and_attribute(
+                        &self.ctx,
+                        &program,
+                        "color",
+                        mesh.material
+                            .vertex_colors
+                            .as_ref()
+                            .expect("Expected vertex color, found nothing!"),
+                        4,
+                    )
+                    .expect("Couldn't bind vertex colors.");
+                } else if shader_type == ShaderType::Texture {
+                    bind_buffer_and_attribute(
+                        &self.ctx,
+                        &program,
+                        "texCoord",
+                        mesh.material
+                            .tex_coords
+                            .as_ref()
+                            .expect("Expected texture coordinates, found nothing!"),
+                        2,
+                    )
+                    .expect("Couldn't bind tex coordinates");
+                }
+                self.ctx.bind_vertex_array(None);
+                self.ctx.bind_buffer(GL::ARRAY_BUFFER, None);
+                self.vaos.push(Some(vao));
+            } else {
+                self.vaos.push(None);
+                continue;
             }
         }
         self.ctx.clear_color(0.0, 0.0, 0.0, 1.0);
@@ -117,65 +147,87 @@ impl Renderer {
         self.ctx.cull_face(GL::BACK);
         self.ctx.enable(GL::CULL_FACE);
     }
-    pub fn render(&self, storage: &Storage) {
+    pub fn render(&self, scene: &Scene) {
         self.ctx.clear(GL::COLOR_BUFFER_BIT | GL::DEPTH_BUFFER_BIT);
-        for each_type in ShaderType::iter() {
-            let program = self.shaders.get(&each_type).unwrap();
-            self.ctx.use_program(Some(&program));
-            if let Some(meshes) = storage.get_meshes(&each_type) {
-                let transforms = storage.get_transforms(&each_type).unwrap();
-                let vaos = self.vaos.get(&each_type).expect("No vao found!");
-                for (i, mesh) in meshes.iter().enumerate() {
-                    let vao = &vaos[i];
-                    self.ctx.bind_vertex_array(Some(&vao));
-                    if each_type == ShaderType::Color {
-                        bind_uniform_vec4(
-                            &self.ctx,
-                            program,
-                            "color",
-                            &mesh
-                                .material
-                                .color
-                                .expect("Can't render a color materaial without a color!"),
-                        );
-                    } else if each_type == ShaderType::Texture {
-                        self.ctx.active_texture(GL::TEXTURE0);
-                        bind_uniform_i32(&self.ctx, program, "sampler", 0);
-                    }
-                    let model = Matrix4::from(transforms[i]);
-                    bind_uniform_mat4(&self.ctx, program, "model", &model);
-                    let normal_matrix = model.invert().unwrap().transpose();
-                    bind_uniform_mat4(&self.ctx, program, "normalMatrix", &normal_matrix);
-                    let indices = &mesh.geometry.indices;
-                    bind_index_buffer(&self.ctx, &indices).expect("Can't bind index buffer!");
-                    self.ctx.draw_elements_with_i32(
-                        GL::TRIANGLES,
-                        indices.len() as i32,
-                        GL::UNSIGNED_SHORT,
-                        0,
-                    );
-                    self.ctx.bind_vertex_array(None);
-                    self.ctx.bind_buffer(GL::ARRAY_BUFFER, None);
-                    self.ctx.bind_buffer(GL::ELEMENT_ARRAY_BUFFER, None);
+        let storage = scene.get_storage();
+        let storage = storage.borrow();
+        let meshes = storage.meshes();
+        for (i, mesh) in meshes.iter().enumerate() {
+            if let Some(mesh) = mesh {
+                let draw_mode = storage.get_info(i).draw_mode;
+                if draw_mode == DrawMode::None {
+                    continue;
                 }
-            } else {
-                continue;
+                let shader_type = mesh.material.shader_type;
+                let program = self.shaders.get(&shader_type).unwrap();
+                self.ctx.use_program(Some(&program));
+                let vao = self.vaos[i].as_ref().unwrap();
+                self.ctx.bind_vertex_array(Some(vao));
+                if shader_type == ShaderType::Color || shader_type == ShaderType::Simple {
+                    bind_uniform_vec4(
+                        &self.ctx,
+                        program,
+                        "color",
+                        &mesh
+                            .material
+                            .color
+                            .expect("Can't render a color materaial without a color!"),
+                    );
+                } else if shader_type == ShaderType::Texture {
+                    self.ctx.active_texture(GL::TEXTURE0);
+                    bind_uniform_i32(&self.ctx, program, "sampler", 0);
+                }
+                let transform = storage.get_transform(i);
+                let model = transform.inverse().to_homogeneous();
+                bind_uniform_mat4(&self.ctx, program, "model", &model);
+                let normal_matrix = model.transpose();
+                if shader_type != ShaderType::Simple {
+                    bind_uniform_mat4(
+                        &self.ctx,
+                        program,
+                        "normalMatrix",
+                        &normal_matrix,
+                    );
+                }
+                let indices = &mesh.geometry.indices;
+                bind_index_buffer(&self.ctx, &indices).expect("Can't bind index buffer!");
+                match draw_mode {
+                    DrawMode::Triangle => {
+                        self.ctx.draw_elements_with_i32(
+                            GL::TRIANGLES,
+                            indices.len() as i32,
+                            GL::UNSIGNED_SHORT,
+                            0,
+                        );
+                    }
+                    DrawMode::Lines => {
+                        self.ctx.draw_elements_with_i32(
+                            GL::LINES,
+                            indices.len() as i32,
+                            GL::UNSIGNED_SHORT,
+                            0,
+                        );
+                    }
+                    _ => (),
+                }
+                self.ctx.bind_vertex_array(None);
+                self.ctx.bind_buffer(GL::ARRAY_BUFFER, None);
+                self.ctx.bind_buffer(GL::ELEMENT_ARRAY_BUFFER, None);
+                self.ctx.use_program(None);
             }
-            self.ctx.use_program(None);
         }
     }
     pub fn update_viewport(&mut self, viewport: &Viewport) {
         for (_, program) in &self.shaders {
             self.ctx.use_program(Some(&program));
-            bind_uniform_mat4(&self.ctx, &program, "view", &viewport.view);
-            bind_uniform_mat4(&self.ctx, &program, "proj", &viewport.proj);
+            bind_uniform_mat4(&self.ctx, &program, "view", &viewport.view());
+            bind_uniform_mat4(&self.ctx, &program, "proj", &viewport.proj());
             self.ctx.use_program(None);
         }
     }
     pub fn resize(&mut self, viewport: &mut Viewport) {
         self.aspect_ratio = resize_canvas(&mut self.canvas, self.config.pixel_ratio);
-        use cgmath::{perspective, Deg, Rad};
-        let proj = perspective(Rad::from(Deg(60.)), self.aspect_ratio, 0.1, 100.);
+        viewport.update_proj(self.aspect_ratio);
         self.ctx.viewport(
             0,
             0,
@@ -184,10 +236,9 @@ impl Renderer {
         );
         for (_, program) in &self.shaders {
             self.ctx.use_program(Some(&program));
-            bind_uniform_mat4(&self.ctx, &program, "proj", &proj);
+            bind_uniform_mat4(&self.ctx, &program, "proj", &viewport.proj());
             self.ctx.use_program(None);
         }
-        viewport.proj = proj;
     }
     pub fn get_context(&self) -> &GL {
         &self.ctx

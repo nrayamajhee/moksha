@@ -1,5 +1,5 @@
 [package]
-name = "wasm-webgl-chess"
+name = "webshell"
 version = "0.1.0"
 authors = ["nrayamajhee <nishan@rayamajhee.com>"]
 edition = "2018"
@@ -14,7 +14,7 @@ default = ["console_error_panic_hook"]
 wasm-bindgen = "0.2.46"
 js-sys = "0.3.23"
 maud = "0.20.0"
-cgmath = "0.17.0"
+nalgebra = "0.18.0"
 genmesh = "0.6.2"
 strum = "0.15.0"
 strum_macros = "0.15.0"
@@ -52,8 +52,11 @@ features = [
   'WebGlShader',
   'WebGlTexture',
   'WebGlVertexArrayObject',
+  'MouseEvent',
+  'Performance',
   'EventTarget',
   'Event',
+  'WheelEvent'
 ]
 
 [dev-dependencies]
