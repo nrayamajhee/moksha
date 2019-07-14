@@ -31,13 +31,13 @@ pub fn create_simple_program(gl: &GL) -> Result<WebGlProgram, String> {
         r#" #version 300 es
             in vec4 position;
 
-            uniform mat4 model, view, proj;
+            uniform mat4 parent, model, view, proj;
             uniform vec4 color;
 
             out vec4 f_color;
 
             void main() {
-                gl_Position = proj * view * model * position;
+                gl_Position = proj * view * parent * model * position;
                 f_color = color;
             }
         "#,
@@ -61,14 +61,14 @@ pub fn create_color_program(gl: &GL) -> Result<WebGlProgram, String> {
             in vec4 position;
 			in vec3  normal;
 
-            uniform mat4 model, view, proj, normalMatrix;
+            uniform mat4 parent, model, view, proj, normalMatrix;
             uniform vec4 color;
 
 			out vec3 lighting;
             out vec4 f_color;
 
             void main() {
-                gl_Position = proj * view * model * position;
+                gl_Position = proj * view * parent * model * position;
                 f_color = color;
 
 				vec3 ambientLight = vec3(0.1, 0.1, 0.1);
@@ -103,13 +103,13 @@ pub fn create_vertex_color_program(gl: &GL) -> Result<WebGlProgram, String> {
 			in vec3  normal;
             in vec4 color;
 
-            uniform mat4 model, view, proj, normalMatrix;
+            uniform mat4 model, view, parent, proj, normalMatrix;
 
             out vec4 f_color;
 			out vec3 lighting;
 
             void main() {
-                gl_Position = proj * view * model * position;
+                gl_Position = proj * view * parent * model * position;
                 f_color = color;
 
 				vec3 ambientLight = vec3(0.1, 0.1, 0.1);
@@ -144,13 +144,13 @@ pub fn create_texture_program(gl: &GL) -> Result<WebGlProgram, String> {
 			in vec3 normal;
             in vec2 texCoord;
 
-            uniform mat4 model, view, proj, normalMatrix;
+            uniform mat4 model, view, parent, proj, normalMatrix;
 
             out vec2 f_texCoord;
 			out vec3 lighting;
 
             void main() {
-                gl_Position = proj * view * model * position;
+                gl_Position = proj * view * parent * model * position;
                 f_texCoord = texCoord;
 
 				vec3 ambientLight = vec3(0.1, 0.1, 0.1);

@@ -5,7 +5,10 @@ use super::shader::{
 };
 use crate::dom_factory::{get_canvas, resize_canvas};
 use crate::mesh::{Geometry, Material};
-use crate::{controller::Viewport, mesh::{Scene, Node}};
+use crate::{
+    controller::Viewport,
+    scene::{Node, Scene},
+};
 use genmesh::generators::Plane;
 use nalgebra::UnitQuaternion;
 use std::collections::HashMap;
@@ -15,7 +18,7 @@ use web_sys::{
     HtmlCanvasElement, WebGl2RenderingContext as GL, WebGlProgram, WebGlVertexArrayObject,
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum DrawMode {
     Points,
     Lines,
@@ -67,6 +70,7 @@ impl Renderer {
             ShaderType::Texture,
             create_texture_program(&ctx).expect("can't create texture shader!"),
         );
+        log!("Renderer is created");
         Self {
             canvas,
             ctx,
@@ -146,6 +150,7 @@ impl Renderer {
         self.ctx.front_face(GL::CCW);
         self.ctx.cull_face(GL::BACK);
         self.ctx.enable(GL::CULL_FACE);
+        log!("Renderer is setup for the scene");
     }
     pub fn render(&self, scene: &Scene) {
         self.ctx.clear(GL::COLOR_BUFFER_BIT | GL::DEPTH_BUFFER_BIT);
@@ -177,17 +182,13 @@ impl Renderer {
                     self.ctx.active_texture(GL::TEXTURE0);
                     bind_uniform_i32(&self.ctx, program, "sampler", 0);
                 }
-                let transform = storage.get_transform(i);
-                let model = transform.inverse().to_homogeneous();
-                bind_uniform_mat4(&self.ctx, program, "model", &model);
-                let normal_matrix = model.transpose();
+                let transform = storage.get_transform(i).to_homogeneous();
+                let p_transform = storage.get_parent_transform(i).to_homogeneous();
+                bind_uniform_mat4(&self.ctx, program, "model", &transform);
+                bind_uniform_mat4(&self.ctx, program, "parent", &p_transform);
+                let normal_matrix = transform.transpose();
                 if shader_type != ShaderType::Simple {
-                    bind_uniform_mat4(
-                        &self.ctx,
-                        program,
-                        "normalMatrix",
-                        &normal_matrix,
-                    );
+                    bind_uniform_mat4(&self.ctx, program, "normalMatrix", &normal_matrix);
                 }
                 let indices = &mesh.geometry.indices;
                 bind_index_buffer(&self.ctx, &indices).expect("Can't bind index buffer!");
@@ -226,6 +227,7 @@ impl Renderer {
         }
     }
     pub fn resize(&mut self, viewport: &mut Viewport) {
+        log!("Renderer resized");
         self.aspect_ratio = resize_canvas(&mut self.canvas, self.config.pixel_ratio);
         viewport.update_proj(self.aspect_ratio);
         self.ctx.viewport(
@@ -240,10 +242,26 @@ impl Renderer {
             self.ctx.use_program(None);
         }
     }
-    pub fn get_context(&self) -> &GL {
+    pub fn context(&self) -> &GL {
         &self.ctx
+    }
+    pub fn canvas(&self) -> &HtmlCanvasElement {
+        &self.canvas
     }
     pub fn aspect_ratio(&self) -> f32 {
         self.aspect_ratio
+    }
+    pub fn change_cursor(&self, grab: bool) {
+        if grab {
+            match self.canvas.class_list().add_1("grab") {
+                Ok(_)=>(),
+                Err(_)=>{log!("Can't change canvas cursor!");}
+            };
+        } else {
+            match self.canvas.class_list().remove_1("grab") {
+                Ok(_)=>(),
+                Err(_)=>{log!("Can't change canvas cursor!");}
+            };
+        }
     }
 }
