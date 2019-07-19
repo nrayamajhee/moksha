@@ -15,7 +15,8 @@ use std::collections::HashMap;
 use std::f32::consts::PI;
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{
-    HtmlCanvasElement, WebGl2RenderingContext as GL, WebGlProgram, WebGlVertexArrayObject,
+    HtmlCanvasElement, HtmlElement, WebGl2RenderingContext as GL, WebGlProgram,
+    WebGlVertexArrayObject,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -70,7 +71,7 @@ impl Renderer {
             ShaderType::Texture,
             create_texture_program(&ctx).expect("can't create texture shader!"),
         );
-        log!("Renderer is created");
+        log!("Renderer created");
         Self {
             canvas,
             ctx,
@@ -184,8 +185,8 @@ impl Renderer {
                 }
                 let transform = storage.get_transform(i).to_homogeneous();
                 let p_transform = storage.get_parent_transform(i).to_homogeneous();
-                bind_uniform_mat4(&self.ctx, program, "model", &transform);
-                bind_uniform_mat4(&self.ctx, program, "parent", &p_transform);
+                let view = p_transform * transform;
+                bind_uniform_mat4(&self.ctx, program, "model", &view);
                 let normal_matrix = transform.transpose();
                 if shader_type != ShaderType::Simple {
                     bind_uniform_mat4(&self.ctx, program, "normalMatrix", &normal_matrix);
@@ -229,18 +230,13 @@ impl Renderer {
     pub fn resize(&mut self, viewport: &mut Viewport) {
         log!("Renderer resized");
         self.aspect_ratio = resize_canvas(&mut self.canvas, self.config.pixel_ratio);
-        viewport.update_proj(self.aspect_ratio);
+        // log!("New aspect ratio: {:?}", self.aspect_ratio());
         self.ctx.viewport(
             0,
             0,
             self.canvas.width() as i32,
             self.canvas.height() as i32,
         );
-        for (_, program) in &self.shaders {
-            self.ctx.use_program(Some(&program));
-            bind_uniform_mat4(&self.ctx, &program, "proj", &viewport.proj());
-            self.ctx.use_program(None);
-        }
     }
     pub fn context(&self) -> &GL {
         &self.ctx
@@ -251,17 +247,39 @@ impl Renderer {
     pub fn aspect_ratio(&self) -> f32 {
         self.aspect_ratio
     }
-    pub fn change_cursor(&self, grab: bool) {
-        if grab {
-            match self.canvas.class_list().add_1("grab") {
-                Ok(_)=>(),
-                Err(_)=>{log!("Can't change canvas cursor!");}
-            };
-        } else {
-            match self.canvas.class_list().remove_1("grab") {
-                Ok(_)=>(),
-                Err(_)=>{log!("Can't change canvas cursor!");}
-            };
+    pub fn width(&self) -> u32 {
+        self.canvas.width()
+    }
+    pub fn height(&self) -> u32 {
+        self.canvas.height()
+    }
+    pub fn change_cursor(&self, cursory_type: CursorType) {
+        let canvas_style = self
+            .canvas
+            .clone()
+            .dyn_into::<HtmlElement>()
+            .unwrap()
+            .style();
+        match cursory_type {
+            CursorType::Pointer => {
+                canvas_style.set_property("cursor", "default").unwrap();
+            }
+            CursorType::Grab => {
+                canvas_style.set_property("cursor", "grabbing").unwrap();
+            }
+            CursorType::ZoomIn => {
+                canvas_style.set_property("cursor", "zoom-in").unwrap();
+            }
+            CursorType::ZoomOut => {
+                canvas_style.set_property("cursor", "zoom-out").unwrap();
+            }
         }
     }
+}
+
+pub enum CursorType {
+    Pointer,
+    Grab,
+    ZoomIn,
+    ZoomOut,
 }

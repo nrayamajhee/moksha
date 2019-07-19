@@ -1,4 +1,5 @@
+mod primitives;
 mod scene;
-pub mod factory;
 
-pub use scene::{Scene, Node, Storage};
+pub use primitives::{create_arrow, create_transform_gizmo, ArrowType};
+pub use scene::{Node, Scene, Storage};

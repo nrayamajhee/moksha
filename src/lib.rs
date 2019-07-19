@@ -31,20 +31,20 @@ use std::f32::consts::PI;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::{JsCast, JsValue};
-use web_sys::{KeyboardEvent, MouseEvent, Performance, WheelEvent, HtmlElement};
+use web_sys::{HtmlElement, KeyboardEvent, MouseEvent, Performance, WheelEvent};
 
 pub mod dom_factory;
-use dom_factory::{add_event, body, document, request_animation_frame, window};
+use dom_factory::{add_event, body, document, request_animation_frame, set_timeout, window};
 
 pub mod controller;
 pub mod mesh;
 pub mod renderer;
 pub mod scene;
 
-use controller::{Viewport, MouseButton};
+use controller::{MouseButton, Viewport};
 use mesh::{Geometry, Material};
-use scene::{Scene, factory::{ArrowType,create_transform_gizmo}};
-use renderer::{DrawMode, Renderer};
+use renderer::{CursorType, DrawMode, Renderer};
+use scene::{create_transform_gizmo, ArrowType, Scene};
 
 pub fn toggle_console(show: bool) {
     let console_el = document().get_element_by_id("console");
@@ -80,10 +80,11 @@ pub fn start() -> Result<(), JsValue> {
 
     document().set_title("Webshell | Rayamajhee");
     body().set_inner_html(dom.into_string().as_str());
+    let window = window();
 
     let mut renderer = Renderer::new(renderer::Config {
         selector: "#gl-canvas",
-        pixel_ratio: 1.,
+        pixel_ratio: 1.0,
     });
 
     let cube_geometry = Geometry::from_genmesh(&Cube::new());
@@ -114,87 +115,76 @@ pub fn start() -> Result<(), JsValue> {
         0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
     ];
 
-    let cube_tex = Material::from_image_texture(
-        renderer.context(),
-        "/assets/img/box_tex.png",
-        tex_coords,
-    )?;
+    let cube_tex =
+        Material::from_image_texture(renderer.context(), "/assets/img/box_tex.png", tex_coords)?;
 
     let scene = Scene::new();
 
-    let cube = scene.object_from_mesh(cube_geometry.clone(), cube_tex);
+    // let cube = scene.object_from_mesh(cube_geometry.clone(), cube_tex);
+    // let cube2 = scene.object_from_mesh(cube_geometry.clone(), Material::vertex_colors(colors));
 
-    let cube2 = scene.object_from_mesh(cube_geometry.clone(), Material::vertex_colors(colors));
-
-    let sphere = scene.object_from_mesh(
-        Geometry::from_genmesh(&IcoSphere::subdivide(3)),
-        Material::single_color(0.0, 0.0, 1.0, 1.0),
-    );
-
-    let cone = scene.object_from_mesh(
-        Geometry::from_genmesh(&Cone::new(8)),
-        Material::single_color(1.0, 1.0, 0.0, 1.0),
-    );
-
-    let cylinder = scene.object_from_mesh(
-        Geometry::from_genmesh(&Cylinder::subdivide(8, 2)),
-        Material::single_color(1.0, 0.0, 1.0, 1.0),
-    );
-
-    let uv_sphere = scene.object_from_mesh(
-        Geometry::from_genmesh(&SphereUv::new(8, 16)),
-        Material::single_color(0.0, 1.0, 1.0, 1.0),
-    );
-
-    let torus = scene.object_from_mesh(
-        Geometry::from_genmesh(&Torus::new(2., 0.5, 8, 8)),
-        Material::single_color(0.0, 1.0, 1.0, 0.0),
-    );
+    // cube.set_position([10.,0.,10.]);
+    // cube2.set_position([-10.,0.,-10.]);
+    // scene.add(&cube);
+    // scene.add(&cube2);
 
     let grid = scene.object_from_mesh(
         Geometry::from_genmesh_no_normals(&Plane::subdivide(100, 100)),
         Material::single_color_no_shade(1.0, 1.0, 1.0, 1.0),
     );
-    grid.set_rotation(UnitQuaternion::from_euler_angles(PI / 2., 0., 0.));
     grid.scale(50.0);
+    grid.set_rotation(UnitQuaternion::from_euler_angles(PI / 2., 0., 0.));
+    scene.add_with_mode(&grid, DrawMode::Lines);
 
     let translation_gizmo = create_transform_gizmo(&scene, ArrowType::Cone);
     let scale_gizmo = create_transform_gizmo(&scene, ArrowType::Cube);
     let pan_gizmo = create_transform_gizmo(&scene, ArrowType::Sphere);
-    translation_gizmo.set_position([-14.0,0.0,0.0]);
-    scale_gizmo.set_position([8.0,0.0,0.0]);
-    pan_gizmo.set_position([0.0,0.0,0.0]);
-    scene.add_with_mode(&grid, DrawMode::Lines);
+    translation_gizmo.set_position([-14.0, 0.0, 0.0]);
+    scale_gizmo.set_position([8.0, 0.0, 0.0]);
+    pan_gizmo.set_position([0.0, 0.0, 0.0]);
     scene.add(&translation_gizmo);
     scene.add(&scale_gizmo);
     scene.add(&pan_gizmo);
 
-    cube.set_position([-13.0, 0.0, 0.0]);
-    cube2.set_position([13.0, 0.0, 0.0]);
-    sphere.set_position([10.0, 10.0, 10.0]);
-    sphere.scale(5.0);
-    // cone.set_position([0.0, 0.0, -30.0]);
-    // torus.set_position([0.0, -5.0, 0.0]);
-    // cylinder.set_position([0.0, 5.0, 0.0]);
+    let mut sun = scene.object_from_mesh(
+        Geometry::from_genmesh(&IcoSphere::subdivide(1)),
+        Material::single_color(1.0, 1.0, 0.0, 1.0),
+    );
 
-    // scene.add(&cube);
-    // scene.add(&cube2);
-    // scene.add(&torus);
-    // scene.add(&sphere);
-    // scene.add(&uv_sphere);
-    // scene.add(&cylinder);
-    // scene.add(&cone);
+    let mut earth = scene.object_from_mesh(
+        Geometry::from_genmesh(&IcoSphere::subdivide(1)),
+        Material::single_color(0.0, 0.0, 1.0, 1.0),
+    );
 
-    let viewport = Viewport::new(&renderer);
+    let moon = scene.object_from_mesh(
+        Geometry::from_genmesh(&IcoSphere::subdivide(1)),
+        Material::single_color(1.0, 1.0, 1.0, 1.0),
+    );
+
+    // moon.set_position([5.0, 0.0, 0.0]);
+    // earth.set_position([5.0, 0.0, 0.0]);
+    // moon.scale(0.5);
+    // earth.scale(0.5);
+    // sun.scale(2.0);
+    // sun.set_position([-10.,0.,10.]);
+
+    // let moon = Rc::new(RefCell::new(moon));
+    // earth.add(moon);
+    // let earth = Rc::new(RefCell::new(earth));
+    // sun.add(earth.clone());
+    // scene.add(&sun);
+
+    let viewport = Viewport::new(renderer.aspect_ratio());
     renderer.setup_renderer(&scene);
     renderer.update_viewport(&viewport);
 
     let a_rndr = Rc::new(RefCell::new(renderer));
     let a_scene = Rc::new(RefCell::new(scene));
     let a_view = Rc::new(RefCell::new(viewport));
-    let a_cube = Rc::new(RefCell::new(cube));
+    // let a_cube = Rc::new(RefCell::new(cube));
+    // let a_sun = Rc::new(RefCell::new(sun));
+    // let a_earth = earth.clone();
 
-    let window = window();
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
 
@@ -202,8 +192,12 @@ pub fn start() -> Result<(), JsValue> {
     let b_view = a_view.clone();
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
         let mut renderer = b_rndr.borrow_mut();
-        let cube = a_cube.borrow_mut();
-        cube.rotate_by(UnitQuaternion::from_euler_angles(0.01, 0.02, 0.));
+        // let sun = a_sun.borrow();
+        // let earth = a_earth.borrow();
+        // let cube = a_cube.borrow_mut();
+        // cube.rotate_by(UnitQuaternion::from_euler_angles(0.01, 0.02, 0.));
+        // earth.rotate_by(UnitQuaternion::from_euler_angles(0.,0.02, 0.));
+        // sun.rotate_by(UnitQuaternion::from_euler_angles(0.,0.01, 0.));
         renderer.render(&a_scene.borrow());
         renderer.update_viewport(&b_view.borrow());
         request_animation_frame(f.borrow().as_ref().unwrap());
@@ -215,6 +209,7 @@ pub fn start() -> Result<(), JsValue> {
         let mut renderer = b_rndr.borrow_mut();
         let mut viewport = b_view.borrow_mut();
         renderer.resize(&mut viewport);
+        viewport.resize(renderer.aspect_ratio());
     });
 
     add_event(
@@ -234,8 +229,9 @@ pub fn start() -> Result<(), JsValue> {
     );
 
     let b_view = a_view.clone();
+    let b_rndr = a_rndr.clone();
     let perf = window.performance().unwrap();
-    add_event(&window, "mousemove", move |e| {
+    add_event(&b_rndr.borrow().canvas(), "mousemove", move |e| {
         let mut view = b_view.borrow_mut();
         let me = e.dyn_into::<MouseEvent>().unwrap();
         let dt = perf.now();
@@ -252,7 +248,7 @@ pub fn start() -> Result<(), JsValue> {
             let renderer = b_rndr.borrow_mut();
             let me = e.dyn_into::<MouseEvent>().unwrap();
             if me.button() == button as i16 {
-                renderer.change_cursor(true);
+                renderer.change_cursor(CursorType::Grab);
                 view.enable_rotation();
             }
         });
@@ -263,7 +259,7 @@ pub fn start() -> Result<(), JsValue> {
             let renderer = b_rndr.borrow_mut();
             let me = e.dyn_into::<MouseEvent>().unwrap();
             if me.button() == button as i16 {
-                renderer.change_cursor(false);
+                renderer.change_cursor(CursorType::Pointer);
                 view.disable_rotation();
             }
         });
@@ -279,6 +275,7 @@ pub fn start() -> Result<(), JsValue> {
     });
 
     let b_view = a_view.clone();
+    let b_rndr = a_rndr.clone();
     add_event(&window, "keydown", move |e| {
         let keycode = e.dyn_into::<KeyboardEvent>().unwrap().code();
         if keycode == "Backquote" {
@@ -295,6 +292,10 @@ pub fn start() -> Result<(), JsValue> {
         } else if keycode == "KeyR" {
             let mut view = b_view.borrow_mut();
             view.reset();
+        } else if keycode == "KeyP" {
+            let mut view = b_view.borrow_mut();
+            let renderer = b_rndr.borrow();
+            view.switch_projection();
         }
     });
     request_animation_frame(g.borrow().as_ref().unwrap());

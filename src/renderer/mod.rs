@@ -4,7 +4,7 @@ use web_sys::WebGl2RenderingContext as GL;
 mod renderer;
 mod shader;
 
-pub use renderer::{Config, DrawMode, Renderer};
+pub use renderer::{Config, CursorType, DrawMode, Renderer};
 
 pub use shader::{
     bind_attribute, bind_buffer_and_attribute, bind_buffer_f32, bind_index_buffer, bind_texture,

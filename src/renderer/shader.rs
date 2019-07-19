@@ -37,7 +37,7 @@ pub fn create_simple_program(gl: &GL) -> Result<WebGlProgram, String> {
             out vec4 f_color;
 
             void main() {
-                gl_Position = proj * view * parent * model * position;
+                gl_Position = proj * view * model * position;
                 f_color = color;
             }
         "#,
@@ -68,7 +68,7 @@ pub fn create_color_program(gl: &GL) -> Result<WebGlProgram, String> {
             out vec4 f_color;
 
             void main() {
-                gl_Position = proj * view * parent * model * position;
+                gl_Position = proj * view * model * position;
                 f_color = color;
 
 				vec3 ambientLight = vec3(0.1, 0.1, 0.1);
@@ -109,7 +109,7 @@ pub fn create_vertex_color_program(gl: &GL) -> Result<WebGlProgram, String> {
 			out vec3 lighting;
 
             void main() {
-                gl_Position = proj * view * parent * model * position;
+                gl_Position = proj * view * model * position;
                 f_color = color;
 
 				vec3 ambientLight = vec3(0.1, 0.1, 0.1);
@@ -150,7 +150,7 @@ pub fn create_texture_program(gl: &GL) -> Result<WebGlProgram, String> {
 			out vec3 lighting;
 
             void main() {
-                gl_Position = proj * view * parent * model * position;
+                gl_Position = proj * view * model * position;
                 f_texCoord = texCoord;
 
 				vec3 ambientLight = vec3(0.1, 0.1, 0.1);

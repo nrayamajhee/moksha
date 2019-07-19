@@ -1,9 +1,9 @@
-use crate::renderer::{bind_texture, DrawMode, ShaderType};
+use crate::renderer::{bind_texture, ShaderType};
 use genmesh::{
     generators::{IndexedPolygon, SharedVertex},
     EmitTriangles, Triangulate, Vertex,
 };
-use nalgebra::{one, Isometry3, Vector3, Matrix4};
+use nalgebra::{one, Isometry3, Matrix4, Translation3, Vector3};
 use wasm_bindgen::JsValue;
 use web_sys::WebGl2RenderingContext as GL;
 
@@ -15,8 +15,12 @@ pub struct Transform {
 
 impl Transform {
     pub fn to_homogeneous(&self) -> Matrix4<f32> {
-        self.isometry.to_homogeneous() * Matrix4::new_nonuniform_scaling(&self.scale) 
+        self.isometry.to_homogeneous() * Matrix4::new_nonuniform_scaling(&self.scale)
     }
+}
+
+fn multiply(left: Vector3<f32>, right: Vector3<f32>) -> Vector3<f32> {
+    Vector3::new(left.x * right.x, left.y * right.y, left.z * right.z)
 }
 
 impl std::ops::Mul<Transform> for Transform {
@@ -24,13 +28,18 @@ impl std::ops::Mul<Transform> for Transform {
 
     #[inline]
     fn mul(self, rhs: Self) -> Self {
-        let isometry = self.isometry * rhs.isometry;
-        // let scale = rhs.scale.cross(&self.scale);
-        let scale = rhs.scale;
-        Self {
-            isometry,
-            scale,
-        }
+        let scale = multiply(self.scale, rhs.scale);
+        let shift = multiply(
+            self.scale,
+            self.isometry
+                .rotation
+                .transform_vector(&rhs.isometry.translation.vector),
+        );
+        let isometry = Isometry3::from_parts(
+            Translation3::from(&self.isometry.translation.vector + shift),
+            self.isometry.rotation * rhs.isometry.rotation,
+        );
+        Self { isometry, scale }
     }
 }
 
@@ -38,11 +47,10 @@ impl Default for Transform {
     fn default() -> Self {
         Self {
             isometry: one(),
-            scale: Vector3::new(1.0,1.0,1.0),
+            scale: Vector3::new(1.0, 1.0, 1.0),
         }
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct Mesh {
@@ -125,7 +133,7 @@ impl Material {
     pub fn single_color(r: f32, g: f32, b: f32, a: f32) -> Self {
         Self {
             shader_type: ShaderType::Color,
-            color: Some([r,g,b,a]),
+            color: Some([r, g, b, a]),
             vertex_colors: None,
             tex_coords: None,
         }
@@ -133,7 +141,7 @@ impl Material {
     pub fn single_color_no_shade(r: f32, g: f32, b: f32, a: f32) -> Self {
         Self {
             shader_type: ShaderType::Simple,
-            color: Some([r,g,b,a]),
+            color: Some([r, g, b, a]),
             vertex_colors: None,
             tex_coords: None,
         }

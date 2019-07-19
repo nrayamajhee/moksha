@@ -54,3 +54,14 @@ where
         .unwrap();
     cl.forget();
 }
+
+pub fn set_timeout<H>(callback: H, timeout: i32)
+where
+    H: 'static + Fn(),
+{
+    let cl = Closure::wrap(Box::new(callback) as Box<dyn Fn()>);
+    window()
+        .set_timeout_with_callback_and_timeout_and_arguments_0(cl.as_ref().unchecked_ref(), timeout)
+        .unwrap();
+    cl.forget();
+}
