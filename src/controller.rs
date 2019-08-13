@@ -13,15 +13,33 @@ pub enum MouseButton {
 
 #[derive(Debug, Copy, Clone)]
 pub struct ProjectionConfig {
-    fov: f32,
-    near: f32,
-    far: f32,
+    pub fov: f32,
+    pub near: f32,
+    pub far: f32,
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum Projection {
     Orthographic(Orthographic3<f32>),
     Perspective(Perspective3<f32>),
+}
+
+#[derive(PartialEq)]
+pub enum ProjectionType {
+    Orthographic,
+    Perspective,
+}
+
+fn ortho_from_persp(
+    fov: f32,
+    aspect_ratio: f32,
+    distance: f32,
+    clip_len: f32,
+) -> Orthographic3<f32> {
+    let halfy = fov / 2.;
+    let height = distance * halfy.tan();
+    let width = height * aspect_ratio;
+    Orthographic3::new(-width, width, -height, height, -clip_len, clip_len)
 }
 
 pub struct Viewport {
@@ -38,17 +56,27 @@ pub struct Viewport {
 }
 
 impl Viewport {
-    pub fn new(aspect_ratio: f32) -> Self {
-        let fov = PI / 3.;
-        let (near, far) = (0.1, 100.);
-        let persp = Perspective3::new(aspect_ratio, fov, near, far);
-        let proj = Projection::Perspective(persp);
-        let proj_config = ProjectionConfig { fov, near, far };
-
+    pub fn new(proj_config: ProjectionConfig, aspect_ratio: f32, proj_type: ProjectionType) -> Self {
         let pos = Point3::new(0.0, 0.0, 10.0);
         let target = Point3::new(0.0, 0.0, 0.0);
         let up = Vector3::y();
         let view = Isometry3::look_at_rh(&pos, &target, &up);
+
+        let proj = if proj_type == ProjectionType::Perspective {
+            Projection::Perspective(Perspective3::new(
+                aspect_ratio,
+                proj_config.fov,
+                proj_config.near,
+                proj_config.far,
+            ))
+        } else {
+            Projection::Orthographic(ortho_from_persp(
+                proj_config.fov,
+                aspect_ratio,
+                view.translation.vector.magnitude(),
+                proj_config.far,
+            ))
+        };
 
         let button = Some(MouseButton::LEFT);
         let rotate = false;
@@ -94,21 +122,24 @@ impl Viewport {
         let delta = if ds < 0. { 1. - d } else { 1. + d };
         self.view.translation.vector = self.speed * delta * self.view.translation.vector;
         if let Projection::Orthographic(_) = self.proj {
-            self.update_proj(false)
+            self.update_proj(ProjectionType::Orthographic)
         }
     }
     pub fn reset(&mut self) {
         self.view = self.initial_view;
         if let Projection::Orthographic(_) = self.proj {
-            self.update_proj(false);
+            self.update_proj(ProjectionType::Orthographic)
         }
     }
     pub fn resize(&mut self, aspect_ratio: f32) {
         self.aspect_ratio = aspect_ratio;
-        self.update_proj(false);
+        match self.proj {
+            Projection::Orthographic(_) => self.update_proj(ProjectionType::Orthographic),
+            Projection::Perspective(_) => self.update_proj(ProjectionType::Perspective),
+        }
     }
-    pub fn update_proj(&mut self, perspective: bool) {
-        self.proj = if perspective {
+    fn update_proj(&mut self, proj_type: ProjectionType) {
+        self.proj = if proj_type == ProjectionType::Perspective {
             Projection::Perspective(Perspective3::new(
                 self.aspect_ratio,
                 self.proj_config.fov,
@@ -116,15 +147,10 @@ impl Viewport {
                 self.proj_config.far,
             ))
         } else {
-            let halfy = self.proj_config.fov / 2.;
-            let height = self.view.translation.vector.magnitude() * halfy.tan();
-            let width = height * self.aspect_ratio;
-            Projection::Orthographic(Orthographic3::new(
-                -width,
-                width,
-                -height,
-                height,
-                -self.proj_config.far,
+            Projection::Orthographic(ortho_from_persp(
+                self.proj_config.fov,
+                self.aspect_ratio,
+                self.view.translation.vector.magnitude(),
                 self.proj_config.far,
             ))
         };
@@ -132,10 +158,10 @@ impl Viewport {
     pub fn switch_projection(&mut self) {
         match self.proj {
             Projection::Perspective(_) => {
-                self.update_proj(false);
+                self.update_proj(ProjectionType::Orthographic)
             }
             Projection::Orthographic(_) => {
-                self.update_proj(true);
+                self.update_proj(ProjectionType::Perspective)
             }
         }
     }

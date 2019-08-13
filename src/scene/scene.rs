@@ -117,11 +117,11 @@ impl Node {
         storage.get_parent_transform(self.index)
     }
     pub fn get_info(&self) -> ObjectInfo {
-        let storage = self.storage.borrow_mut();
+        let storage = self.storage.borrow();
         storage.get_info(self.index)
     }
     pub fn get_mesh(&self) -> Option<Mesh> {
-        let storage = self.storage.borrow_mut();
+        let storage = self.storage.borrow();
         storage.get_mesh(self.index)
     }
     pub fn set_transform(&self, transform: Transform) {
@@ -188,7 +188,7 @@ impl Scene {
     fn object_default(storage: Rc<RefCell<Storage>>) -> Node {
         Self::object(storage, None, Default::default(), "node")
     }
-    pub fn object(
+    fn object(
         storage: Rc<RefCell<Storage>>,
         mesh: Option<Mesh>,
         transform: Transform,

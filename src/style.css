@@ -1,9 +1,16 @@
 @import url('https://fonts.googleapis.com/css?family=Fira+Sans:400,400i,700&display=swap');
-@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons+Round');
 :root {
-    --radius: 20px;
     --bg: rgba(255,255,255,0.5);
     --border: rgba(255,255,255, 0.6);
+
+    /* Dark Color Scheme */
+    --dark-nearest: rgba(100,100,100,0.5);   
+
+    --fg-nearest: var(--dark-nearest);
+    --pad: 10px;
+    --radius: 5px;
+    --small-pad: 8px;
 }
 body {
     margin: 0;
@@ -51,6 +58,72 @@ canvas.grab {
     margin: 0;
     padding: 1em;
 }
+button {
+    position: relative;
+    padding: 0;
+    margin: 0.5em;
+    color: white;
+    border: 0;
+    font-size: 1em;
+    line-height: 1;
+}
+button .material-icons-round {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+}
+button > * {
+    display: inline-block;
+    padding: var(--small-pad);
+}
+button::-moz-focus-inner {
+    border: 0;
+}
+button span {
+    line-height: 24px; /* size of material icon */
+    vertical-align: top;
+}
+button .hint {
+    display: none;
+    position: absolute;
+    left: 100%;
+    top: 0;
+    background: var(--fg-nearest);
+    margin-left: 1.2em;
+    min-width: 1em;
+    border-radius: 0 var(--radius) var(--radius) 0;
+}
+button .hint::before {
+    width: 0;
+    height: 0;
+    border: 0px solid transparent;
+    border-right-color: var(--fg-nearest);
+    border-width: calc(12px + var(--small-pad)) 0.8em;
+    display: block;
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 100%; 
+}
+button:hover > .hint {
+    display: block;
+    animation: popin-afterawhile 1s;
+    width: auto;
+}
+@keyframes popin-afterawhile {
+    0% {
+        opacity: 0;
+    }
+    50% {
+        opacity: 0;
+    }
+    60% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 1;
+    }
+}
 #console button {
     position: absolute;
     top: 0;
@@ -63,20 +136,17 @@ canvas.grab {
     font-weight: bold;
     background: rgba(50,50,50,0.5);
 }
-button {
-    line-height: 1;
+#open-console {
+    position: absolute;
+    bottom: 0;
+    left: 0;
     margin: 0;
-    padding: 0.5em;
-    margin: 0.5em;
-    border-radius: 50%;
-    background: var(--bg);
-    color: white;
-    border: 1px solid var(--border);
 }
-button .material-icons {
-    line-height: 1;
-    display: block;
+#open-console .material-icons-round {
+    background: transparent;
+    border-color: transparent;    
 }
-button::-moz-focus-inner {
-    border: 0;
+#open-console .label {
+    padding-left: 0;
+    padding-right: 0;
 }

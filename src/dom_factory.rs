@@ -1,6 +1,7 @@
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{Document, Event, EventTarget, HtmlCanvasElement, HtmlElement, Window};
+use maud::{html, Markup};
 
 pub fn window() -> Window {
     web_sys::window().expect("No global window found!")
@@ -64,4 +65,14 @@ where
         .set_timeout_with_callback_and_timeout_and_arguments_0(cl.as_ref().unchecked_ref(), timeout)
         .unwrap();
     cl.forget();
+}
+
+pub fn query_html_el(selector: &str) -> HtmlElement {
+    document().query_selector(selector).unwrap().expect(&format!("Can't find any element with query: `{}`", selector)).dyn_into::<HtmlElement>().expect("Can't cast the element as HtmlElement")
+}
+
+pub fn icon_btn_w_id(id: &str, hint: &str, icon_name: &str, hotkey: &str) -> Markup {
+    html! {
+        button id=(id) aria-label=(hint) {i.material-icons-round{(icon_name)} span.hint {(&format!("{}: {}",hint,hotkey))}}
+    }
 }

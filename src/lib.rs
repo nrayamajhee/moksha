@@ -16,7 +16,7 @@ macro_rules! log {
 				para_el.insert_adjacent_html("afterend", &format!("<p>{}</p>", msg)).unwrap();
 			},
 			None => {
-				web_sys::console::log_1(&wasm_bindgen::JsValue::from("Couldn't find console element. Only displaying to the dev console!"));
+                let msg = format!("dev console only: {:?}", msg);
 				web_sys::console::log_1(&wasm_bindgen::JsValue::from_str(&msg));
 			}
 		}
@@ -40,52 +40,45 @@ pub mod controller;
 pub mod mesh;
 pub mod renderer;
 pub mod scene;
+pub mod editor;
 
-use controller::{MouseButton, Viewport};
+use controller::{MouseButton, ProjectionConfig, ProjectionType, Viewport};
 use mesh::{Geometry, Material};
 use renderer::{CursorType, DrawMode, Renderer};
-use scene::{create_transform_gizmo, ArrowType, Scene};
-
-pub fn toggle_console(show: bool) {
-    let console_el = document().get_element_by_id("console");
-    match console_el {
-        Some(el) => {
-            if show {
-                el.class_list().add_1("shown").unwrap();
-            } else {
-                el.class_list().remove_1("shown").unwrap();
-            }
-        }
-        None => {
-            log!("Couldn't find console element!");
-        }
-    }
-}
+use editor:: {
+    console
+};
+use scene::{
+    primitives::{create_transform_gizmo, ArrowType},
+    Scene,
+};
 
 #[wasm_bindgen(start)]
 pub fn start() -> Result<(), JsValue> {
-    #[cfg(feature = "console_error_panic_hook")]
-    console_error_panic_hook::set_once();
-
+    console::setup();
     let dom = html! {
-        section #console {
-            p {"Logs"}
-            button#close-console {i.material-icons{"close"}}
-        }
-        section #toolbar {
-            button#open-console {i.material-icons{"assignment"}}
-        }
         canvas #gl-canvas oncontextmenu="return false;" {}
     };
 
     document().set_title("Webshell | Rayamajhee");
-    body().set_inner_html(dom.into_string().as_str());
+    body().insert_adjacent_html("beforeend", dom.into_string().as_str()).expect("Couldn't insert markup into the DOM!");
     let window = window();
 
     let mut renderer = Renderer::new(renderer::Config {
         selector: "#gl-canvas",
         pixel_ratio: 1.0,
     });
+    let viewport = Viewport::new(
+        ProjectionConfig {
+            fov: PI / 2.,
+            near: 0.1,
+            far: 100.,
+        },
+        renderer.aspect_ratio(),
+        ProjectionType::Perspective,
+    );
+
+    let scene = Scene::new();
 
     let cube_geometry = Geometry::from_genmesh(&Cube::new());
 
@@ -117,8 +110,6 @@ pub fn start() -> Result<(), JsValue> {
 
     let cube_tex =
         Material::from_image_texture(renderer.context(), "/assets/img/box_tex.png", tex_coords)?;
-
-    let scene = Scene::new();
 
     // let cube = scene.object_from_mesh(cube_geometry.clone(), cube_tex);
     // let cube2 = scene.object_from_mesh(cube_geometry.clone(), Material::vertex_colors(colors));
@@ -174,7 +165,6 @@ pub fn start() -> Result<(), JsValue> {
     // sun.add(earth.clone());
     // scene.add(&sun);
 
-    let viewport = Viewport::new(renderer.aspect_ratio());
     renderer.setup_renderer(&scene);
     renderer.update_viewport(&viewport);
 
@@ -184,6 +174,7 @@ pub fn start() -> Result<(), JsValue> {
     // let a_cube = Rc::new(RefCell::new(cube));
     // let a_sun = Rc::new(RefCell::new(sun));
     // let a_earth = earth.clone();
+    editor::setup(a_view.clone());
 
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
@@ -211,22 +202,6 @@ pub fn start() -> Result<(), JsValue> {
         renderer.resize(&mut viewport);
         viewport.resize(renderer.aspect_ratio());
     });
-
-    add_event(
-        &document().get_element_by_id("close-console").unwrap(),
-        "click",
-        move |_| {
-            toggle_console(false);
-        },
-    );
-
-    add_event(
-        &document().get_element_by_id("open-console").unwrap(),
-        "click",
-        move |_| {
-            toggle_console(true);
-        },
-    );
 
     let b_view = a_view.clone();
     let b_rndr = a_rndr.clone();
@@ -278,24 +253,9 @@ pub fn start() -> Result<(), JsValue> {
     let b_rndr = a_rndr.clone();
     add_event(&window, "keydown", move |e| {
         let keycode = e.dyn_into::<KeyboardEvent>().unwrap().code();
-        if keycode == "Backquote" {
-            let console_el = document().get_element_by_id("console");
-            match console_el {
-                Some(el) => {
-                    let shown = el.class_list().contains("shown");
-                    toggle_console(!shown);
-                }
-                None => {
-                    log!("Didn't find console element. Not adding event handlers!");
-                }
-            }
-        } else if keycode == "KeyR" {
+        if keycode == "KeyR" {
             let mut view = b_view.borrow_mut();
             view.reset();
-        } else if keycode == "KeyP" {
-            let mut view = b_view.borrow_mut();
-            let renderer = b_rndr.borrow();
-            view.switch_projection();
         }
     });
     request_animation_frame(g.borrow().as_ref().unwrap());

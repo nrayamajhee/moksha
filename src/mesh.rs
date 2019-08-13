@@ -80,7 +80,7 @@ impl Geometry {
     {
         Self::generate(primitive, false)
     }
-    pub fn generate<T, P>(primitive: &T, add_normals: bool) -> Self
+    fn generate<T, P>(primitive: &T, add_normals: bool) -> Self
     where
         P: EmitTriangles<Vertex = usize>,
         T: SharedVertex<Vertex> + IndexedPolygon<P>,
