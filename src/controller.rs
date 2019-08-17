@@ -53,10 +53,15 @@ pub struct Viewport {
     speed: f32,
     button: Option<MouseButton>,
     rotate: bool,
+    zoom: bool,
 }
 
 impl Viewport {
-    pub fn new(proj_config: ProjectionConfig, aspect_ratio: f32, proj_type: ProjectionType) -> Self {
+    pub fn new(
+        proj_config: ProjectionConfig,
+        aspect_ratio: f32,
+        proj_type: ProjectionType,
+    ) -> Self {
         let pos = Point3::new(0.0, 0.0, 10.0);
         let target = Point3::new(0.0, 0.0, 0.0);
         let up = Vector3::y();
@@ -80,6 +85,7 @@ impl Viewport {
 
         let button = Some(MouseButton::LEFT);
         let rotate = false;
+        let zoom = false;
 
         Self {
             initial_config: proj_config.clone(),
@@ -92,6 +98,7 @@ impl Viewport {
             speed: 1.0,
             button,
             rotate,
+            zoom,
         }
     }
     pub fn view(&self) -> Matrix4<f32> {
@@ -118,11 +125,13 @@ impl Viewport {
         }
     }
     pub fn update_zoom(&mut self, ds: f32) {
-        let d = 0.1;
-        let delta = if ds < 0. { 1. - d } else { 1. + d };
-        self.view.translation.vector = self.speed * delta * self.view.translation.vector;
-        if let Projection::Orthographic(_) = self.proj {
-            self.update_proj(ProjectionType::Orthographic)
+        if self.zoom {
+            let d = 0.1;
+            let delta = if ds < 0. { 1. - d } else { 1. + d };
+            self.view.translation.vector = self.speed * delta * self.view.translation.vector;
+            if let Projection::Orthographic(_) = self.proj {
+                self.update_proj(ProjectionType::Orthographic)
+            }
         }
     }
     pub fn reset(&mut self) {
@@ -157,12 +166,8 @@ impl Viewport {
     }
     pub fn switch_projection(&mut self) {
         match self.proj {
-            Projection::Perspective(_) => {
-                self.update_proj(ProjectionType::Orthographic)
-            }
-            Projection::Orthographic(_) => {
-                self.update_proj(ProjectionType::Perspective)
-            }
+            Projection::Perspective(_) => self.update_proj(ProjectionType::Orthographic),
+            Projection::Orthographic(_) => self.update_proj(ProjectionType::Perspective),
         }
     }
     pub fn button(&self) -> Option<MouseButton> {
@@ -173,5 +178,11 @@ impl Viewport {
     }
     pub fn enable_rotation(&mut self) {
         self.rotate = true;
+    }
+    pub fn disable_zoom(&mut self) {
+        self.zoom = false;
+    }
+    pub fn enable_zoom(&mut self) {
+        self.zoom = true;
     }
 }

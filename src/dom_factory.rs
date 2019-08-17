@@ -1,7 +1,7 @@
+use maud::{html, Markup};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{Document, Event, EventTarget, HtmlCanvasElement, HtmlElement, Window};
-use maud::{html, Markup};
 
 pub fn window() -> Window {
     web_sys::window().expect("No global window found!")
@@ -68,11 +68,42 @@ where
 }
 
 pub fn query_html_el(selector: &str) -> HtmlElement {
-    document().query_selector(selector).unwrap().expect(&format!("Can't find any element with query: `{}`", selector)).dyn_into::<HtmlElement>().expect("Can't cast the element as HtmlElement")
+    document()
+        .query_selector(selector)
+        .unwrap()
+        .expect(&format!(
+            "Can't find any element with query: `{}`",
+            selector
+        ))
+        .dyn_into::<HtmlElement>()
+        .expect("Can't cast the element as HtmlElement")
 }
 
 pub fn icon_btn_w_id(id: &str, hint: &str, icon_name: &str, hotkey: &str) -> Markup {
+    button(id, None, hint, icon_name, hotkey)
+}
+
+pub fn labelled_btn_w_id(
+    id: &str,
+    label: &str,
+    hint: &str,
+    icon_name: &str,
+    hotkey: &str,
+) -> Markup {
+    button(id, Some(label), hint, icon_name, hotkey)
+}
+
+fn button(id: &str, label: Option<&str>, hint: &str, icon_name: &str, hotkey: &str) -> Markup {
+    let class = match label {
+        Some(_) => "labelled",
+        None => "",
+    };
+    let label_span = html! {
+        @if let Some(lbl) = label {
+            span.label{(lbl)}
+        }
+    };
     html! {
-        button id=(id) aria-label=(hint) {i.material-icons-round{(icon_name)} span.hint {(&format!("{}: {}",hint,hotkey))}}
+        button class=(class) id=(id) aria-label=(hint) {i.material-icons-outlined{(icon_name)} (label_span) span.hint {(&format!("{}: [ {} ]",hint,hotkey))}}
     }
 }

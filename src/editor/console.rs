@@ -1,21 +1,23 @@
+use crate::dom_factory::{add_event, body, document, icon_btn_w_id, labelled_btn_w_id, window};
 use maud::html;
-use crate::dom_factory::{window, body, document, add_event};
-use web_sys::KeyboardEvent;
 use wasm_bindgen::JsCast;
+use web_sys::KeyboardEvent;
 
 pub fn setup() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
-    body().insert_adjacent_html("beforeend", markup().as_str()).expect("Couldn't insert console into the DOM!");
+    body()
+        .insert_adjacent_html("beforeend", markup().as_str())
+        .expect("Couldn't insert console into the DOM!");
     add_events();
 }
 fn markup() -> String {
     let markup = html! {
         section #console {
             p {"Logs"}
-            button#close-console {i.material-icons-round{"close"}}
+            (icon_btn_w_id("close-console", "Close console", "close", "`"))
         }
-        button#open-console {i.material-icons-round{"assignment"} span.label {"Logs"} span.hint {"`"}}
+        (labelled_btn_w_id("open-console", "Logs", "Open console", "assignment", "`"))
     };
     markup.into_string()
 }

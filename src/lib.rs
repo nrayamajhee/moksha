@@ -13,7 +13,7 @@ macro_rules! log {
 			Some(_) => {
                 let para_el = document.query_selector("#console p:first-of-type").unwrap().unwrap();
 				web_sys::console::log_1(&wasm_bindgen::JsValue::from_str(&msg));
-				para_el.insert_adjacent_html("afterend", &format!("<p>{}</p>", msg)).unwrap();
+				para_el.insert_adjacent_html("afterend", &format!("<p><i class='material-icons-outlined'>info</i>{}</p>", msg)).unwrap();
 			},
 			None => {
                 let msg = format!("dev console only: {:?}", msg);
@@ -37,17 +37,15 @@ pub mod dom_factory;
 use dom_factory::{add_event, body, document, request_animation_frame, set_timeout, window};
 
 pub mod controller;
+pub mod editor;
 pub mod mesh;
 pub mod renderer;
 pub mod scene;
-pub mod editor;
 
 use controller::{MouseButton, ProjectionConfig, ProjectionType, Viewport};
+use editor::console;
 use mesh::{Geometry, Material};
 use renderer::{CursorType, DrawMode, Renderer};
-use editor:: {
-    console
-};
 use scene::{
     primitives::{create_transform_gizmo, ArrowType},
     Scene,
@@ -61,7 +59,9 @@ pub fn start() -> Result<(), JsValue> {
     };
 
     document().set_title("Webshell | Rayamajhee");
-    body().insert_adjacent_html("beforeend", dom.into_string().as_str()).expect("Couldn't insert markup into the DOM!");
+    body()
+        .insert_adjacent_html("beforeend", dom.into_string().as_str())
+        .expect("Couldn't insert markup into the DOM!");
     let window = window();
 
     let mut renderer = Renderer::new(renderer::Config {
@@ -211,6 +211,7 @@ pub fn start() -> Result<(), JsValue> {
         let me = e.dyn_into::<MouseEvent>().unwrap();
         let dt = perf.now();
         view.update_rot(me.movement_x(), me.movement_y(), dt as f32);
+        view.update_zoom(me.movement_y() as f32);
     });
 
     if let Some(button) = a_view.borrow().button() {
@@ -229,13 +230,14 @@ pub fn start() -> Result<(), JsValue> {
         });
         let b_view = a_view.clone();
         let b_rndr = a_rndr.clone();
-        add_event(canvas, "mouseup", move |e| {
+        add_event(&window, "mouseup", move |e| {
             let mut view = b_view.borrow_mut();
             let renderer = b_rndr.borrow_mut();
             let me = e.dyn_into::<MouseEvent>().unwrap();
             if me.button() == button as i16 {
                 renderer.change_cursor(CursorType::Pointer);
                 view.disable_rotation();
+                // view.disable_zoom()
             }
         });
     }
@@ -246,7 +248,9 @@ pub fn start() -> Result<(), JsValue> {
         let mut view = b_view.borrow_mut();
         let we = e.dyn_into::<WheelEvent>().unwrap();
         let dy = we.delta_y() as f32;
+        // view.enable_zoom();
         view.update_zoom(dy);
+        // view.disable_zoom();
     });
 
     let b_view = a_view.clone();
