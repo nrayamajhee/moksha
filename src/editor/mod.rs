@@ -51,7 +51,7 @@ fn add_events(view: Rc<RefCell<Viewport>>) {
         "mousedown",
         move |_| {
             let mut view = a_view.borrow_mut();
-            // view.enable_zoom();
+            view.enable_zoom();
         },
     );
     let a_view = view.clone();

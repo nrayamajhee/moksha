@@ -19,6 +19,15 @@ impl Transform {
     }
 }
 
+impl From<Isometry3<f32>> for Transform {
+    fn from(isometry: Isometry3<f32>) -> Self {
+        Self {
+            isometry,
+            scale: Vector3::new(1.,1.,1.),
+        }
+    }
+}
+
 fn multiply(left: Vector3<f32>, right: Vector3<f32>) -> Vector3<f32> {
     Vector3::new(left.x * right.x, left.y * right.y, left.z * right.z)
 }

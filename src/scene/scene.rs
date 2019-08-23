@@ -88,6 +88,20 @@ impl Node {
             child.apply_parent_transform(p_transform);
         }
     }
+    pub fn set_transform(&self, transform: Transform) {
+        let p_transform = {
+            let mut storage = self.storage.borrow_mut();
+            let t = storage.get_mut_transform(self.index);
+            *t = transform;
+            *t
+        };
+        for child in self.children.iter() {
+            child.borrow().apply_parent_transform(p_transform);
+        }
+        for child in self.owned_children.iter() {
+            child.apply_parent_transform(p_transform);
+        }
+    }
     pub fn get_position(&self) -> Vector3<f32> {
         let mut storage = self.storage.borrow_mut();
         let transform = storage.get_mut_transform(self.index);
@@ -123,11 +137,6 @@ impl Node {
     pub fn get_mesh(&self) -> Option<Mesh> {
         let storage = self.storage.borrow();
         storage.get_mesh(self.index)
-    }
-    pub fn set_transform(&self, transform: Transform) {
-        let mut storage = self.storage.borrow_mut();
-        let t = storage.get_mut_transform(self.index);
-        *t = transform;
     }
     pub fn set_parent_transform(&self, transform: Transform) {
         let mut storage = self.storage.borrow_mut();

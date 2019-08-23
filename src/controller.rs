@@ -185,4 +185,7 @@ impl Viewport {
     pub fn enable_zoom(&mut self) {
         self.zoom = true;
     }
+    pub fn get_transform(&self) -> Isometry3<f32> {
+        self.view
+    }
 }

@@ -130,12 +130,13 @@ pub fn start() -> Result<(), JsValue> {
     let translation_gizmo = create_transform_gizmo(&scene, ArrowType::Cone);
     let scale_gizmo = create_transform_gizmo(&scene, ArrowType::Cube);
     let pan_gizmo = create_transform_gizmo(&scene, ArrowType::Sphere);
-    translation_gizmo.set_position([-14.0, 0.0, 0.0]);
     scale_gizmo.set_position([8.0, 0.0, 0.0]);
     pan_gizmo.set_position([0.0, 0.0, 0.0]);
-    scene.add(&translation_gizmo);
-    scene.add(&scale_gizmo);
+    //scene.add(&translation_gizmo);
+    //scene.add(&scale_gizmo);
     scene.add(&pan_gizmo);
+
+    let pan_gizmo = Rc::new(RefCell::new(pan_gizmo));
 
     let mut sun = scene.object_from_mesh(
         Geometry::from_genmesh(&IcoSphere::subdivide(1)),
@@ -152,18 +153,17 @@ pub fn start() -> Result<(), JsValue> {
         Material::single_color(1.0, 1.0, 1.0, 1.0),
     );
 
-    // moon.set_position([5.0, 0.0, 0.0]);
-    // earth.set_position([5.0, 0.0, 0.0]);
-    // moon.scale(0.5);
-    // earth.scale(0.5);
-    // sun.scale(2.0);
-    // sun.set_position([-10.,0.,10.]);
+     moon.set_position([5.0, 0.0, 0.0]);
+     earth.set_position([5.0, 0.0, 0.0]);
+     moon.scale(0.5);
+     earth.scale(0.5);
+     sun.scale(2.0);
 
-    // let moon = Rc::new(RefCell::new(moon));
-    // earth.add(moon);
-    // let earth = Rc::new(RefCell::new(earth));
-    // sun.add(earth.clone());
-    // scene.add(&sun);
+     let moon = Rc::new(RefCell::new(moon));
+     earth.add(moon);
+     let earth = Rc::new(RefCell::new(earth));
+     sun.add(earth.clone());
+     scene.add(&sun);
 
     renderer.setup_renderer(&scene);
     renderer.update_viewport(&viewport);
@@ -172,25 +172,31 @@ pub fn start() -> Result<(), JsValue> {
     let a_scene = Rc::new(RefCell::new(scene));
     let a_view = Rc::new(RefCell::new(viewport));
     // let a_cube = Rc::new(RefCell::new(cube));
-    // let a_sun = Rc::new(RefCell::new(sun));
-    // let a_earth = earth.clone();
+    let a_sun = Rc::new(RefCell::new(sun));
+    let a_earth = earth.clone();
     editor::setup(a_view.clone());
 
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
+    let p_g = pan_gizmo.clone();
 
     let b_rndr = a_rndr.clone();
     let b_view = a_view.clone();
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
         let mut renderer = b_rndr.borrow_mut();
-        // let sun = a_sun.borrow();
-        // let earth = a_earth.borrow();
+         let sun = a_sun.borrow();
+         let earth = a_earth.borrow();
         // let cube = a_cube.borrow_mut();
         // cube.rotate_by(UnitQuaternion::from_euler_angles(0.01, 0.02, 0.));
-        // earth.rotate_by(UnitQuaternion::from_euler_angles(0.,0.02, 0.));
-        // sun.rotate_by(UnitQuaternion::from_euler_angles(0.,0.01, 0.));
+        earth.rotate_by(UnitQuaternion::from_euler_angles(0.,0.02, 0.));
+        sun.rotate_by(UnitQuaternion::from_euler_angles(0.,0.01, 0.));
         renderer.render(&a_scene.borrow());
         renderer.update_viewport(&b_view.borrow());
+        let pan_gizmo = p_g.borrow_mut();
+        let transform = &b_view.borrow().get_transform();
+        let p = transform.rotation.transform_vector(&transform.translation.vector);
+        //let p = -transform.translation.vector;
+        pan_gizmo.set_position([p.x,p.y,p.z]);
         request_animation_frame(f.borrow().as_ref().unwrap());
     }) as Box<dyn FnMut()>));
 
@@ -237,7 +243,7 @@ pub fn start() -> Result<(), JsValue> {
             if me.button() == button as i16 {
                 renderer.change_cursor(CursorType::Pointer);
                 view.disable_rotation();
-                // view.disable_zoom()
+                view.disable_zoom()
             }
         });
     }
@@ -248,9 +254,9 @@ pub fn start() -> Result<(), JsValue> {
         let mut view = b_view.borrow_mut();
         let we = e.dyn_into::<WheelEvent>().unwrap();
         let dy = we.delta_y() as f32;
-        // view.enable_zoom();
+        view.enable_zoom();
         view.update_zoom(dy);
-        // view.disable_zoom();
+        view.disable_zoom();
     });
 
     let b_view = a_view.clone();

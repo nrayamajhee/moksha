@@ -136,8 +136,8 @@ impl Renderer {
                     )
                     .expect("Couldn't bind tex coordinates");
                 }
-                self.ctx.bind_vertex_array(None);
                 self.ctx.bind_buffer(GL::ARRAY_BUFFER, None);
+                self.ctx.bind_vertex_array(None);
                 self.vaos.push(Some(vao));
             } else {
                 self.vaos.push(None);
