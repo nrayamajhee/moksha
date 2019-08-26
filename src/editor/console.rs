@@ -1,27 +1,28 @@
 use crate::dom_factory::{add_event, body, document, icon_btn_w_id, labelled_btn_w_id, window};
+use crate::log;
 use maud::html;
 use wasm_bindgen::JsCast;
 use web_sys::KeyboardEvent;
 
-pub fn setup() {
+pub fn setup(button: bool) {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
     body()
-        .insert_adjacent_html("beforeend", markup().as_str())
+        .insert_adjacent_html("beforeend", markup(button).as_str())
         .expect("Couldn't insert console into the DOM!");
-    add_events();
+    add_events(button);
 }
-fn markup() -> String {
+fn markup(button: bool) -> String {
     let markup = html! {
         section #console {
             p {"Logs"}
             (icon_btn_w_id("close-console", "Close console", "close", "`"))
         }
-        (labelled_btn_w_id("open-console", "Logs", "Open console", "assignment", "`"))
+        @if button {(labelled_btn_w_id("open-console", "Logs", "Open console", "assignment", "`"))}
     };
     markup.into_string()
 }
-fn add_events() {
+fn add_events(button: bool) {
     add_event(
         &document().get_element_by_id("close-console").unwrap(),
         "click",
@@ -29,14 +30,15 @@ fn add_events() {
             toggle_console(false);
         },
     );
-
-    add_event(
-        &document().get_element_by_id("open-console").unwrap(),
-        "click",
-        move |_| {
-            toggle_console(true);
-        },
-    );
+    if button {
+        add_event(
+            &document().get_element_by_id("open-console").unwrap(),
+            "click",
+            move |_| {
+                toggle_console(true);
+            },
+        );
+    }
     add_event(&window(), "keydown", move |e| {
         let keycode = e.dyn_into::<KeyboardEvent>().unwrap().code();
         if keycode == "Backquote" {

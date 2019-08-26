@@ -1,1 +1,1 @@
-import * as chess from "wasm-webgl-chess";
+import * as moksha from "moksha";

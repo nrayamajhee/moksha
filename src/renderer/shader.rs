@@ -1,8 +1,6 @@
-use crate::dom_factory::add_event;
+use crate::{dom_factory::add_event, rc_rcell};
 use js_sys::{Float32Array, Uint16Array, Uint8Array};
 use nalgebra::Matrix4;
-use std::cell::RefCell;
-use std::rc::Rc;
 use wasm_bindgen::JsValue;
 use web_sys::{
     HtmlImageElement, WebGl2RenderingContext as GL, WebGlProgram, WebGlShader, WebGlTexture,
@@ -260,7 +258,7 @@ pub fn bind_texture(gl: &GL, url: &str) -> Result<(), JsValue> {
         Some(&pixel),
     )?;
     let image = HtmlImageElement::new().expect("Can't create Image Element");
-    let img = Rc::new(RefCell::new(image));
+    let img = rc_rcell(image);
     let a_img = img.clone();
     // couldn't avoid this
     let gl = gl.clone();

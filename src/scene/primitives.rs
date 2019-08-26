@@ -2,7 +2,7 @@ use crate::{
     mesh::{Geometry, Material},
     scene::{Node, Scene},
 };
-use genmesh::generators::{Cone, Cube, Cylinder, IcoSphere, Torus};
+use genmesh::generators::{Circle, Cone, Cube, Cylinder, IcoSphere, Plane, SphereUv, Torus};
 use nalgebra::UnitQuaternion;
 use std::f32::consts::PI;
 
@@ -47,7 +47,7 @@ pub fn create_arrow(scene: &Scene, color: [f32; 4], arrow_type: ArrowType, has_s
             let head = scene.object_from_mesh_and_name(
                 Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(1)),
                 Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
-                "Flat Arrow Head",
+                "Sphere Arrow Head",
             );
             head.scale(0.8);
             head
@@ -61,10 +61,15 @@ pub fn create_arrow(scene: &Scene, color: [f32; 4], arrow_type: ArrowType, has_s
 }
 
 pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowType) -> Node {
+    let name = match arrow_type {
+        ArrowType::Cone => "translation",
+        ArrowType::Sphere => "look",
+        ArrowType::Cube => "scale",
+    };
     let mut node = scene.object_from_mesh_and_name(
         Geometry::from_genmesh(&IcoSphere::subdivide(1)),
         Material::single_color_no_shade(1.0, 1.0, 1.0, 1.0),
-        "Gizmo",
+        name,
     );
     node.scale(0.5);
     let x = create_arrow(scene, [1.0, 0.0, 0.0, 1.0], arrow_type, true);
@@ -91,4 +96,50 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowType) -> Node {
         node.own(n_z);
     }
     node
+}
+
+pub fn create_primitive_node(scene: &Scene, primitive: &str) -> Node {
+    match primitive {
+        "Plane" => scene.object_from_mesh_and_name(
+            Geometry::from_genmesh(&Plane::new()),
+            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            primitive,
+        ),
+        "Cube" => scene.object_from_mesh_and_name(
+            Geometry::from_genmesh(&Cube::new()),
+            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            primitive,
+        ),
+        "Circle" => scene.object_from_mesh_and_name(
+            Geometry::from_genmesh(&Circle::new(8)),
+            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            primitive,
+        ),
+        "IcoSphere" => scene.object_from_mesh_and_name(
+            Geometry::from_genmesh(&IcoSphere::new()),
+            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            primitive,
+        ),
+        "Cylinder" => scene.object_from_mesh_and_name(
+            Geometry::from_genmesh(&Cylinder::new(8)),
+            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            primitive,
+        ),
+        "Cone" => scene.object_from_mesh_and_name(
+            Geometry::from_genmesh(&Cone::new(8)),
+            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            primitive,
+        ),
+        "UVSphere" => scene.object_from_mesh_and_name(
+            Geometry::from_genmesh(&SphereUv::new(8, 16)),
+            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            primitive,
+        ),
+        "Torus" => scene.object_from_mesh_and_name(
+            Geometry::from_genmesh(&Torus::new(1., 0.2, 16, 8)),
+            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            primitive,
+        ),
+        _ => scene.empty(),
+    }
 }

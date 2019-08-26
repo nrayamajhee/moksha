@@ -1,7 +1,9 @@
 use maud::{html, Markup};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use web_sys::{Document, Event, EventTarget, HtmlCanvasElement, HtmlElement, Window};
+use web_sys::{
+    Document, Element, Event, EventTarget, HtmlCanvasElement, HtmlElement, NodeList, Window,
+};
 
 pub fn window() -> Window {
     web_sys::window().expect("No global window found!")
@@ -67,6 +69,18 @@ where
     cl.forget();
 }
 
+pub fn get_el(id: &str) -> Element {
+    document().get_element_by_id(id).unwrap()
+}
+
+pub fn get_html_el(id: &str) -> HtmlElement {
+    document()
+        .get_element_by_id(id)
+        .unwrap()
+        .dyn_into::<HtmlElement>()
+        .unwrap()
+}
+
 pub fn query_html_el(selector: &str) -> HtmlElement {
     document()
         .query_selector(selector)
@@ -77,6 +91,10 @@ pub fn query_html_el(selector: &str) -> HtmlElement {
         ))
         .dyn_into::<HtmlElement>()
         .expect("Can't cast the element as HtmlElement")
+}
+
+pub fn query_els(selector: &str) -> NodeList {
+    document().query_selector_all(selector).unwrap()
 }
 
 pub fn icon_btn_w_id(id: &str, hint: &str, icon_name: &str, hotkey: &str) -> Markup {
