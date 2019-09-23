@@ -79,7 +79,7 @@ impl Viewport {
         aspect_ratio: f32,
         proj_type: ProjectionType,
     ) -> Self {
-        let pos = Point3::new(0.0, 20.0, 20.0);
+        let pos = Point3::new(10.0, 10.0, 10.0);
         let target = Point3::new(0.0, 0.0, 0.0);
         let up = Vector3::y();
         let view = Isometry3::look_at_rh(&pos, &target, &up);

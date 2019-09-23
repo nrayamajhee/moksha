@@ -1,4 +1,5 @@
 #![feature(proc_macro_hygiene)]
+#![doc(html_logo_url = "https://moksha.rayamajhee.com/assets/img/icon.png", html_favicon_url = "https://moksha.rayamajhee.com/assets/img/icon.png")]
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
@@ -6,7 +7,6 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[macro_use]
 mod log_macros;
-
 
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -33,18 +33,25 @@ pub mod mesh;
 pub mod renderer;
 pub mod scene;
 
-use controller::{MouseButton, ProjectionConfig, ProjectionType, Viewport};
-use mesh::{Geometry, Material};
-use renderer::{CursorType, DrawMode, Renderer};
+#[doc(inline)]
+pub use crate::{
+    scene::{Node, Scene, Storage, Primitive},
+    renderer::Renderer,
+    mesh::{Geometry, Material, Mesh, Transform},
+    editor::Editor,
+    controller::{Viewport,ProjectionType, MouseButton},
+};
+
+use controller::{ProjectionConfig};
+use renderer::{CursorType, DrawMode};
 use scene::{
     primitives::{create_transform_gizmo, ArrowType},
-    Scene,
 };
-use editor::{Editor,console};
+use editor::console_setup;
 
 #[wasm_bindgen(start)]
 pub fn start() -> Result<(), JsValue> {
-    console::setup(true);
+    console_setup(true);
     let dom = html! {
         canvas #gl-canvas oncontextmenu="return false;" {}
     };
@@ -106,9 +113,8 @@ pub fn start() -> Result<(), JsValue> {
      let cube2 = scene.object_from_mesh(cube_geometry.clone(), Material::vertex_colors(colors));
 
      cube.set_position([10.,0.,10.]);
-     cube2.set_position([-10.,0.,-10.]);
      scene.add(&cube);
-     scene.add(&cube2);
+     //scene.add(&cube2);
 
     let pan_gizmo = create_transform_gizmo(&scene, ArrowType::Sphere);
     scene.add(&pan_gizmo);
@@ -164,7 +170,6 @@ pub fn start() -> Result<(), JsValue> {
     let f = rc_rcell(None);
     let g = f.clone();
 
-    log!("Crashes Here");
     let b_rndr = a_rndr.clone();
     let b_view = a_view.clone();
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
@@ -208,9 +213,8 @@ pub fn start() -> Result<(), JsValue> {
         let me = e.dyn_into::<MouseEvent>().unwrap();
         let dt = perf.now();
         view.update_rot(me.movement_x(), me.movement_y(), dt as f32);
-        let dy = if me.movement_y() > 0 { 0.1 } else { -0.1 };
-        view.update_zoom(dy);
     });
+    
     let b_view = a_view.clone();
     let b_rndr = a_rndr.clone();
     add_event(&b_rndr.borrow().canvas(), "wheel", move |e| {

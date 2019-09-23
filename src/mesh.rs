@@ -7,7 +7,7 @@ use nalgebra::{one, Isometry3, Matrix4, Translation3, Vector3};
 use wasm_bindgen::JsValue;
 use web_sys::WebGl2RenderingContext as GL;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Transform {
     pub isometry: Isometry3<f32>,
     pub scale: Vector3<f32>,
@@ -61,13 +61,13 @@ impl Default for Transform {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Mesh {
     pub geometry: Geometry,
     pub material: Material,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Geometry {
     pub vertices: Vec<f32>,
     pub indices: Vec<u16>,
@@ -120,7 +120,7 @@ impl Geometry {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Material {
     pub shader_type: ShaderType,
     pub color: Option<[f32; 4]>,

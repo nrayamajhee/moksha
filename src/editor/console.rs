@@ -4,13 +4,13 @@ use maud::html;
 use wasm_bindgen::JsCast;
 use web_sys::KeyboardEvent;
 
-pub fn setup(button: bool) {
+pub fn console_setup(show_ui_button: bool) {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
     body()
-        .insert_adjacent_html("beforeend", markup(button).as_str())
+        .insert_adjacent_html("beforeend", markup(show_ui_button).as_str())
         .expect("Couldn't insert console into the DOM!");
-    add_events(button);
+    add_events(show_ui_button);
 }
 fn markup(button: bool) -> String {
     let markup = html! {

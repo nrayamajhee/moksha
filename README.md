@@ -7,40 +7,48 @@ This is an experimental video game written in rust. Building an editor of some s
 After many attempts and blunders, I have finally settled for wasm-bindgen. My first attempt was to try three-rs (<https://gitlab.com/nrayamajhee/moksha-three>). It was a good starting point, but I eventually learnt some webgl and GLSLS, which led me to abandon three-rs's three-js like abstraction. I then thought, I would instead write my own vulkan based renderer (<https://gitlab.com/nrayamajhee/moksha-vk>), which turned out to be an agonizing journery that was well beyond my capabilities. Hence, I am here, using wasm-bindgen's webgl binding. Hopefully someday WebGPU kicks off and drags me back to vulkan like code base. 
 
 # ToDo
+- System
+    - [x] Storage to hold all the data
+    - [x] Reorganize vaos into Storage
+	- [ ] Cap the framerate for performance.
+	- [ ] Debug firefox's memory leaks.
+
 - Scene
-    - [ ] Storage to hold all the data
-    - [ ] Scene tree that allows node creations
+    - [x] Scene tree that allows node creations
     - [x] Add primitive meshes
     - [ ] load obj
     - [ ] load gltf
-    - [ ] Editing controls (Add, Translate, Rotate, Scale, Zoom, Switch Perspective)
-    - [ ] Reorganize vaos into Storage
-    - [ ] Implement all transformational gizmos including a guide(This might need rendering on a separate framebuffer)
-  
-- Editor
-    - [x] Custom logging screen
-    - [ ] Configuration Editor
-    - [ ] Create a fps and debug text screen
-  
-- Render 
+
+- Renderer
     - [x] Rendering component that holds, compiles, and binds shaders
     - [x] Unshaded Color
     - [x] Vertext Color
-    - [ ] Albedo
-    - [ ] Normal Map
-    - [ ] Occlusion Map
-    - [ ] Metallic/Roughness Map
+    - [x] Albedo
     - [ ] Per pixel shading (Flat + Smooth)
+    - [ ] Normal Map
+    - [ ] Metallic/Roughness Map
+    - [ ] Occlusion Map
     - [ ] Fancy Wireframe (Line + Points + Depth Fade with shader based)
+	- [ ] Reflection and HDR Cubemaps
     - [ ] Volumetrics
     - [ ] Procedulal Texures
+  
+- Editor
+    - [x] Custom logging screen
+    - [x] Zoom and Switch Perspective controls
+	- [ ] Fancy mesh outline while selecting
+    - [ ] Configuration Editor
+    - [ ] Create a fps and debug text screen
+    - [ ] Implement all transformational gizmos.
+	- [ ] Implement a pan guide gizmo. (This might need rendering on a separate framebuffer)
+  
   
 - Viewport
     - [x] Perspective Projection
     - [x] Orthographic Projection
-    - [x] Third Person Perspective
-    - [ ] First Person Perspective
-    - [ ] Fixed viewport
+    - [x] Third Person Controls
+    - [ ] First Person COnstrol
+    - [ ] Allow camera animations
     
 - Controller
     - [ ] Fly Navigation: accelerate, Deaccelerate, Roll, Pitch, and yaw movements
@@ -58,7 +66,7 @@ After many attempts and blunders, I have finally settled for wasm-bindgen. My fi
 
 - Physics
     - [ ] Gravity
-
+	- [ ] Collision with the surface
 
 ## How to?
 
@@ -122,7 +130,7 @@ This is what the editor currently looks like:
 
 ## Rust-lang usages
 
-Although, I have been learning rust for a while and was writing some C/C++ in the past, I am in no capability to judge how idiomatic my code is nor how healthy its memory management is. This program, although robust to my eyes does have some memory issues. I can't quite figure out if its my code, or the WebGL driver in browsers, but I suspect there's some memory leaks, especially when running on firefox on windows. My arch linux setup seems completely healthy.
+Although, I have been learning rust for a while and was writing some C/C++ in the past, I am in no capability to judge how idiomatic my code is nor how healthy its memory management is. This program, although robust to my eyes does have some memory issues. I can't quite figure out if its my code, or firefox's WebGL driver, but I suspect there's some memory leaks as firefox's memory usage only climbs when run. Chrome, on the other hand, works perfectly fine.
 
 Due to wasm-bingen's lack of support for rust lifetime annotations, I make heavy use of Rc<RefCell> to pass around the various structs to event handlers. Although, I can ditch wasm-bindgen endpoint and use lifetimes, I think it is better to expose all my structs and functions to javascript so that if anyone wants to use this library from javascript, it is as feature rich and complete.
 

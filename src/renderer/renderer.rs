@@ -30,12 +30,14 @@ pub enum DrawMode {
     None,
 }
 
+#[derive(Debug)]
 pub struct Config {
     pub selector: &'static str,
     pub pixel_ratio: f64,
 }
 
 #[wasm_bindgen]
+#[derive(Debug)]
 pub struct Renderer {
     canvas: HtmlCanvasElement,
     ctx: GL,
@@ -148,7 +150,7 @@ impl Renderer {
         self.ctx.front_face(GL::CCW);
         self.ctx.cull_face(GL::BACK);
         self.ctx.enable(GL::CULL_FACE);
-        log!("Renderer is setup!");
+        log!("Renderer is ready to draw");
     }
     pub fn render(&self, scene: &Scene) {
         self.ctx.clear(GL::COLOR_BUFFER_BIT | GL::DEPTH_BUFFER_BIT);
@@ -193,8 +195,13 @@ impl Renderer {
                 match draw_mode {
                     DrawMode::Triangle => {
                         let name = storage.get_info(i).name;
-                        if name == "translation" {
-                            self.ctx.disable(GL::DEPTH_TEST);
+                        match name.as_str() {
+                            "translation" | "Pointy Arrow Head" | "Arrow Stem" => {
+                                self.ctx.disable(GL::DEPTH_TEST);
+                            }
+                            _=> {
+                                self.ctx.enable(GL::DEPTH_TEST);
+                            }
                         }
                         self.ctx.draw_elements_with_i32(
                             GL::TRIANGLES,
@@ -202,9 +209,6 @@ impl Renderer {
                             GL::UNSIGNED_SHORT,
                             0,
                         );
-                        if name == "translation" {
-                            self.ctx.enable(GL::DEPTH_TEST);
-                        }
                     }
                     DrawMode::Lines => {
                         self.ctx.draw_elements_with_i32(

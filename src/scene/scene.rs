@@ -10,13 +10,13 @@ use web_sys::WebGlVertexArrayObject;
 // use std::f32::consts::PI;
 use std::rc::Rc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ObjectInfo {
     pub name: String,
     pub draw_mode: DrawMode,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Node {
     index: usize,
     storage: RcRcell<Storage>,
@@ -263,7 +263,7 @@ impl Scene {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Storage {
     info: Vec<ObjectInfo>,
     meshes: Vec<Option<Mesh>>,
