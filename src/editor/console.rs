@@ -15,8 +15,12 @@ pub fn console_setup(show_ui_button: bool) {
 fn markup(button: bool) -> String {
     let markup = html! {
         section #console {
-            p {"Logs"}
-            (icon_btn_w_id("close-console", "Close console", "close", "`"))
+            div.header {
+                p {"Logs"}
+                (icon_btn_w_id("close-console", "Close console", "close", "`"))
+            }
+            section #logs {
+            }
         }
         @if button {(labelled_btn_w_id("open-console", "Logs", "Open console", "assignment", "`"))}
     };

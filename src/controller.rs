@@ -4,6 +4,7 @@ use nalgebra::{
 };
 use std::f32::consts::PI;
 
+/// 3 Button mouse configuration.
 #[derive(Copy, Clone)]
 pub enum MouseButton {
     LEFT = 0,
@@ -39,6 +40,7 @@ impl Projection {
     }
 }
 
+/// Orhtographic or Perspective Projection.
 #[derive(PartialEq)]
 pub enum ProjectionType {
     Orthographic,
@@ -58,7 +60,7 @@ fn ortho_from_persp(
 }
 
 /// A dynamic viewport that can switch camera persective as well as targets,
-/// look position as well as modes.
+/// look position, and modes.
 pub struct Viewport {
     proj_config: ProjectionConfig,
     initial_config: ProjectionConfig,
@@ -221,7 +223,7 @@ impl Viewport {
     pub fn enable_zoom(&mut self) {
         self.zoom = true;
     }
-    pub fn get_transform(&self) -> Isometry3<f32> {
+    pub fn transform(&self) -> Isometry3<f32> {
         self.view
     }
 }
