@@ -54,7 +54,7 @@ use editor::console_setup;
 
 /// The main entrypoint that is automatically executed on page load.
 #[wasm_bindgen(start)]
-pub fn main() -> Result<(), JsValue> {
+pub fn start() -> Result<(), JsValue> {
     console_setup(true);
     let dom = html! {
         canvas #gl-canvas oncontextmenu="return false;" {}
