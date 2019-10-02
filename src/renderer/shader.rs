@@ -57,36 +57,41 @@ pub fn create_color_program(gl: &GL) -> Result<WebGlProgram, String> {
         gl,
         r#" #version 300 es
             in vec4 position;
-			in vec3  normal;
+            in vec3  normal;
 
             uniform mat4 parent, model, view, proj, normalMatrix;
             uniform vec4 color;
 
-			out vec3 lighting;
+            out vec3 light_vector;
+            out vec3 surface_normal;
             out vec4 f_color;
 
             void main() {
-                gl_Position = proj * view * model * position;
+                vec4 world_position = model * position;
+                gl_Position = proj * view * world_position;
                 f_color = color;
-
-				vec3 ambientLight = vec3(0.1, 0.1, 0.1);
-				vec3 directionalLightColor = vec3(1, 1, 1);
-				vec3 directionalVector = normalize(vec3(5.0, 5.0, 0.0));
-
-				vec4 transformedNormal = normalMatrix * vec4(normal, 1.0);
-
-				float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
-				lighting = ambientLight + directionalLightColor * directional;
+                surface_normal = normalize((normalMatrix * vec4(normal, 1.0)).xyz);
+                //vec3 light_position = vec3(50.0,0.0,0.0);
+                //light_vector = normalize(light_position - world_position.xyz);
+                light_vector = normalize(vec3(0.0,0.0,5.0));
             }
         "#,
         r#" #version 300 es
             precision mediump float;
-			in vec3 lighting;
+
+            in vec3 light_vector;
+            in vec3 surface_normal;
+
             in vec4 f_color;
             out vec4 outputColor;
 
             void main() {
-				outputColor = vec4(f_color.xyz * lighting, 1.0);
+                vec3 ambientLight = vec3(0.1, 0.1, 0.1);
+                vec3 directionalLightColor = vec3(1, 1, 1);
+
+                float directional = max(dot(surface_normal, light_vector), 0.0);
+                vec3 lighting = ambientLight + directionalLightColor * directional;
+                outputColor = vec4(f_color.xyz * lighting, 1.0);
             }
         "#,
     )?;
@@ -112,7 +117,7 @@ pub fn create_vertex_color_program(gl: &GL) -> Result<WebGlProgram, String> {
 
 				vec3 ambientLight = vec3(0.1, 0.1, 0.1);
 				vec3 directionalLightColor = vec3(1, 1, 1);
-				vec3 directionalVector = normalize(vec3(5.0, 5.0, 0.0));
+				vec3 directionalVector = normalize(vec3(0., 0., 5.0));
 
 				vec4 transformedNormal = normalMatrix * vec4(normal, 1.0);
 
@@ -153,7 +158,7 @@ pub fn create_texture_program(gl: &GL) -> Result<WebGlProgram, String> {
 
 				vec3 ambientLight = vec3(0.1, 0.1, 0.1);
 				vec3 directionalLightColor = vec3(1, 1, 1);
-				vec3 directionalVector = normalize(vec3(5.0, 5.0, 0.0));
+				vec3 directionalVector = normalize(vec3(0., 0., 5.0));
 
 				vec4 transformedNormal = normalMatrix * vec4(normal, 1.0);
 
