@@ -27,6 +27,7 @@ pub enum DrawMode {
     Lines,
     PointyLines,
     Triangle,
+    Triangle_no_depth,
     None,
 }
 
@@ -36,6 +37,7 @@ pub struct Config {
     pub pixel_ratio: f64,
 }
 
+/// WebGL renderer that compiles, binds and executes all shaders; also capable of handling window resizes and configuration changes
 #[wasm_bindgen]
 #[derive(Debug)]
 pub struct Renderer {
@@ -146,24 +148,23 @@ impl Renderer {
         self.ctx.clear_color(0.1, 0.1, 0.1, 1.0);
         self.ctx.clear_depth(1.0);
         self.ctx.depth_func(GL::LEQUAL);
-        self.ctx.enable(GL::DEPTH_TEST);
         self.ctx.front_face(GL::CCW);
         self.ctx.cull_face(GL::BACK);
         self.ctx.enable(GL::CULL_FACE);
         log!("Renderer is ready to draw");
     }
-    pub fn render(&self, scene: &Scene) {
+    pub fn render(&self, scene: &Scene, viewport: &Viewport) {
         self.ctx.clear(GL::COLOR_BUFFER_BIT | GL::DEPTH_BUFFER_BIT);
-        let storage = scene.get_storage();
+        let storage = scene.storage();
         let storage = storage.borrow();
         let meshes = storage.meshes();
         for (i, mesh) in meshes.iter().enumerate() {
             if let Some(mesh) = mesh {
-                let draw_mode = storage.get_info(i).draw_mode;
-                let vao = storage.get_vao(i);
+                let draw_mode = storage.info(i).draw_mode;
                 if draw_mode == DrawMode::None {
                     continue;
                 }
+                let vao = storage.get_vao(i);
                 let shader_type = mesh.material.shader_type;
                 let program = self.shaders.get(&shader_type).unwrap();
                 self.ctx.use_program(Some(&program));
@@ -182,27 +183,30 @@ impl Renderer {
                     self.ctx.active_texture(GL::TEXTURE0);
                     bind_uniform_i32(&self.ctx, program, "sampler", 0);
                 }
-                let transform = storage.get_transform(i).to_homogeneous();
-                let p_transform = storage.get_parent_transform(i).to_homogeneous();
+                let transform = storage.transform(i).to_homogeneous();
+                let p_transform = storage.parent_tranform(i).to_homogeneous();
                 let model = p_transform * transform;
                 bind_uniform_mat4(&self.ctx, program, "model", &model);
-                let normal_matrix = transform.transpose();
                 if shader_type != ShaderType::Simple {
+                    let normal_matrix = model.transpose();
                     bind_uniform_mat4(&self.ctx, program, "normalMatrix", &normal_matrix);
                 }
+                bind_uniform_mat4(&self.ctx, &program, "view", &viewport.view());
+                bind_uniform_mat4(&self.ctx, &program, "proj", &viewport.proj());
                 let indices = &mesh.geometry.indices;
                 bind_index_buffer(&self.ctx, &indices).expect("Can't bind index buffer!");
                 match draw_mode {
                     DrawMode::Triangle => {
-                        let name = storage.get_info(i).name;
-                        match name.as_str() {
-                            "translation" | "Pointy Arrow Head" | "Arrow Stem" => {
-                                self.ctx.disable(GL::DEPTH_TEST);
-                            }
-                            _=> {
-                                self.ctx.enable(GL::DEPTH_TEST);
-                            }
-                        }
+                        self.ctx.enable(GL::DEPTH_TEST);
+                        self.ctx.draw_elements_with_i32(
+                            GL::TRIANGLES,
+                            indices.len() as i32,
+                            GL::UNSIGNED_SHORT,
+                            0,
+                        );
+                    }
+                    DrawMode::Triangle_no_depth => {
+                        self.ctx.disable(GL::DEPTH_TEST);
                         self.ctx.draw_elements_with_i32(
                             GL::TRIANGLES,
                             indices.len() as i32,
@@ -220,20 +224,12 @@ impl Renderer {
                     }
                     _ => (),
                 }
-                self.ctx.bind_vertex_array(None);
-                self.ctx.bind_buffer(GL::ARRAY_BUFFER, None);
-                self.ctx.bind_buffer(GL::ELEMENT_ARRAY_BUFFER, None);
-                self.ctx.use_program(None);
             }
         }
-    }
-    pub fn update_viewport(&self, viewport: &Viewport) {
-        for (_, program) in &self.shaders {
-            self.ctx.use_program(Some(&program));
-            bind_uniform_mat4(&self.ctx, &program, "view", &viewport.view());
-            bind_uniform_mat4(&self.ctx, &program, "proj", &viewport.proj());
-            self.ctx.use_program(None);
-        }
+        self.ctx.bind_vertex_array(None);
+        self.ctx.bind_buffer(GL::ARRAY_BUFFER, None);
+        self.ctx.bind_buffer(GL::ELEMENT_ARRAY_BUFFER, None);
+        self.ctx.use_program(None);
     }
     pub fn resize(&mut self, viewport: &mut Viewport) {
         log!("Renderer resized");

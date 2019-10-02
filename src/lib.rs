@@ -10,8 +10,11 @@ mod log_macros;
 
 use std::rc::Rc;
 use std::cell::RefCell;
+
+/// Shorthand for Rc<RefCell\<T\>>.
 pub type RcRcell<T> = Rc<RefCell<T>>;
 
+/// Shorthand for Rc::new(RefCell::new(T)).
 pub fn rc_rcell<T>(inner: T) -> RcRcell<T> {
    Rc::new(RefCell::new(inner))
 }
@@ -49,6 +52,7 @@ use scene::{
 };
 use editor::console_setup;
 
+/// The main entrypoint that is automatically executed on page load.
 #[wasm_bindgen(start)]
 pub fn start() -> Result<(), JsValue> {
     console_setup(true);
@@ -76,7 +80,7 @@ pub fn start() -> Result<(), JsValue> {
     );
 
     let a_rndr = rc_rcell(renderer);
-    let scene = Scene::new(a_rndr.clone());
+    let mut scene = Scene::new(a_rndr.clone());
 
     let cube_geometry = Geometry::from_genmesh(&Cube::new());
 
@@ -109,17 +113,16 @@ pub fn start() -> Result<(), JsValue> {
     let cube_tex =
     Material::from_image_texture(a_rndr.borrow().context(), "/assets/img/box_tex.png", tex_coords)?;
 
-     let cube = scene.object_from_mesh(cube_geometry.clone(), cube_tex);
-     let cube2 = scene.object_from_mesh(cube_geometry.clone(), Material::vertex_colors(colors));
+     let cube = scene.object_from_mesh_and_name(cube_geometry.clone(), cube_tex, "Wooden Cube");
+     let cube2 = scene.object_from_mesh_and_name(cube_geometry.clone(), Material::vertex_colors(colors), "Colored Cube");
 
      cube.set_position([10.,0.,10.]);
-     scene.add(&cube);
-     scene.add(&cube2);
 
-    let pan_gizmo = create_transform_gizmo(&scene, ArrowType::Sphere);
-    scene.add(&pan_gizmo);
-    let pan_gizmo = rc_rcell(pan_gizmo);
-    
+     let a_cube = rc_rcell(cube);
+     let a_cube2 = rc_rcell(cube2);
+     scene.add(a_cube.clone());
+     scene.add(a_cube2.clone());
+
     let (a_sun, a_earth) = {
         //let scene = a_scene.borrow();
         let renderer = a_rndr.borrow();
@@ -145,27 +148,25 @@ pub fn start() -> Result<(), JsValue> {
 
         moon.set_position([5.0, 0.0, 0.0]);
         earth.set_position([5.0, 0.0, 0.0]);
-        moon.scale(0.5);
-        earth.scale(0.5);
-        sun.scale(2.0);
+        moon.set_scale(0.5);
+        earth.set_scale(0.5);
+        sun.set_scale(2.0);
         sun.set_position([0.,-10.,0.]);
 
         let moon = rc_rcell(moon);
         earth.add(moon);
         let earth = rc_rcell(earth);
         sun.add(earth.clone());
-        scene.add(&sun);
+        let sun = rc_rcell(sun);
+        scene.add(sun.clone());
         renderer.setup_renderer();
-        renderer.update_viewport(&viewport);
-        (rc_rcell(sun), earth)
+        (sun, earth)
     };
 
-    let a_cube = rc_rcell(cube);
     let a_scene = rc_rcell(scene);
     let a_view = rc_rcell(viewport);
-    let editor = rc_rcell(Editor::new(a_view.clone(), a_scene.clone(), a_rndr.clone()));
-
-    let p_g = pan_gizmo.clone();
+    let mut editor = Editor::new(a_view.clone(), a_scene.clone(), a_rndr.clone());
+    editor.set_active_node(a_cube2.clone());
 
     let f = rc_rcell(None);
     let g = f.clone();
@@ -180,19 +181,8 @@ pub fn start() -> Result<(), JsValue> {
         //earth.rotate_by(UnitQuaternion::from_euler_angles(0., 0.02, 0.));
         //sun.rotate_by(UnitQuaternion::from_euler_angles(0., 0.01, 0.));
         let cube = a_cube.borrow_mut();
-        //cube.rotate_by(UnitQuaternion::from_euler_angles(0.01, 0.02, 0.));
-        renderer.render(&a_scene.borrow());
-        renderer.update_viewport(&view);
-        let pan_gizmo = p_g.borrow_mut();
-        match view.projection_type() {
-            ProjectionType::Orthographic => {
-                pan_gizmo.set_position(view.screen_to_world([-0.9,0.9,0.]));
-                pan_gizmo.scale(0.14);
-            }, ProjectionType::Perspective => {
-                pan_gizmo.set_position(view.screen_to_world([-0.9,0.9,-0.4]));
-                pan_gizmo.scale(0.0015);
-            }
-        }
+        cube.rotate_by(UnitQuaternion::from_euler_angles(0.01, 0.02, 0.));
+        renderer.render(&a_scene.borrow(), &view);
         request_animation_frame(f.borrow().as_ref().unwrap());
     }) as Box<dyn FnMut()>));
 

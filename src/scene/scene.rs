@@ -16,6 +16,8 @@ pub struct ObjectInfo {
     pub draw_mode: DrawMode,
 }
 
+/// A node is a entity in a scene that holds reference to its props in Storage, keeps tracks of
+/// other nodes that are its children either borrowed or owned.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node {
     index: usize,
@@ -25,10 +27,15 @@ pub struct Node {
 }
 
 impl Node {
+    pub fn position(&self) -> Vector3<f32> {
+        let mut storage = self.storage.borrow_mut();
+        let transform = storage.mut_transform(self.index);
+        transform.isometry.translation.vector
+    }
     pub fn set_position(&self, pos: [f32; 3]) {
         let p_transform = {
             let mut storage = self.storage.borrow_mut();
-            let transform = storage.get_mut_transform(self.index);
+            let transform = storage.mut_transform(self.index);
             transform.isometry.translation.vector = Vector3::from(pos);
             *transform
         };
@@ -39,10 +46,10 @@ impl Node {
             child.apply_parent_transform(p_transform);
         }
     }
-    pub fn scale(&self, scale: f32) {
+    pub fn set_scale(&self, scale: f32) {
         let p_transform = {
             let mut storage = self.storage.borrow_mut();
-            let transform = storage.get_mut_transform(self.index);
+            let transform = storage.mut_transform(self.index);
             transform.scale = Vector3::new(scale, scale, scale);
             *transform
         };
@@ -55,7 +62,7 @@ impl Node {
     }
     fn apply_parent_transform(&self, transform: Transform) {
         self.set_parent_transform(transform);
-        let p_transform = transform * self.get_transform();
+        let p_transform = transform * self.transform();
         // log!("Transform\n{:?}\nChild:\nTransform\n{:?}", transform, p_transform);
         for child in self.children.iter() {
             child.borrow().apply_parent_transform(p_transform);
@@ -67,7 +74,7 @@ impl Node {
     pub fn set_rotation(&self, rot: UnitQuaternion<f32>) {
         let p_transform = {
             let mut storage = self.storage.borrow_mut();
-            let mut transform = storage.get_mut_transform(self.index);
+            let mut transform = storage.mut_transform(self.index);
             transform.isometry.rotation = rot;
             *transform
         };
@@ -81,7 +88,7 @@ impl Node {
     pub fn rotate_by(&self, rot: UnitQuaternion<f32>) {
         let p_transform = {
             let mut storage = self.storage.borrow_mut();
-            let transform = storage.get_mut_transform(self.index);
+            let transform = storage.mut_transform(self.index);
             transform.isometry.append_rotation_wrt_center_mut(&rot);
             *transform
         };
@@ -95,7 +102,7 @@ impl Node {
     pub fn set_transform(&self, transform: Transform) {
         let p_transform = {
             let mut storage = self.storage.borrow_mut();
-            let t = storage.get_mut_transform(self.index);
+            let t = storage.mut_transform(self.index);
             *t = transform;
             *t
         };
@@ -106,41 +113,36 @@ impl Node {
             child.apply_parent_transform(p_transform);
         }
     }
-    pub fn get_position(&self) -> Vector3<f32> {
-        let mut storage = self.storage.borrow_mut();
-        let transform = storage.get_mut_transform(self.index);
-        transform.isometry.translation.vector
-    }
     pub fn rotation(&self) -> UnitQuaternion<f32> {
         let mut storage = self.storage.borrow_mut();
-        let transform = storage.get_mut_transform(self.index);
+        let transform = storage.mut_transform(self.index);
         transform.isometry.rotation
     }
-    pub fn scale_vec(&self, scale: [f32; 3]) {
+    pub fn set_scale_vec(&self, scale: [f32; 3]) {
         let mut storage = self.storage.borrow_mut();
-        let transform = storage.get_mut_transform(self.index);
+        let transform = storage.mut_transform(self.index);
         transform.scale = Vector3::new(scale[0], scale[2], scale[1]);
     }
-    pub fn get_scale(&self) -> Vector3<f32> {
+    pub fn scale(&self) -> Vector3<f32> {
         let storage = self.storage.borrow();
-        let transform = storage.get_transform(self.index);
+        let transform = storage.transform(self.index);
         transform.scale
     }
-    pub fn get_transform(&self) -> Transform {
+    pub fn transform(&self) -> Transform {
         let storage = self.storage.borrow();
-        storage.get_transform(self.index)
+        storage.transform(self.index)
     }
-    pub fn get_parent_transform(&self) -> Transform {
+    pub fn parent_tranform(&self) -> Transform {
         let storage = self.storage.borrow();
-        storage.get_parent_transform(self.index)
+        storage.parent_tranform(self.index)
     }
-    pub fn get_info(&self) -> ObjectInfo {
+    pub fn info(&self) -> ObjectInfo {
         let storage = self.storage.borrow();
-        storage.get_info(self.index)
+        storage.info(self.index)
     }
-    pub fn get_mesh(&self) -> Option<Mesh> {
+    pub fn mesh(&self) -> Option<Mesh> {
         let storage = self.storage.borrow();
-        storage.get_mesh(self.index)
+        storage.mesh(self.index)
     }
     pub fn set_mesh(&self, mesh: Mesh) {
         let mut storage = self.storage.borrow_mut();
@@ -156,14 +158,14 @@ impl Node {
         self.index
     }
     pub fn add(&mut self, node: RcRcell<Node>) {
-        node.borrow().apply_parent_transform(self.get_transform());
+        node.borrow().apply_parent_transform(self.transform());
         self.children.push(node);
     }
     pub fn own(&mut self, node: Node) {
-        node.apply_parent_transform(self.get_transform());
+        node.apply_parent_transform(self.transform());
         self.owned_children.push(node);
     }
-    pub fn get_storage(&self) -> RcRcell<Storage> {
+    pub fn storage(&self) -> RcRcell<Storage> {
         self.storage.clone()
     }
     pub fn children(&self) -> &Vec<RcRcell<Node>> {
@@ -174,6 +176,7 @@ impl Node {
     }
 }
 
+/// A Scene tree that facilitates creation of varieties of Nodes; this also owns the Storage.
 pub struct Scene {
     root: Node,
     renderer: RcRcell<Renderer>,
@@ -182,42 +185,49 @@ pub struct Scene {
 impl Scene {
     pub fn new(renderer: RcRcell<Renderer>) -> Self {
         let storage = rc_rcell(Storage::new());
+        let root = {
+            Self::object_default(storage, &renderer.borrow(), "Scene")
+        };
         Self {
-            root: Self::object_default(storage.clone(), renderer.clone(), "root"),
+            root,
             renderer,
         }
     }
-    pub fn add(&self, node: &Node) {
+    pub fn add(&mut self, node: RcRcell<Node>) {
         self.add_with_mode(node, DrawMode::Triangle);
     }
-    pub fn add_with_mode(&self, node: &Node, mode: DrawMode) {
+    pub fn show(&self, node: &Node, mode: DrawMode) {
         {
-            let sto = node.get_storage();
+            let sto = node.storage();
             let mut storage = sto.borrow_mut();
             let info = storage.get_mut_info(node.index());
             info.draw_mode = mode;
         }
         for child in node.children() {
             let child = child.borrow();
-            self.add_with_mode(&child, mode);
+            self.show(&child, mode);
         }
         for child in node.owned_children() {
-            self.add_with_mode(child, mode);
+            self.show(child, mode);
         }
     }
-    fn object_default(storage: RcRcell<Storage>,renderer: RcRcell<Renderer>, name: &str) -> Node {
+    pub fn add_with_mode(&mut self, node: RcRcell<Node>, mode: DrawMode) {
+        self.root.add(node.clone());
+        self.show(&node.borrow(), mode);
+    }
+    fn object_default(storage: RcRcell<Storage>, renderer: &Renderer, name: &str) -> Node {
         Self::object(storage, renderer, None, Default::default(), name)
     }
     fn object(
         storage: RcRcell<Storage>,
-        renderer: RcRcell<Renderer>,
+        renderer: &Renderer,
         mesh: Option<Mesh>,
         transform: Transform,
         name: &str,
     ) -> Node {
         let sto = storage.clone();
         let mut a_storage = sto.borrow_mut();
-        let vao = renderer.borrow().create_vao(&mesh);
+        let vao = renderer.create_vao(&mesh);
         let index = a_storage.add(mesh, vao, transform, name.into());
         Node {
             index,
@@ -226,13 +236,19 @@ impl Scene {
             owned_children: Vec::new(),
         }
     }
+    pub fn empty_w_name(&self, name: &str) -> Node {
+        Self::object_default(self.storage(), &self.renderer.borrow(), name)
+    }
     pub fn empty(&self) -> Node {
-        Self::object_default(self.get_storage(), self.renderer.clone(), "Empty")
+        self.empty_w_name("Empty")
+    }
+    pub fn root(&self) -> &Node {
+        &self.root
     }
     pub fn object_from_mesh(&self, geometry: Geometry, material: Material) -> Node {
         Self::object(
-            self.get_storage(),
-            self.renderer.clone(),
+            self.storage(),
+            &self.renderer.borrow(),
             Some(Mesh { geometry, material }),
             Default::default(),
             "node",
@@ -245,24 +261,26 @@ impl Scene {
         name: &str,
     ) -> Node {
         Self::object(
-            self.get_storage(),
-            self.renderer.clone(),
+            self.storage(),
+            &self.renderer.borrow(),
             Some(Mesh { geometry, material }),
             Default::default(),
             name,
         )
     }
-    pub fn get_storage(&self) -> Rc<RefCell<Storage>> {
-        self.root.get_storage()
+    pub fn storage(&self) -> RcRcell<Storage> {
+        self.root.storage()
     }
     pub fn duplicate_node(&self, node: &Node) -> Node {
-        let transform = node.get_transform();
-        let info = node.get_info();
-        let mesh = node.get_mesh();
-        Self::object(self.get_storage(), self.renderer.clone(), mesh, transform, info.name.as_str())
+        let transform = node.transform();
+        let info = node.info();
+        let mesh = node.mesh();
+        Self::object(self.storage(), &self.renderer.borrow(), mesh, transform, info.name.as_str())
     }
 }
 
+/// The main data structure that holds almost everything: object info, meshes, transforms, vaos,
+/// etc.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Storage {
     info: Vec<ObjectInfo>,
@@ -295,12 +313,12 @@ impl Storage {
         index
     }
     pub fn setup_vao(&mut self) {}
-    pub fn get_mut_transform(&mut self, indx: usize) -> &mut Transform {
+    pub fn mut_transform(&mut self, indx: usize) -> &mut Transform {
         self.transforms
             .get_mut(indx)
             .expect("No such transform found!")
     }
-    pub fn get_transform(&self, indx: usize) -> Transform {
+    pub fn transform(&self, indx: usize) -> Transform {
         *self.transforms.get(indx).expect("No such transform found!")
     }
     pub fn get_mut_parent_transform(&mut self, indx: usize) -> &mut Transform {
@@ -308,13 +326,13 @@ impl Storage {
             .get_mut(indx)
             .expect("No such transform found!")
     }
-    pub fn get_parent_transform(&self, indx: usize) -> Transform {
+    pub fn parent_tranform(&self, indx: usize) -> Transform {
         *self
             .parent_transforms
             .get(indx)
             .expect("No such transform found!")
     }
-    pub fn get_mesh(&self, indx: usize) -> Option<Mesh> {
+    pub fn mesh(&self, indx: usize) -> Option<Mesh> {
         self.meshes.get(indx).expect("No such mesh found!").clone()
     }
     pub fn get_mut_mesh(&mut self, indx: usize) -> &mut Option<Mesh> {
@@ -323,7 +341,7 @@ impl Storage {
     pub fn meshes(&self) -> &Vec<Option<Mesh>> {
         &self.meshes
     }
-    pub fn get_info(&self, indx: usize) -> ObjectInfo {
+    pub fn info(&self, indx: usize) -> ObjectInfo {
         self.info.get(indx).expect("No node info found!").clone()
     }
     pub fn get_vao(&self, indx: usize) -> Option<&WebGlVertexArrayObject> {

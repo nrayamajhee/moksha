@@ -18,14 +18,13 @@ macro_rules! log {
             )*
             match console_el {
                 Some(_) => {
-                    let para_el = document
-                        .query_selector("#console p:first-of-type")
-                        .unwrap()
+                    let log_el = document
+                        .get_element_by_id("logs")
                         .unwrap();
                     web_sys::console::log_1(&wasm_bindgen::JsValue::from_str(&msg));
-                    para_el
+                    log_el
                         .insert_adjacent_html(
-                            "afterend",
+                            "afterbegin",
                             &format!("<div><i class='material-icons-outlined'>info</i><pre>{}</pre></div>", msg),
                         )
                         .unwrap();

@@ -3,7 +3,7 @@ use crate::{
     scene::{Node, Scene},
 };
 use genmesh::generators::{Circle, Cone, Cube, Cylinder, IcoSphere, Plane, SphereUv, Torus};
-use nalgebra::UnitQuaternion;
+use nalgebra::{UnitQuaternion, Isometry3};
 use std::f32::consts::PI;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -13,6 +13,7 @@ pub enum ArrowType {
     Sphere,
 }
 
+/// Various primitive types (eg. Plane, Cube, Torus, IcoSphere, etc).
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Primitive {
     Plane,
@@ -64,37 +65,37 @@ pub enum GizmoGrab {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Gizmo {
-    Translate(Node, GizmoGrab),
-    Scale(Node, GizmoGrab),
-    Rotate(Node, GizmoGrab),
+    Translate(Node, GizmoGrab, Isometry3<f32>),
+    set_scale(Node, GizmoGrab, Isometry3<f32>),
+    Rotate(Node, GizmoGrab, Isometry3<f32>),
 }
 
 impl Gizmo {
-    pub fn inner(&self) -> (&Node, &GizmoGrab) {
+    pub fn inner(&self) -> (&Node, &GizmoGrab, &Isometry3<f32>) {
         match self {
-            Gizmo::Translate(n, s) => (n, s),
-            Gizmo::Scale(n, s) => (n, s),
-            Gizmo::Rotate(n, s) => (n, s),
+            Gizmo::Translate(n, s, i) => (n, s, i),
+            Gizmo::set_scale(n, s, i) => (n, s, i),
+            Gizmo::Rotate(n, s, i) => (n, s, i),
         }
     }
-    pub fn inner_mut(&mut self) -> (&Node, &mut GizmoGrab) {
+    pub fn inner_mut(&mut self) -> (&Node, &mut GizmoGrab, &mut Isometry3<f32>) {
         match self {
-            Gizmo::Translate(n, s) => (n, s),
-            Gizmo::Scale(n, s) => (n, s),
-            Gizmo::Rotate(n, s) => (n, s),
+            Gizmo::Translate(n, s, i) => (n, s, i),
+            Gizmo::set_scale(n, s, i) => (n, s, i),
+            Gizmo::Rotate(n, s, i) => (n, s, i),
         }
     }
 }
 
-pub fn create_arrow(scene: &Scene, color: [f32; 4], arrow_type: ArrowType, has_stem: bool) -> Node {
-    let mut node = scene.empty();
+pub fn create_arrow(scene: &Scene, color: [f32; 4], arrow_type: ArrowType, name: &str, has_stem: bool) -> Node {
+    let mut node = scene.empty_w_name(name);
     if has_stem {
         let stem = scene.object_from_mesh_and_name(
             Geometry::from_genmesh_no_normals(&Cylinder::subdivide(8, 1)),
             Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
             "Arrow Stem",
         );
-        stem.scale_vec([0.2, 3., 0.2]);
+        stem.set_scale_vec([0.2, 3., 0.2]);
         node.own(stem);
     }
     let head = match arrow_type {
@@ -102,27 +103,27 @@ pub fn create_arrow(scene: &Scene, color: [f32; 4], arrow_type: ArrowType, has_s
             let head = scene.object_from_mesh_and_name(
                 Geometry::from_genmesh(&Cone::new(8)),
                 Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
-                "Pointy Arrow Head",
+                "Arrow Head",
             );
-            head.scale(0.5);
+            head.set_scale(0.5);
             head
         }
         ArrowType::Cube => {
             let head = scene.object_from_mesh_and_name(
                 Geometry::from_genmesh_no_normals(&Cube::new()),
                 Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
-                "Flat Arrow Head",
+                "Arrow Head",
             );
-            head.scale(0.4);
+            head.set_scale(0.4);
             head
         }
         ArrowType::Sphere => {
             let head = scene.object_from_mesh_and_name(
                 Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(1)),
                 Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
-                "Sphere Arrow Head",
+                "Arrow Head",
             );
-            head.scale(0.8);
+            head.set_scale(0.8);
             head
         }
     };
@@ -137,8 +138,8 @@ pub fn create_arrow(scene: &Scene, color: [f32; 4], arrow_type: ArrowType, has_s
 //use ncollide3d::{shape::ConvexHull, query::Ray, query::RayCast, pipeline::object::CollisionObject};
 //use nalgebra::{Vector3, Point3, Isometry3};
 //let mut points = Vec::new();
-//let v = mesh.get_mesh().unwrap().geometry.vertices;
-//let s = mesh.get_transform().scale;
+//let v = mesh.mesh().unwrap().geometry.vertices;
+//let s = mesh.transform().scale;
 //for i in 0..v.len() / 3 {
 //points.push(Point3::new(v[i] * s.x, v[i+1] * s.y, v[i+2] * s.z));
 //}
@@ -152,9 +153,9 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowType) -> Node {
         ArrowType::Sphere => "look",
         ArrowType::Cube => "scale",
     };
-    let x = create_arrow(scene, [0.8, 0., 0., 1.], arrow_type, true);
-    let y = create_arrow(scene, [0., 0.8, 0., 1.], arrow_type, true);
-    let z = create_arrow(scene, [0., 0., 0.8, 1.], arrow_type, true);
+    let x = create_arrow(scene, [0.8, 0., 0., 1.], arrow_type, "x-axis", true);
+    let y = create_arrow(scene, [0., 0.8, 0., 1.], arrow_type, "y-axis", true);
+    let z = create_arrow(scene, [0., 0., 0.8, 1.], arrow_type, "z-axis", true);
     let mut node = scene.object_from_mesh_and_name(
         Geometry::from_genmesh(&IcoSphere::subdivide(2)),
         Material::single_color_no_shade(0.8, 0.8, 0.8, 0.8),
@@ -184,20 +185,20 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowType) -> Node {
     x_p.set_position([0., 3., 3.]);
     y_p.set_position([3., 0., 3.]);
     z_p.set_position([3., 3., 0.]);
-    x_p.scale_vec([0.2,1.,1.]);
-    y_p.scale_vec([1.,1.,0.2]);
-    z_p.scale_vec([1.,0.2,1.]);
+    x_p.set_scale_vec([0.2,1.,1.]);
+    y_p.set_scale_vec([1.,1.,0.2]);
+    z_p.set_scale_vec([1.,0.2,1.]);
     node.own(x);
     node.own(y);
     node.own(z);
     node.own(x_p);
     node.own(y_p);
     node.own(z_p);
-    node.scale(0.5);
+    node.set_scale(0.5);
     if arrow_type == ArrowType::Sphere {
-        let n_x = create_arrow(scene, [1.0, 0.0, 0.0, 1.0], arrow_type, false);
-        let n_y = create_arrow(scene, [0.0, 1.0, 0.0, 1.0], arrow_type, false);
-        let n_z = create_arrow(scene, [0.0, 0.0, 1.0, 1.0], arrow_type, false);
+        let n_x = create_arrow(scene, [1.0, 0.0, 0.0, 1.0], arrow_type, "snap-x", false);
+        let n_y = create_arrow(scene, [0.0, 1.0, 0.0, 1.0], arrow_type, "snap-y", false);
+        let n_z = create_arrow(scene, [0.0, 0.0, 1.0, 1.0], arrow_type, "snap-z", false);
         n_x.set_position([-6., 0., 0.]);
         n_y.set_position([0., -6., 0.]);
         n_z.set_position([0., 0., -6.]);

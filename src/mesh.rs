@@ -7,6 +7,7 @@ use nalgebra::{one, Isometry3, Matrix4, Translation3, Vector3};
 use wasm_bindgen::JsValue;
 use web_sys::WebGl2RenderingContext as GL;
 
+/// A 3D transform that can handle translation, rotation, and scaling.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Transform {
     pub isometry: Isometry3<f32>,
@@ -28,6 +29,7 @@ impl From<Isometry3<f32>> for Transform {
     }
 }
 
+/// Computes a direct product of two vector3s i.e. (a,b,c) x (a',b',c') => (aa', bb', cc')
 pub fn multiply(left: Vector3<f32>, right: Vector3<f32>) -> Vector3<f32> {
     Vector3::new(left.x * right.x, left.y * right.y, left.z * right.z)
 }
@@ -61,12 +63,14 @@ impl Default for Transform {
     }
 }
 
+/// A 3D mesh containing geometry and material.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Mesh {
     pub geometry: Geometry,
     pub material: Material,
 }
 
+/// Geometry of a 3D object containing vertices, indices, and face normals.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Geometry {
     pub vertices: Vec<f32>,
@@ -120,6 +124,7 @@ impl Geometry {
     }
 }
 
+/// Material for a 3D object; can contain either color, vertex colors, or texture.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Material {
     pub shader_type: ShaderType,
