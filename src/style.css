@@ -131,6 +131,20 @@ canvas.grab {
 #console.shown ~ section, #console.shown ~ canvas {
     filter: blur(10px);
 }
+#console div {
+    margin: 0;
+    padding: var(--pad);
+}
+#console pre {
+	margin: 0;
+	margin-left: calc(24px + var(--pap));
+}
+#console div i {
+    margin-right: var(--pad);
+    vertical-align: top;
+	float: left;
+    color: yellow;
+}
 button {
     position: relative;
     padding: 0;

@@ -60,7 +60,7 @@ impl Editor {
             let grid = rc_rcell(grid);
             scene.add_with_mode(grid, DrawMode::Lines);
             let gizmo = create_transform_gizmo(&scene, ArrowType::Cone);
-            scene.show(&gizmo, DrawMode::Triangle_no_depth);
+            //scene.show(&gizmo, DrawMode::Triangle_no_depth);
             gizmo
         };
         let gizmo = rc_rcell(Gizmo::Translate(
@@ -393,6 +393,8 @@ impl Editor {
             if let Some(i) = pan_view.toi_and_normal_with_ray(&transform, &ray, false) {
                 let mut g_p = gizmo_node.global_position();
                 let poi = ray.point_at(i.toi);
+                log!(poi.y);
+                log!(g_p[1]);
                 let pos = match gizmo_state {
                     GizmoGrab::XAxis => [poi.x, g_p[1], g_p[2]],
                     GizmoGrab::YAxis => [g_p[0], poi.y, g_p[2]],

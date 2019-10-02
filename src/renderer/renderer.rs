@@ -1,6 +1,6 @@
 use super::shader::{
     bind_buffer_and_attribute, bind_index_buffer, bind_uniform_i32, bind_uniform_mat4,
-    bind_uniform_vec4, create_color_program, create_simple_program, create_texture_program,
+    bind_uniform_vec4, bind_uniform_vec3, create_color_program, create_simple_program, create_texture_program,
     create_vertex_color_program, ShaderType,
 };
 use crate::dom_factory::{get_canvas, resize_canvas};
@@ -183,12 +183,10 @@ impl Renderer {
                     self.ctx.active_texture(GL::TEXTURE0);
                     bind_uniform_i32(&self.ctx, program, "sampler", 0);
                 }
-                let transform = storage.transform(i).to_homogeneous();
-                let p_transform = storage.parent_tranform(i).to_homogeneous();
-                let model = p_transform * transform;
-                bind_uniform_mat4(&self.ctx, program, "model", &model);
+                let model = storage.transform(i) * storage.parent_tranform(i);
+                bind_uniform_mat4(&self.ctx, program, "model", &model.to_homogeneous());
                 if shader_type != ShaderType::Simple {
-                    let normal_matrix = model.transpose();
+                    let normal_matrix = model.inverse().to_homogeneous().transpose();
                     bind_uniform_mat4(&self.ctx, program, "normalMatrix", &normal_matrix);
                 }
                 bind_uniform_mat4(&self.ctx, &program, "view", &viewport.view());

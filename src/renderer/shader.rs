@@ -316,6 +316,17 @@ pub fn bind_uniform_vec4(gl: &GL, program: &WebGlProgram, attribute: &str, vecto
         vector[3],
     );
 }
+pub fn bind_uniform_vec3(gl: &GL, program: &WebGlProgram, attribute: &str, vector: &[f32]) {
+    let mat_attrib = gl
+        .get_uniform_location(program, attribute)
+        .expect(format!("Can't bind uniform: {}", attribute).as_str());
+    gl.uniform3f(
+        Some(&mat_attrib),
+        vector[0],
+        vector[1],
+        vector[2],
+    );
+}
 pub fn bind_buffer_f32(gl: &GL, data: &[f32]) -> Result<(), JsValue> {
     let buffer = gl.create_buffer().ok_or("failed to create buffer")?;
     gl.bind_buffer(GL::ARRAY_BUFFER, Some(&buffer));

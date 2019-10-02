@@ -139,9 +139,14 @@ pub fn start() -> Result<(), JsValue> {
         let renderer = a_rndr.borrow();
         //let viewport = a_view.borrow();
 
+        //let mut sun = scene.object_from_mesh_and_name(
+            //Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(1)),
+            //Material::single_color_no_shade(1.0, 1.0, 0.0, 1.0),
+            //"Sun",
+        //);
         let mut sun = scene.object_from_mesh_and_name(
-            Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(1)),
-            Material::single_color_no_shade(1.0, 1.0, 0.0, 1.0),
+            Geometry::from_genmesh(&IcoSphere::subdivide(3)),
+            Material::single_color(1.0, 1.0, 0.0, 1.0),
             "Sun",
         );
 
@@ -165,7 +170,7 @@ pub fn start() -> Result<(), JsValue> {
 
         let moon = rc_rcell(moon);
         earth.add(moon.clone());
-        earth.add(a_cube.clone());
+        //earth.add(a_cube.clone());
         let earth = rc_rcell(earth);
         sun.add(earth.clone());
         let sun = rc_rcell(sun);
@@ -177,7 +182,7 @@ pub fn start() -> Result<(), JsValue> {
     let a_scene = rc_rcell(scene);
     let a_view = rc_rcell(viewport);
     let mut editor = Editor::new(a_view.clone(), a_scene.clone(), a_rndr.clone());
-    editor.set_active_node(a_earth.clone());
+    editor.set_active_node(a_sun.clone());
     let a_editor = rc_rcell(editor);
 
     let f = rc_rcell(None);

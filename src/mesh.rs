@@ -18,6 +18,12 @@ impl Transform {
     pub fn to_homogeneous(&self) -> Matrix4<f32> {
         self.isometry.to_homogeneous() * Matrix4::new_nonuniform_scaling(&self.scale)
     }
+    pub fn inverse(&self) -> Self {
+        Self {
+            isometry: self.isometry.inverse(),
+            scale: divide([1.,1.,1.].into(), self.scale),
+        }
+    }
 }
 
 impl From<Isometry3<f32>> for Transform {

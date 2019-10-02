@@ -8,6 +8,6 @@ pub use renderer::{Config, CursorType, DrawMode, Renderer};
 
 pub use shader::{
     bind_attribute, bind_buffer_and_attribute, bind_buffer_f32, bind_index_buffer, bind_texture,
-    bind_uniform_i32, bind_uniform_mat4, bind_uniform_vec4, compile_shader, create_color_program,
+    bind_uniform_i32, bind_uniform_mat4, bind_uniform_vec4, bind_uniform_vec3,compile_shader, create_color_program,
     create_program, create_simple_program, create_texture_program, create_vertex_color_program, link_program, ShaderType,
 };

@@ -231,6 +231,10 @@ impl Viewport {
     pub fn transform(&self) -> Isometry3<f32> {
         self.view
     }
+    pub fn eye(&self) -> [f32;3] {
+        let v = (self.target * self.view.inverse()).translation.vector;
+        [v.x,v.y,v.z]
+    }
     pub fn focus(&mut self, node: &Node) {
         self.target = (node.parent_transform() * node.transform()).isometry;
     }
