@@ -114,7 +114,7 @@ pub fn start() -> Result<(), JsValue> {
 
      cube.set_position([10.,0.,10.]);
      scene.add(&cube);
-     //scene.add(&cube2);
+     scene.add(&cube2);
 
     let pan_gizmo = create_transform_gizmo(&scene, ArrowType::Sphere);
     scene.add(&pan_gizmo);
@@ -177,10 +177,10 @@ pub fn start() -> Result<(), JsValue> {
         let view = b_view.borrow();
         let sun = a_sun.borrow();
         let earth = a_earth.borrow();
-        earth.rotate_by(UnitQuaternion::from_euler_angles(0., 0.02, 0.));
-        sun.rotate_by(UnitQuaternion::from_euler_angles(0., 0.01, 0.));
+        //earth.rotate_by(UnitQuaternion::from_euler_angles(0., 0.02, 0.));
+        //sun.rotate_by(UnitQuaternion::from_euler_angles(0., 0.01, 0.));
         let cube = a_cube.borrow_mut();
-        cube.rotate_by(UnitQuaternion::from_euler_angles(0.01, 0.02, 0.));
+        //cube.rotate_by(UnitQuaternion::from_euler_angles(0.01, 0.02, 0.));
         renderer.render(&a_scene.borrow());
         renderer.update_viewport(&view);
         let pan_gizmo = p_g.borrow_mut();

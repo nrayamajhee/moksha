@@ -13,7 +13,7 @@ macro_rules! log {
                 if let Some(s) = (&$x as &dyn std::any::Any).downcast_ref::<&str>() {
                     msg.push_str(&format!("{} ",s));
                 } else {
-                    msg.push_str(&format!("{:?} ",$x));
+                    msg.push_str(&format!("{:#?} ",$x));
                 }
             )*
             match console_el {
@@ -26,7 +26,7 @@ macro_rules! log {
                     para_el
                         .insert_adjacent_html(
                             "afterend",
-                            &format!("<p><i class='material-icons-outlined'>info</i>{}</p>", msg),
+                            &format!("<div><i class='material-icons-outlined'>info</i><pre>{}</pre></div>", msg),
                         )
                         .unwrap();
                 },

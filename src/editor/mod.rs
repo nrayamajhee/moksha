@@ -114,7 +114,7 @@ impl Editor {
         if let Some(target) = ConvexHull::try_from_points(&verts) {
             let mut transform = c_t.isometry * p_t.isometry;
             transform.translation.vector = multiply(transform.translation.vector, s); 
-            log!("TRANSFORM", c_t.isometry.translation.vector,p_t.isometry.translation.vector, transform);
+            log!("TRANSFORM", c_t.isometry.translation.vector.data,p_t.isometry.translation.vector.data, transform);
             if target.intersects_ray(&transform, &ray) {
                 true
             } else {

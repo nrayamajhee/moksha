@@ -98,13 +98,18 @@ canvas.grab {
 #console.shown ~ section, #console.shown ~ canvas {
     filter: blur(10px);
 }
-#console p {
+#console div {
     margin: 0;
     padding: var(--pad);
 }
-#console p i {
+#console pre {
+	margin: 0;
+	margin-left: calc(24px + var(--pap));
+}
+#console div i {
     margin-right: var(--pad);
     vertical-align: top;
+	float: left;
     color: yellow;
 }
 button {
@@ -209,7 +214,9 @@ button:hover > .hint {
     border-color: transparent;
     padding: var(--pad);
 }
-#console p:first-of-type {
+#console p {
+    margin: 0;
+    padding: var(--pad);
     text-transform: uppercase;
     font-weight: bold;
     background: rgba(50,50,50,0.5);
