@@ -82,7 +82,7 @@ impl Viewport {
         proj_type: ProjectionType,
     ) -> Self {
         let view =
-            Isometry3::look_at_rh(&[0., 3., 3.].into(), &[0., 0., 0.].into(), &Vector3::y());
+            Isometry3::look_at_rh(&[0., 10., 10.].into(), &[0., 0., 0.].into(), &Vector3::y());
 
         let proj = if proj_type == ProjectionType::Perspective {
             Projection::Perspective(Perspective3::new(
@@ -120,15 +120,18 @@ impl Viewport {
         }
     }
     pub fn view(&self) -> Matrix4<f32> {
-        self.view.to_homogeneous() * self.target.inverse().to_homogeneous()
+        let m = self.translation.vector.magnitude() + self.target.translation.vector.magnitude();
+        let eye = self.view.rotation.transform_vector([m,0.,0.].into());
+        let transform = Isometry3::from([].into(),[5.,0.,0.,].into(), (self.view.rotation *
+        self.target.rotation) * Vector3::y());
+        (self.view * self.target).to_homogeneous()
     }
     pub fn proj(&self) -> Matrix4<f32> {
         self.proj.to_matrix()
     }
     pub fn screen_to_world(&self, point: [f32; 3]) -> [f32; 3] {
         let p = self.proj.unproject_point(&point.into());
-        let view_m = (self.target * self.view.inverse());
-        let p = view_m.transform_point(&p);
+        let p = self.view.inverse().transform_point(&p);
         [p.x, p.y, p.z]
     }
     pub fn screen_to_ray(&self, point: [f32; 2]) -> [f32; 3] {
@@ -142,8 +145,7 @@ impl Viewport {
             ),
             Projection::Perspective(proj) => Vector3::new(p.x, p.y, p.z),
         };
-        let view_m = (self.target * self.view.inverse());
-        let v = view_m.transform_vector(&v);
+        let v = self.view.rotation.inverse().transform_vector(&v);
         let v = v.normalize();
         [v.x, v.y, v.z]
     }
@@ -232,6 +234,7 @@ impl Viewport {
         self.view
     }
     pub fn focus(&mut self, node: &Node) {
-        self.target = (node.parent_transform() * node.transform()).isometry;
+        let transform = node.parent_transform() * node.transform();
+        self.target = transform.isometry;
     }
 }

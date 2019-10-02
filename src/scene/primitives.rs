@@ -194,7 +194,6 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowType) -> Node {
     node.own(x_p);
     node.own(y_p);
     node.own(z_p);
-    node.set_scale(0.5);
     if arrow_type == ArrowType::Sphere {
         let n_x = create_arrow(scene, [1.0, 0.0, 0.0, 1.0], arrow_type, "snap-x", false);
         let n_y = create_arrow(scene, [0.0, 1.0, 0.0, 1.0], arrow_type, "snap-y", false);

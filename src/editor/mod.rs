@@ -5,7 +5,7 @@ use crate::{
     dom_factory::{
         add_event, body, document, get_el, icon_btn_w_id, query_els, query_html_el, window,
     },
-    mesh::{multiply, Geometry, Material},
+    mesh::{multiply, Geometry, Material, divide},
     rc_rcell,
     renderer::DrawMode,
     scene::{
@@ -156,7 +156,7 @@ impl Editor {
     }
     fn ray_collides_w_node(ray: &Ray<f32>, node: &Node) -> Option<Isometry3<f32>> {
         let mut c_t = node.transform();
-        let p_t = node.parent_tranform();
+        let p_t = node.parent_transform();
         let s = multiply(c_t.scale, p_t.scale);
         let verts: Vec<Point3<f32>> = node
             .mesh()
@@ -169,6 +169,7 @@ impl Editor {
         if let Some(target) = ConvexHull::try_from_points(&verts) {
             let transform = (p_t * c_t).isometry;
             if target.intersects_ray(&transform, &ray) {
+                log!("NODE:", transform.translation.vector);
                 Some(transform)
             } else {
                 None
@@ -177,13 +178,50 @@ impl Editor {
             None
         }
     }
-    fn change_color(
-        node: &Node,
-        color: [f32; 3],
-    ) {
+    fn change_color(node: &Node, color: [f32; 3]) {
         let mut mesh = node.mesh().unwrap();
         mesh.material = Material::single_color_no_shade(color[0], color[1], color[2], 1.);
         node.set_mesh(mesh);
+    }
+    fn check_collision(
+        ray: &Ray<f32>,
+        a_node: RcRcell<Node>,
+        a_active: RcRcell<Option<RcRcell<Node>>>,
+        a_gizmo: RcRcell<Gizmo>,
+    ) -> bool {
+        let node = a_node.borrow();
+        {
+            if let Some(transform) = Self::ray_collides_w_node(ray, &node) {
+                let v = node.transform().isometry.translation.vector;
+                let gizmo = a_gizmo.borrow();
+                let gizmo_node = gizmo.inner().0;
+                gizmo_node.set_position([v.x, v.y, v.z]);
+                let mut active_node = a_active.borrow_mut();
+                *active_node = Some(a_node.clone());
+                return true;
+            }
+        }
+        for child in node.children() {
+            if Self::check_collision(ray, child.clone(), a_active.clone(), a_gizmo.clone()) {
+                return true;
+            }
+        }
+        false
+    }
+    pub fn update(&mut self, view: &mut Viewport) {
+        let node = self.active_node.borrow();
+        if let Some(node) = node.as_ref() {
+            view.focus(&node.borrow());
+            let gizmo = self.gizmo.borrow();
+            let gizmo_node = gizmo.inner().0;
+            let p_t = node.borrow().parent_transform();
+            gizmo_node.set_parent_transform(p_t);
+            let v = node.borrow().position();
+            gizmo_node.set_position(v);
+            let ds = 1. / p_t.scale.magnitude() * view.transform().translation.vector.magnitude() / 20.;
+            gizmo_node.set_scale(ds);
+            //log!(node.borrow().info());
+        }
     }
     fn add_events(&mut self) {
         let handle_persp_toggle = |a_view: RcRcell<Viewport>| {
@@ -248,76 +286,81 @@ impl Editor {
         let a_scene = self.scene.clone();
         let a_node = self.active_node.clone();
         add_event(self.renderer.borrow().canvas(), "mousedown", move |e| {
-            let mut renderer = a_rndr.borrow_mut();
             let mut view = a_view.borrow_mut();
-            let mut gizmo = a_gizmo.borrow_mut();
             let scene = a_scene.borrow();
 
             get_el("mesh-list").class_list().remove_1("shown").unwrap();
             let me = e.dyn_into::<MouseEvent>().unwrap();
-            let ray = Self::get_ray_from_screen(&me, &view, renderer.canvas());
-            let (gizmo_node, gizmo_state, g_transform) = gizmo.inner_mut();
 
-            let target = Ball::new(0.5);
-            // if the central white ball is clicked
-            if target.intersects_ray(&gizmo_node.transform().isometry, &ray) {
-                let transform = Isometry3::from_parts(
-                    Translation3::new(0., 0., 0.),
-                    view.transform().inverse().rotation,
-                );
-                *gizmo_state = GizmoGrab::ViewPlane;
-                *g_transform = transform;
-                Self::change_color(gizmo_node, [1.,1.,1.]);
-            } else {
+            let ray = {
+                let mut renderer = a_rndr.borrow_mut();
+                Self::get_ray_from_screen(&me, &view, renderer.canvas())
+            };
+
+            {
+                let mut gizmo = a_gizmo.borrow_mut();
+                let (gizmo_node, gizmo_state, g_transform) = gizmo.inner_mut();
+
+                let target = Ball::new(0.5);
+                // if the central white ball is clicked
+                let gizmo_node_t = gizmo_node.transform().isometry;
+                if target.intersects_ray(&gizmo_node_t, &ray) {
+                    let translation = gizmo_node_t.translation;
+                    let transform =
+                        Isometry3::from_parts(translation, view.transform().rotation);
+                    *gizmo_state = GizmoGrab::ViewPlane;
+                    *g_transform = transform;
+                    Self::change_color(gizmo_node, [1., 1., 1.]);
+                    return;
+                }
+                // if the arrows are clicked
                 for child in gizmo_node.owned_children() {
                     let g_c = child.owned_children();
-                    // if the arrows are clicked 
                     if g_c.len() > 0 {
-                            let (tip, stem) = (&g_c[1], &g_c[0]);
-                            let mut collided = false;
-                            if let Some(_) = Self::ray_collides_w_node(&ray, tip) {
-                               collided = true 
-                            } else if let Some(_) = Self::ray_collides_w_node(&ray, stem) {
-                               collided = true 
-                            }
-                            let transform = gizmo_node.transform().isometry;
-                            let (color, g_state) = match child.info().name.as_str() {
-                                "x-axis" => ([1.,0.,0.,], GizmoGrab::XAxis),
-                                "y-axis" => ([0.,1.,0.,], GizmoGrab::YAxis),
-                                "z-axis" => ([0.,0.,1.,], GizmoGrab::ZAxis),
-                                _=>([0.,0.,0.], GizmoGrab::None),
-                            };
-                            if collided {
-                                *gizmo_state = g_state;
-                                *g_transform = transform;
-                                Self::change_color(stem, color);
-                                Self::change_color(tip, color);
-                                break;
-                            }
-                    // if the cuboids are clicked 
+                        let (tip, stem) = (&g_c[1], &g_c[0]);
+                        let mut collided = false;
+                        if let Some(_) = Self::ray_collides_w_node(&ray, tip) {
+                            collided = true
+                        } else if let Some(_) = Self::ray_collides_w_node(&ray, stem) {
+                            collided = true
+                        }
+                        let v = gizmo_node.transform().isometry.translation.vector;
+                        let mut transform = Isometry3::identity();
+                        let (color, g_state) = match child.info().name.as_str() {
+                            "x-axis" => ([1., 0., 0.], GizmoGrab::XAxis),
+                            "y-axis" => ([0., 1., 0.], GizmoGrab::YAxis),
+                            "z-axis" => ([0., 0., 1.], GizmoGrab::ZAxis),
+                            _ => ([0., 0., 0.], GizmoGrab::None),
+                        };
+                        if collided {
+                            *gizmo_state = g_state;
+                            *g_transform = transform;
+                            Self::change_color(stem, color);
+                            Self::change_color(tip, color);
+                            return;
+                        }
+                    // if the cuboids are clicked
                     } else {
                         if let Some(transform) = Self::ray_collides_w_node(&ray, &child) {
+                            let d = transform.translation.vector;
                             let (color, g_state) = match child.info().name.as_str() {
-                                "pan_x" => ([1.,0.,0.,], GizmoGrab::XPlane),
-                                "pan_y" => ([0.,1.,0.,], GizmoGrab::YPlane),
-                                "pan_z" => ([0.,0.,1.,], GizmoGrab::ZPlane),
-                                _=>([0.,0.,0.], GizmoGrab::None),
+                                "pan_x" => ([1., 0., 0.], GizmoGrab::XPlane),
+                                "pan_y" => ([0., 1., 0.], GizmoGrab::YPlane),
+                                "pan_z" => ([0., 0., 1.], GizmoGrab::ZPlane),
+                                _ => ([0., 0., 0.], GizmoGrab::None),
                             };
                             *gizmo_state = g_state;
                             *g_transform = transform;
                             Self::change_color(&child, color);
-                            break;
+                            return;
                         }
                     }
                 }
-                // if any other object is clicked 
-                for child in scene.root().children() {
-                    if let Some(transform) = Self::ray_collides_w_node(&ray, &child.borrow()) {
-                        let mut active_node = a_node.borrow_mut();
-                        let v = child.borrow().transform().isometry.translation.vector;
-                        *active_node = Some(child.clone());
-                        gizmo_node.set_position([v.x, v.y, v.z]);
-                    }
+            }
+            // if any other object is clicked
+            for each in scene.root().children() {
+                if Self::check_collision(&ray, each.clone(), a_node.clone(), a_gizmo.clone()) {
+                    return;
                 }
             }
         });
@@ -344,41 +387,42 @@ impl Editor {
             let axis = match gizmo_state {
                 GizmoGrab::YAxis | GizmoGrab::XPlane => Vector3::x_axis(),
                 GizmoGrab::XAxis | GizmoGrab::ZAxis | GizmoGrab::YPlane => Vector3::y_axis(),
-                _=> Vector3::z_axis(),
+                _ => Vector3::z_axis(),
             };
             let pan_view = CollidePlane::new(axis);
-            if let Some(i) = pan_view.toi_and_normal_with_ray(&transform, &ray, true) {
-                let g_p = gizmo_node.position();
+            if let Some(i) = pan_view.toi_and_normal_with_ray(&transform, &ray, false) {
+                let mut g_p = gizmo_node.global_position();
                 let poi = ray.point_at(i.toi);
                 let pos = match gizmo_state {
-                    GizmoGrab::XAxis => {
-                        [poi.x, g_p.y, g_p.z] 
-                    } 
-                    GizmoGrab::YAxis => {
-                        [g_p.x, poi.y, g_p.z] 
-                    } 
-                    GizmoGrab::ZAxis => {
-                        [g_p.x, g_p.y, poi.z] 
-                    } _=> {
-                        [poi.x, poi.y, poi.z]
-                    }
+                    GizmoGrab::XAxis => [poi.x, g_p[1], g_p[2]],
+                    GizmoGrab::YAxis => [g_p[0], poi.y, g_p[2]],
+                    GizmoGrab::ZAxis => [g_p[0], g_p[1], poi.z],
+                    _ => [poi.x, poi.y, poi.z],
                 };
-                gizmo_node.set_position(pos);
                 if let Some(node) = active_node.as_ref() {
-                    node.borrow().set_position(pos);
+                    // do calculation relative to parent element
+                    // then set the calculated position
+                    let node = node.borrow();
+                    let p_t = node.parent_transform();
+                    let p_v = p_t.isometry.translation.vector;
+                    let p_r = p_t.isometry.rotation;
+                    let p_diff = Vector3::from(pos) - p_v;
+                    let p = divide(p_diff, p_t.scale);
+                    let p = p_r.inverse().transform_vector(&p);
+                    node.set_position([p.x,p.y,p.z].into());
                 }
             }
         });
 
-        let a_gizmo = self.gizmo.clone();
-        add_event(self.renderer.borrow().canvas(), "wheel", move |e| {
+        //let a_gizmo = self.gizmo.clone();
+        //let a_view = self.view.clone();
+        //add_event(self.renderer.borrow().canvas(), "wheel", move |_| {
             //let gizmo = a_gizmo.borrow();
             //let gizmo = gizmo.inner().0;
-            //let we = e.dyn_into::<WheelEvent>().unwrap();
-            //let scale = gizmo.scale().x;
-            //let ds = if we.delta_y() > 0. { scale + 0.1 } else { scale - 0.1 };
+            //let view = a_view.borrow();
+            //let ds = view.transform().translation.vector.magnitude() / 30.;
             //gizmo.set_scale(ds);
-        });
+        //});
 
         let a_gizmo = self.gizmo.clone();
         add_event(self.renderer.borrow().canvas(), "mouseup", move |e| {
@@ -388,10 +432,10 @@ impl Editor {
                 return;
             }
             let color = match *gizmo_state {
-                GizmoGrab::ViewPlane => [0.8,0.8,0.8],
-                GizmoGrab::XAxis | GizmoGrab::XPlane => [0.8,0.,0.],
-                GizmoGrab::YAxis | GizmoGrab::YPlane => [0.,0.8,0.],
-                _=> [0.,0.,0.8],
+                GizmoGrab::ViewPlane => [0.8, 0.8, 0.8],
+                GizmoGrab::XAxis | GizmoGrab::XPlane => [0.8, 0., 0.],
+                GizmoGrab::YAxis | GizmoGrab::YPlane => [0., 0.8, 0.],
+                _ => [0., 0., 0.8],
             };
             let mut nodes = vec![gizmo_node];
             if *gizmo_state != GizmoGrab::ViewPlane {
@@ -411,13 +455,13 @@ impl Editor {
                             break;
                         }
                     } else {
-                        if *gizmo_state == GizmoGrab::XPlane && name =="pan_x" {
+                        if *gizmo_state == GizmoGrab::XPlane && name == "pan_x" {
                             nodes = vec![child];
                             break;
-                        } else if *gizmo_state == GizmoGrab::YPlane && name =="pan_y" {
+                        } else if *gizmo_state == GizmoGrab::YPlane && name == "pan_y" {
                             nodes = vec![child];
                             break;
-                        } else if *gizmo_state == GizmoGrab::ZPlane && name =="pan_z" {
+                        } else if *gizmo_state == GizmoGrab::ZPlane && name == "pan_z" {
                             nodes = vec![child];
                             break;
                         }
@@ -427,10 +471,7 @@ impl Editor {
             *gizmo_state = GizmoGrab::None;
             *g_transform = Isometry3::identity();
             for each in nodes {
-                Self::change_color(
-                    each,
-                    color,
-                );
+                Self::change_color(each, color);
             }
         });
 
@@ -445,8 +486,7 @@ impl Editor {
         add_event(&window(), "mousemove", move |e| {
             let me = e.dyn_into::<MouseEvent>().unwrap();
             let mut view = a_view.borrow_mut();
-            let dy = if me.movement_y() > 0 { 0.1 } else { -0.1 };
-            view.update_zoom(dy);
+            view.update_zoom(me.movement_y());
         });
 
         let a_view = self.view.clone();

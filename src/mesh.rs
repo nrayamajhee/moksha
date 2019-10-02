@@ -34,6 +34,11 @@ pub fn multiply(left: Vector3<f32>, right: Vector3<f32>) -> Vector3<f32> {
     Vector3::new(left.x * right.x, left.y * right.y, left.z * right.z)
 }
 
+/// Computes a direct division of two vector3s i.e. (a,b,c) x (a',b',c') => (a/a', b/b', c/c')
+pub fn divide(left: Vector3<f32>, right: Vector3<f32>) -> Vector3<f32> {
+    Vector3::new(left.x / right.x, left.y / right.y, left.z / right.z)
+}
+
 impl std::ops::Mul<Transform> for Transform {
     type Output = Self;
 

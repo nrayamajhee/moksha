@@ -1,5 +1,8 @@
 #![feature(proc_macro_hygiene)]
-#![doc(html_logo_url = "https://moksha.rayamajhee.com/assets/img/icon.png", html_favicon_url = "https://moksha.rayamajhee.com/assets/img/icon.png")]
+#![doc(
+    html_logo_url = "https://moksha.rayamajhee.com/assets/img/icon.png",
+    html_favicon_url = "https://moksha.rayamajhee.com/assets/img/icon.png"
+)]
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
@@ -8,15 +11,15 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 #[macro_use]
 mod log_macros;
 
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 /// Shorthand for Rc<RefCell\<T\>>.
 pub type RcRcell<T> = Rc<RefCell<T>>;
 
 /// Shorthand for Rc::new(RefCell::new(T)).
 pub fn rc_rcell<T>(inner: T) -> RcRcell<T> {
-   Rc::new(RefCell::new(inner))
+    Rc::new(RefCell::new(inner))
 }
 
 use genmesh::generators::{Cone, Cube, Cylinder, IcoSphere, Plane, SphereUv, Torus};
@@ -38,19 +41,17 @@ pub mod scene;
 
 #[doc(inline)]
 pub use crate::{
-    scene::{Node, Scene, Storage, Primitive},
-    renderer::Renderer,
-    mesh::{Geometry, Material, Mesh, Transform},
+    controller::{MouseButton, ProjectionType, Viewport},
     editor::Editor,
-    controller::{Viewport,ProjectionType, MouseButton},
+    mesh::{Geometry, Material, Mesh, Transform},
+    renderer::Renderer,
+    scene::{Node, Primitive, Scene, Storage},
 };
 
-use controller::{ProjectionConfig};
-use renderer::{CursorType, DrawMode};
-use scene::{
-    primitives::{create_transform_gizmo, ArrowType},
-};
+use controller::ProjectionConfig;
 use editor::console_setup;
+use renderer::{CursorType, DrawMode};
+use scene::primitives::{create_transform_gizmo, ArrowType};
 
 /// The main entrypoint that is automatically executed on page load.
 #[wasm_bindgen(start)]
@@ -69,7 +70,7 @@ pub fn start() -> Result<(), JsValue> {
         selector: "#gl-canvas",
         pixel_ratio: 1.0,
     });
-    let viewport = Viewport::new(
+    let mut viewport = Viewport::new(
         ProjectionConfig {
             fov: PI / 2.,
             near: 0.1,
@@ -86,51 +87,61 @@ pub fn start() -> Result<(), JsValue> {
 
     let mut colors = Vec::new();
     let face_colors = vec![
-    [1.0, 1.0, 1.0, 1.0], // Front face: white
-    [1.0, 0.0, 0.0, 1.0], // Back face: red
-    [0.0, 1.0, 0.0, 1.0], // Top face: green
-    [0.0, 0.0, 1.0, 1.0], // Bottom face: blue
-    [1.0, 1.0, 0.0, 1.0], // Right face: yellow
-    [1.0, 0.0, 1.0, 1.0], // Left face: purple
+        [1.0, 1.0, 1.0, 1.0], // Front face: white
+        [1.0, 0.0, 0.0, 1.0], // Back face: red
+        [0.0, 1.0, 0.0, 1.0], // Top face: green
+        [0.0, 0.0, 1.0, 1.0], // Bottom face: blue
+        [1.0, 1.0, 0.0, 1.0], // Right face: yellow
+        [1.0, 0.0, 1.0, 1.0], // Left face: purple
     ];
     for each in face_colors {
-    for _ in 0..4 {
-    for i in 0..4 {
-    colors.push(each[i]);
-    }
-    }
+        for _ in 0..4 {
+            for i in 0..4 {
+                colors.push(each[i]);
+            }
+        }
     }
     let tex_coords = vec![
-    // Front
-    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Back
-    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Top
-    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Bottom
-    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Right
-    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Left
-    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+        // Front
+        0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Back
+        0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Top
+        0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Bottom
+        0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Right
+        0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Left
+        0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
     ];
 
-    let cube_tex =
-    Material::from_image_texture(a_rndr.borrow().context(), "/assets/img/box_tex.png", tex_coords)?;
+    let cube_tex = Material::from_image_texture(
+        a_rndr.borrow().context(),
+        "/assets/img/box_tex.png",
+        tex_coords,
+    )?;
 
-     let cube = scene.object_from_mesh_and_name(cube_geometry.clone(), cube_tex, "Wooden Cube");
-     let cube2 = scene.object_from_mesh_and_name(cube_geometry.clone(), Material::vertex_colors(colors), "Colored Cube");
+    let mut cube = scene.object_from_mesh_and_name(cube_geometry.clone(), cube_tex, "Wooden Cube");
+    let cube2 = scene.object_from_mesh_and_name(
+        cube_geometry.clone(),
+        Material::vertex_colors(colors),
+        "Colored Cube",
+    );
 
-     cube.set_position([10.,0.,10.]);
+    cube.set_position([0., 1., 0.]);
+    cube.set_scale(0.2);
+    cube2.set_position([4., 0., 0.]);
 
-     let a_cube = rc_rcell(cube);
-     let a_cube2 = rc_rcell(cube2);
-     scene.add(a_cube.clone());
-     scene.add(a_cube2.clone());
+    let a_cube2 = rc_rcell(cube2);
+    cube.add(a_cube2);
+    let a_cube = rc_rcell(cube);
+    //scene.add(a_cube.clone());
+    //scene.add(a_cube2.clone());
 
-    let (a_sun, a_earth) = {
+    let (a_sun, a_earth, a_moon) = {
         //let scene = a_scene.borrow();
         let renderer = a_rndr.borrow();
         //let viewport = a_view.borrow();
 
         let mut sun = scene.object_from_mesh_and_name(
-            Geometry::from_genmesh(&IcoSphere::subdivide(1)),
-            Material::single_color(1.0, 1.0, 0.0, 1.0),
+            Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(1)),
+            Material::single_color_no_shade(1.0, 1.0, 0.0, 1.0),
             "Sun",
         );
 
@@ -146,27 +157,28 @@ pub fn start() -> Result<(), JsValue> {
             "Moon",
         );
 
-        moon.set_position([5.0, 0.0, 0.0]);
-        earth.set_position([5.0, 0.0, 0.0]);
-        moon.set_scale(0.5);
+        moon.set_position([6.0, 0.0, 0.0]);
+        earth.set_position([10.0, 0.0, 0.0]);
         earth.set_scale(0.5);
+        moon.set_scale(0.5);
         sun.set_scale(2.0);
-        sun.set_position([0.,-10.,0.]);
 
         let moon = rc_rcell(moon);
-        earth.add(moon);
+        earth.add(moon.clone());
+        earth.add(a_cube.clone());
         let earth = rc_rcell(earth);
         sun.add(earth.clone());
         let sun = rc_rcell(sun);
         scene.add(sun.clone());
         renderer.setup_renderer();
-        (sun, earth)
+        (sun, earth, moon)
     };
 
     let a_scene = rc_rcell(scene);
     let a_view = rc_rcell(viewport);
     let mut editor = Editor::new(a_view.clone(), a_scene.clone(), a_rndr.clone());
-    editor.set_active_node(a_cube2.clone());
+    editor.set_active_node(a_earth.clone());
+    let a_editor = rc_rcell(editor);
 
     let f = rc_rcell(None);
     let g = f.clone();
@@ -174,15 +186,20 @@ pub fn start() -> Result<(), JsValue> {
     let b_rndr = a_rndr.clone();
     let b_view = a_view.clone();
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
-        let mut renderer = b_rndr.borrow_mut();
-        let view = b_view.borrow();
-        let sun = a_sun.borrow();
-        let earth = a_earth.borrow();
-        earth.rotate_by(UnitQuaternion::from_euler_angles(0., 0.02, 0.));
-        sun.rotate_by(UnitQuaternion::from_euler_angles(0., 0.01, 0.));
-        let cube = a_cube.borrow_mut();
-        cube.rotate_by(UnitQuaternion::from_euler_angles(0.01, 0.02, 0.));
-        renderer.render(&a_scene.borrow(), &view);
+        // borrow scene objects first
+        {
+            //a_earth.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.02, 0.));
+            //a_sun.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.01, 0.));
+            //let cube = a_cube.borrow_mut();
+        }
+        // borrow system componenets second
+        {
+            let mut view = b_view.borrow_mut();
+            let mut editor = a_editor.borrow_mut();
+            editor.update(&mut view);
+            let mut renderer = b_rndr.borrow_mut();
+            renderer.render(&a_scene.borrow(), &view);
+        }
         request_animation_frame(f.borrow().as_ref().unwrap());
     }) as Box<dyn FnMut()>));
 
@@ -204,15 +221,14 @@ pub fn start() -> Result<(), JsValue> {
         let dt = perf.now();
         view.update_rot(me.movement_x(), me.movement_y(), dt as f32);
     });
-    
+
     let b_view = a_view.clone();
     let b_rndr = a_rndr.clone();
     add_event(&b_rndr.borrow().canvas(), "wheel", move |e| {
         let mut view = b_view.borrow_mut();
         let we = e.dyn_into::<WheelEvent>().unwrap();
-        let dy = if we.delta_y() > 0. { 0.1 } else { -0.1 };
         view.enable_zoom();
-        view.update_zoom(dy);
+        view.update_zoom(we.delta_y() as i32);
         view.disable_zoom();
     });
 

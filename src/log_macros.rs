@@ -2,6 +2,7 @@
 ///
 /// Please note that this macro doesn't require {:?} formatting.
 /// Simply pass expressions separated by commas.
+
 #[macro_export]
 macro_rules! log {
     ($($x:expr),*) => {
@@ -9,11 +10,16 @@ macro_rules! log {
             let document = crate::dom_factory::document();
             let console_el = document.get_element_by_id("console");
             let mut msg = String::new();
+            use std::any::Any;
             $(
-                if let Some(s) = (&$x as &dyn std::any::Any).downcast_ref::<&str>() {
+                if let Some(s) = (&$x as &dyn Any).downcast_ref::<&str>() {
                     msg.push_str(&format!("{} ",s));
                 } else {
-                    msg.push_str(&format!("{:?} ",$x));
+                    if let Some(s) = (&$x as &dyn Any).downcast_ref::<String>() {
+                        msg.push_str(&format!("{} ",s));
+                    } else {
+                        msg.push_str(&format!("{:?} ",$x));
+                    }
                 }
             )*
             match console_el {

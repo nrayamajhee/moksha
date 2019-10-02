@@ -164,7 +164,7 @@ impl Renderer {
                 if draw_mode == DrawMode::None {
                     continue;
                 }
-                let vao = storage.get_vao(i);
+                let vao = storage.vao(i);
                 let shader_type = mesh.material.shader_type;
                 let program = self.shaders.get(&shader_type).unwrap();
                 self.ctx.use_program(Some(&program));
