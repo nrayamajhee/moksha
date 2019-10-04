@@ -1,0 +1,20 @@
+#!/bin/bash
+
+case $1 in
+	"w" | "watch")
+		cargo watch -w src -s "wasm-pack build"
+	;;
+	"b" | "build")
+		wasm-pack build
+	;;
+	"d" | "doc")
+		cargo doc --document-private-items
+	;;
+	"s" | "serve")
+		cd www
+		npm run start
+	;;
+	*)
+		echo "moksha [(w)atch | (b)uild | (d)oc | (s)erve]"
+	;;
+esac

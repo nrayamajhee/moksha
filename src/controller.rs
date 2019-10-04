@@ -1,8 +1,7 @@
-use crate::{mesh::Transform, renderer::Renderer, Node};
+use crate::Node;
 use nalgebra::{
     Isometry3, Matrix4, Orthographic3, Perspective3, Point3, Unit, UnitQuaternion, Vector3,
 };
-use std::f32::consts::PI;
 
 /// 3 Button mouse configuration.
 #[derive(Copy, Clone)]
@@ -63,7 +62,6 @@ fn ortho_from_persp(
 /// look position, and modes.
 pub struct Viewport {
     proj_config: ProjectionConfig,
-    initial_config: ProjectionConfig,
     proj: Projection,
     view: Isometry3<f32>,
     initial_view: Isometry3<f32>,
@@ -81,8 +79,7 @@ impl Viewport {
         aspect_ratio: f32,
         proj_type: ProjectionType,
     ) -> Self {
-        let view =
-            Isometry3::look_at_rh(&[0., 3., 3.].into(), &[0., 0., 0.].into(), &Vector3::y());
+        let view = Isometry3::look_at_rh(&[0., 3., 3.].into(), &[0., 0., 0.].into(), &Vector3::y());
 
         let proj = if proj_type == ProjectionType::Perspective {
             Projection::Perspective(Perspective3::new(
@@ -106,7 +103,6 @@ impl Viewport {
         let zoom = false;
 
         Self {
-            initial_config: proj_config.clone(),
             proj_config,
             proj,
             initial_view: view.clone(),
@@ -127,7 +123,7 @@ impl Viewport {
     }
     pub fn screen_to_world(&self, point: [f32; 3]) -> [f32; 3] {
         let p = self.proj.unproject_point(&point.into());
-        let view_m = (self.target * self.view.inverse());
+        let view_m = self.target * self.view.inverse();
         let p = view_m.transform_point(&p);
         [p.x, p.y, p.z]
     }
@@ -135,14 +131,14 @@ impl Viewport {
         let point = Point3::new(point[0], point[1], -1.);
         let p = self.proj.unproject_point(&point);
         let v = match self.proj {
-            Projection::Orthographic(proj) => Vector3::new(
+            Projection::Orthographic(_) => Vector3::new(
                 p.x,
                 p.y,
                 -p.z / (self.proj_config.near / self.proj_config.far),
             ),
-            Projection::Perspective(proj) => Vector3::new(p.x, p.y, p.z),
+            Projection::Perspective(_) => Vector3::new(p.x, p.y, p.z),
         };
-        let view_m = (self.target * self.view.inverse());
+        let view_m = self.target * self.view.inverse();
         let v = view_m.transform_vector(&v);
         let v = v.normalize();
         [v.x, v.y, v.z]
@@ -166,28 +162,6 @@ impl Viewport {
             let delta = if ds > 0 { 1.05 } else { 0.95 };
             self.view.translation.vector = self.speed * delta * self.view.translation.vector;
             self.update_ortho();
-        }
-    }
-    fn create_proj(&self, proj_type: ProjectionType) -> Projection {
-        if proj_type == ProjectionType::Perspective {
-            Projection::Perspective(Perspective3::new(
-                self.aspect_ratio,
-                self.proj_config.fov,
-                self.proj_config.near,
-                self.proj_config.far,
-            ))
-        } else {
-            Projection::Orthographic(ortho_from_persp(
-                self.proj_config.fov,
-                self.aspect_ratio,
-                self.view.translation.vector.magnitude(),
-                self.proj_config.far,
-            ))
-        }
-    }
-    fn update_ortho(&mut self) {
-        if let Projection::Orthographic(_) = self.proj {
-            self.proj = self.create_proj(ProjectionType::Orthographic);
         }
     }
     pub fn reset(&mut self) {
@@ -231,11 +205,33 @@ impl Viewport {
     pub fn transform(&self) -> Isometry3<f32> {
         self.view
     }
-    pub fn eye(&self) -> [f32;3] {
+    pub fn eye(&self) -> [f32; 3] {
         let v = (self.target * self.view.inverse()).translation.vector;
-        [v.x,v.y,v.z]
+        [v.x, v.y, v.z]
     }
     pub fn focus(&mut self, node: &Node) {
         self.target = (node.parent_transform() * node.transform()).isometry;
+    }
+    fn create_proj(&self, proj_type: ProjectionType) -> Projection {
+        if proj_type == ProjectionType::Perspective {
+            Projection::Perspective(Perspective3::new(
+                self.aspect_ratio,
+                self.proj_config.fov,
+                self.proj_config.near,
+                self.proj_config.far,
+            ))
+        } else {
+            Projection::Orthographic(ortho_from_persp(
+                self.proj_config.fov,
+                self.aspect_ratio,
+                self.view.translation.vector.magnitude(),
+                self.proj_config.far,
+            ))
+        }
+    }
+    fn update_ortho(&mut self) {
+        if let Projection::Orthographic(_) = self.proj {
+            self.proj = self.create_proj(ProjectionType::Orthographic);
+        }
     }
 }

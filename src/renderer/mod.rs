@@ -1,6 +1,3 @@
-use wasm_bindgen::JsValue;
-use web_sys::WebGl2RenderingContext as GL;
-
 mod renderer;
 mod shader;
 

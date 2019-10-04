@@ -66,7 +66,7 @@ pub enum GizmoGrab {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Gizmo {
     Translate(Node, GizmoGrab, Isometry3<f32>),
-    set_scale(Node, GizmoGrab, Isometry3<f32>),
+    Scale(Node, GizmoGrab, Isometry3<f32>),
     Rotate(Node, GizmoGrab, Isometry3<f32>),
 }
 
@@ -74,14 +74,14 @@ impl Gizmo {
     pub fn inner(&self) -> (&Node, &GizmoGrab, &Isometry3<f32>) {
         match self {
             Gizmo::Translate(n, s, i) => (n, s, i),
-            Gizmo::set_scale(n, s, i) => (n, s, i),
+            Gizmo::Scale(n, s, i) => (n, s, i),
             Gizmo::Rotate(n, s, i) => (n, s, i),
         }
     }
     pub fn inner_mut(&mut self) -> (&Node, &mut GizmoGrab, &mut Isometry3<f32>) {
         match self {
             Gizmo::Translate(n, s, i) => (n, s, i),
-            Gizmo::set_scale(n, s, i) => (n, s, i),
+            Gizmo::Scale(n, s, i) => (n, s, i),
             Gizmo::Rotate(n, s, i) => (n, s, i),
         }
     }
@@ -95,7 +95,7 @@ pub fn create_arrow(scene: &Scene, color: [f32; 4], arrow_type: ArrowType, name:
             Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
             "Arrow Stem",
         );
-        stem.set_scale_vec([0.2, 3., 0.2]);
+        stem.set_scale_vec(0.2, 0.2, 3.);
         node.own(stem);
     }
     let head = match arrow_type {
@@ -133,19 +133,6 @@ pub fn create_arrow(scene: &Scene, color: [f32; 4], arrow_type: ArrowType, name:
     node.own(head);
     node
 }
-
-//pub fn get_collider_center(mesh: &Node) -> ncollide3d::shape::ConvexHull<f32> {
-//use ncollide3d::{shape::ConvexHull, query::Ray, query::RayCast, pipeline::object::CollisionObject};
-//use nalgebra::{Vector3, Point3, Isometry3};
-//let mut points = Vec::new();
-//let v = mesh.mesh().unwrap().geometry.vertices;
-//let s = mesh.transform().scale;
-//for i in 0..v.len() / 3 {
-//points.push(Point3::new(v[i] * s.x, v[i+1] * s.y, v[i+2] * s.z));
-//}
-//let target = ConvexHull::try_from_points(&points);
-//target.unwrap()
-//}
 
 pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowType) -> Node {
     let name = match arrow_type {
@@ -185,9 +172,9 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowType) -> Node {
     x_p.set_position([0., 3., 3.]);
     y_p.set_position([3., 0., 3.]);
     z_p.set_position([3., 3., 0.]);
-    x_p.set_scale_vec([0.2,1.,1.]);
-    y_p.set_scale_vec([1.,1.,0.2]);
-    z_p.set_scale_vec([1.,0.2,1.]);
+    x_p.set_scale_vec(0.2,1.,1.);
+    y_p.set_scale_vec(1.,0.2,1.);
+    z_p.set_scale_vec(1.,1.,0.2);
     node.own(x);
     node.own(y);
     node.own(z);
@@ -207,6 +194,7 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowType) -> Node {
     }
     node
 }
+
 
 pub fn create_primitive_node(scene: &Scene, primitive: Primitive) -> Node {
     match primitive {

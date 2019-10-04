@@ -22,16 +22,15 @@ pub fn rc_rcell<T>(inner: T) -> RcRcell<T> {
     Rc::new(RefCell::new(inner))
 }
 
-use genmesh::generators::{Cone, Cube, Cylinder, IcoSphere, Plane, SphereUv, Torus};
+use genmesh::generators::{IcoSphere, Cube};
 use maud::html;
-use nalgebra::UnitQuaternion;
 use std::f32::consts::PI;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::{JsCast, JsValue};
-use web_sys::{HtmlElement, KeyboardEvent, MouseEvent, Performance, WheelEvent};
+use web_sys::{KeyboardEvent, MouseEvent, WheelEvent};
 
 pub mod dom_factory;
-use dom_factory::{add_event, body, document, request_animation_frame, set_timeout, window};
+use dom_factory::{add_event, body, document, request_animation_frame, window};
 
 pub mod controller;
 pub mod editor;
@@ -45,13 +44,12 @@ pub use crate::{
     editor::Editor,
     mesh::{Geometry, Material, Mesh, Transform},
     renderer::Renderer,
-    scene::{Node, Primitive, Scene, Storage},
+    scene::{Node, Primitive, Scene, Storage, ObjectInfo},
 };
 
 use controller::ProjectionConfig;
 use editor::console_setup;
-use renderer::{CursorType, DrawMode};
-use scene::primitives::{create_transform_gizmo, ArrowType};
+use renderer::{CursorType};
 
 /// The main entrypoint that is automatically executed on page load.
 #[wasm_bindgen(start)]
@@ -70,7 +68,7 @@ pub fn start() -> Result<(), JsValue> {
         selector: "#gl-canvas",
         pixel_ratio: 1.0,
     });
-    let mut viewport = Viewport::new(
+    let viewport = Viewport::new(
         ProjectionConfig {
             fov: PI / 2.,
             near: 0.1,
@@ -139,25 +137,20 @@ pub fn start() -> Result<(), JsValue> {
         let renderer = a_rndr.borrow();
         //let viewport = a_view.borrow();
 
-        //let mut sun = scene.object_from_mesh_and_name(
-            //Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(1)),
-            //Material::single_color_no_shade(1.0, 1.0, 0.0, 1.0),
-            //"Sun",
-        //);
         let mut sun = scene.object_from_mesh_and_name(
-            Geometry::from_genmesh(&IcoSphere::subdivide(3)),
-            Material::single_color(1.0, 1.0, 0.0, 1.0),
+            Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(2)),
+            Material::single_color_no_shade(1.0, 1.0, 0.0, 1.0),
             "Sun",
         );
 
         let mut earth = scene.object_from_mesh_and_name(
-            Geometry::from_genmesh(&IcoSphere::subdivide(1)),
+            Geometry::from_genmesh(&IcoSphere::subdivide(2)),
             Material::single_color(0.0, 0.0, 1.0, 1.0),
             "Earth",
         );
 
         let moon = scene.object_from_mesh_and_name(
-            Geometry::from_genmesh(&IcoSphere::subdivide(1)),
+            Geometry::from_genmesh(&IcoSphere::subdivide(3)),
             Material::single_color(1.0, 1.0, 1.0, 1.0),
             "Moon",
         );
@@ -170,7 +163,7 @@ pub fn start() -> Result<(), JsValue> {
 
         let moon = rc_rcell(moon);
         earth.add(moon.clone());
-        //earth.add(a_cube.clone());
+        earth.add(a_cube.clone());
         let earth = rc_rcell(earth);
         sun.add(earth.clone());
         let sun = rc_rcell(sun);
@@ -182,8 +175,10 @@ pub fn start() -> Result<(), JsValue> {
     let a_scene = rc_rcell(scene);
     let a_view = rc_rcell(viewport);
     let mut editor = Editor::new(a_view.clone(), a_scene.clone(), a_rndr.clone());
-    editor.set_active_node(a_sun.clone());
+    editor.set_active_node(a_moon.clone());
     let a_editor = rc_rcell(editor);
+
+    //let ambient_light = scene.light(L
 
     let f = rc_rcell(None);
     let g = f.clone();
@@ -191,18 +186,15 @@ pub fn start() -> Result<(), JsValue> {
     let b_rndr = a_rndr.clone();
     let b_view = a_view.clone();
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
-        // borrow scene objects first
         {
             //a_earth.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.02, 0.));
             //a_sun.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.01, 0.));
-            //let cube = a_cube.borrow_mut();
         }
-        // borrow system componenets second
         {
             let mut view = b_view.borrow_mut();
             let mut editor = a_editor.borrow_mut();
             editor.update(&mut view);
-            let mut renderer = b_rndr.borrow_mut();
+            let renderer = b_rndr.borrow_mut();
             renderer.render(&a_scene.borrow(), &view);
         }
         request_animation_frame(f.borrow().as_ref().unwrap());
@@ -213,7 +205,7 @@ pub fn start() -> Result<(), JsValue> {
     add_event(&window, "resize", move |_| {
         let mut renderer = b_rndr.borrow_mut();
         let mut viewport = b_view.borrow_mut();
-        renderer.resize(&mut viewport);
+        renderer.resize();
         viewport.resize(renderer.aspect_ratio());
     });
 
@@ -270,7 +262,6 @@ pub fn start() -> Result<(), JsValue> {
     }
 
     let b_view = a_view.clone();
-    let b_rndr = a_rndr.clone();
     add_event(&window, "keydown", move |e| {
         let keycode = e.dyn_into::<KeyboardEvent>().unwrap().code();
         if keycode == "KeyR" {

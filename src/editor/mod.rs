@@ -5,7 +5,7 @@ use crate::{
     dom_factory::{
         add_event, body, document, get_el, icon_btn_w_id, query_els, query_html_el, window,
     },
-    mesh::{multiply, Geometry, Material, divide},
+    mesh::{divide, multiply, Geometry, Material},
     rc_rcell,
     renderer::DrawMode,
     scene::{
@@ -14,19 +14,19 @@ use crate::{
     },
     RcRcell, Renderer, Viewport,
 };
-use genmesh::generators::{IcoSphere, Plane};
+use genmesh::generators::Plane;
 use maud::{html, Markup};
-use nalgebra::{Isometry3, Point3, Translation3, Unit, UnitQuaternion, Vector3};
+use nalgebra::{Isometry3, Point3, UnitQuaternion, Vector3};
 use std::f32::consts::PI;
 //use std::cell::RefCell;
 //use std::rc::Rc;
 use ncollide3d::{
     query::Ray,
     query::RayCast,
-    shape::{Ball, ConvexHull, Cuboid, Plane as CollidePlane},
+    shape::{Ball, ConvexHull, Plane as CollidePlane},
 };
 use wasm_bindgen::JsCast;
-use web_sys::{EventTarget, HtmlCanvasElement, HtmlElement, KeyboardEvent, MouseEvent, WheelEvent};
+use web_sys::{EventTarget, HtmlCanvasElement, HtmlElement, KeyboardEvent, MouseEvent};
 
 /// The main GUI editor that faciliates buttons to manipulate the scene, displays log in a separate
 /// window, and displays the scene tree.
@@ -45,22 +45,21 @@ impl Editor {
         renderer: RcRcell<Renderer>,
     ) -> Self {
         let gizmo = {
-            let mut scene = scene.borrow_mut();
+            let scene = scene.borrow();
             body()
                 .insert_adjacent_html("beforeend", Self::markup(&scene).as_str())
                 .expect("Couldn't insert console into the DOM!");
-            let renderer = renderer.borrow();
-            let grid = scene.object_from_mesh_and_name(
+            let grid = scene.object_from_mesh_name_and_mode(
                 Geometry::from_genmesh_no_normals(&Plane::subdivide(100, 100)),
                 Material::single_color_no_shade(0.8, 0.8, 0.8, 1.0),
                 "Grid",
+                DrawMode::Lines,
             );
             grid.set_scale(50.0);
             grid.set_rotation(UnitQuaternion::from_euler_angles(PI / 2., 0., 0.));
-            let grid = rc_rcell(grid);
-            scene.add_with_mode(grid, DrawMode::Lines);
             let gizmo = create_transform_gizmo(&scene, ArrowType::Cone);
-            //scene.show(&gizmo, DrawMode::Triangle_no_depth);
+            scene.show(&gizmo);
+            scene.show(&grid);
             gizmo
         };
         let gizmo = rc_rcell(Gizmo::Translate(
@@ -132,7 +131,6 @@ impl Editor {
             }
             section #scene-tree {
                 ul {
-                    @let storage = scene.storage();
                     (Self::recurse_tree(scene.root()))
                 }
             }
@@ -155,7 +153,7 @@ impl Editor {
         Ray::new(ray_pos.into(), ray_vec.into())
     }
     fn ray_collides_w_node(ray: &Ray<f32>, node: &Node) -> Option<Isometry3<f32>> {
-        let mut c_t = node.transform();
+        let c_t = node.transform();
         let p_t = node.parent_transform();
         let s = multiply(c_t.scale, p_t.scale);
         let verts: Vec<Point3<f32>> = node
@@ -169,7 +167,6 @@ impl Editor {
         if let Some(target) = ConvexHull::try_from_points(&verts) {
             let transform = (p_t * c_t).isometry;
             if target.intersects_ray(&transform, &ray) {
-                log!("NODE:", transform.translation.vector);
                 Some(transform)
             } else {
                 None
@@ -191,7 +188,7 @@ impl Editor {
     ) -> bool {
         let node = a_node.borrow();
         {
-            if let Some(transform) = Self::ray_collides_w_node(ray, &node) {
+            if let Some(_) = Self::ray_collides_w_node(ray, &node) {
                 let v = node.transform().isometry.translation.vector;
                 let gizmo = a_gizmo.borrow();
                 let gizmo_node = gizmo.inner().0;
@@ -218,7 +215,8 @@ impl Editor {
             gizmo_node.set_parent_transform(p_t);
             let v = node.borrow().position();
             gizmo_node.set_position(v);
-            let ds = 1. / p_t.scale.magnitude() * view.transform().translation.vector.magnitude() / 20.;
+            let ds =
+                1. / p_t.scale.magnitude() * view.transform().translation.vector.magnitude() / 20.;
             gizmo_node.set_scale(ds);
             //log!(node.borrow().info());
         }
@@ -255,7 +253,6 @@ impl Editor {
         for i in 0..list.length() {
             let each = list.get(i).unwrap();
             let a_scene = self.scene.clone();
-            let a_rndr = self.renderer.clone();
             add_event(
                 &each.dyn_into::<EventTarget>().unwrap(),
                 "click",
@@ -274,8 +271,6 @@ impl Editor {
                         let mut scene = a_scene.borrow_mut();
                         scene.add(node);
                     }
-                    let mut renderer = a_rndr.borrow_mut();
-                    let scene = a_scene.borrow();
                 },
             );
         }
@@ -286,14 +281,14 @@ impl Editor {
         let a_scene = self.scene.clone();
         let a_node = self.active_node.clone();
         add_event(self.renderer.borrow().canvas(), "mousedown", move |e| {
-            let mut view = a_view.borrow_mut();
+            let view = a_view.borrow_mut();
             let scene = a_scene.borrow();
 
             get_el("mesh-list").class_list().remove_1("shown").unwrap();
             let me = e.dyn_into::<MouseEvent>().unwrap();
 
             let ray = {
-                let mut renderer = a_rndr.borrow_mut();
+                let renderer = a_rndr.borrow_mut();
                 Self::get_ray_from_screen(&me, &view, renderer.canvas())
             };
 
@@ -306,8 +301,7 @@ impl Editor {
                 let gizmo_node_t = gizmo_node.transform().isometry;
                 if target.intersects_ray(&gizmo_node_t, &ray) {
                     let translation = gizmo_node_t.translation;
-                    let transform =
-                        Isometry3::from_parts(translation, view.transform().rotation);
+                    let transform = Isometry3::from_parts(translation, view.transform().rotation);
                     *gizmo_state = GizmoGrab::ViewPlane;
                     *g_transform = transform;
                     Self::change_color(gizmo_node, [1., 1., 1.]);
@@ -324,8 +318,7 @@ impl Editor {
                         } else if let Some(_) = Self::ray_collides_w_node(&ray, stem) {
                             collided = true
                         }
-                        let v = gizmo_node.transform().isometry.translation.vector;
-                        let mut transform = Isometry3::identity();
+                        let transform = Isometry3::identity();
                         let (color, g_state) = match child.info().name.as_str() {
                             "x-axis" => ([1., 0., 0.], GizmoGrab::XAxis),
                             "y-axis" => ([0., 1., 0.], GizmoGrab::YAxis),
@@ -342,7 +335,6 @@ impl Editor {
                     // if the cuboids are clicked
                     } else {
                         if let Some(transform) = Self::ray_collides_w_node(&ray, &child) {
-                            let d = transform.translation.vector;
                             let (color, g_state) = match child.info().name.as_str() {
                                 "pan_x" => ([1., 0., 0.], GizmoGrab::XPlane),
                                 "pan_y" => ([0., 1., 0.], GizmoGrab::YPlane),
@@ -368,7 +360,6 @@ impl Editor {
         let a_view = self.view.clone();
         let a_rndr = self.renderer.clone();
         let a_gizmo = self.gizmo.clone();
-        let renderer = self.renderer.clone();
         let a_node = self.active_node.clone();
         add_event(self.renderer.borrow().canvas(), "mousemove", move |e| {
             let renderer = a_rndr.borrow();
@@ -391,7 +382,7 @@ impl Editor {
             };
             let pan_view = CollidePlane::new(axis);
             if let Some(i) = pan_view.toi_and_normal_with_ray(&transform, &ray, false) {
-                let mut g_p = gizmo_node.global_position();
+                let g_p = gizmo_node.global_position();
                 let poi = ray.point_at(i.toi);
                 log!(poi.y);
                 log!(g_p[1]);
@@ -411,7 +402,7 @@ impl Editor {
                     let p_diff = Vector3::from(pos) - p_v;
                     let p = divide(p_diff, p_t.scale);
                     let p = p_r.inverse().transform_vector(&p);
-                    node.set_position([p.x,p.y,p.z].into());
+                    node.set_position([p.x, p.y, p.z].into());
                 }
             }
         });
@@ -419,15 +410,15 @@ impl Editor {
         //let a_gizmo = self.gizmo.clone();
         //let a_view = self.view.clone();
         //add_event(self.renderer.borrow().canvas(), "wheel", move |_| {
-            //let gizmo = a_gizmo.borrow();
-            //let gizmo = gizmo.inner().0;
-            //let view = a_view.borrow();
-            //let ds = view.transform().translation.vector.magnitude() / 30.;
-            //gizmo.set_scale(ds);
+        //let gizmo = a_gizmo.borrow();
+        //let gizmo = gizmo.inner().0;
+        //let view = a_view.borrow();
+        //let ds = view.transform().translation.vector.magnitude() / 30.;
+        //gizmo.set_scale(ds);
         //});
 
         let a_gizmo = self.gizmo.clone();
-        add_event(self.renderer.borrow().canvas(), "mouseup", move |e| {
+        add_event(self.renderer.borrow().canvas(), "mouseup", move |_| {
             let mut gizmo = a_gizmo.borrow_mut();
             let (gizmo_node, gizmo_state, g_transform) = gizmo.inner_mut();
             if *gizmo_state == GizmoGrab::None {

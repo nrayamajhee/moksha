@@ -4,17 +4,13 @@ use super::shader::{
     create_vertex_color_program, ShaderType,
 };
 use crate::dom_factory::{get_canvas, resize_canvas};
-use crate::mesh::{Geometry, Material};
 use crate::{
     controller::Viewport,
     log,
-    scene::{Node, Scene},
+    scene::{Scene},
     mesh::Mesh,
 };
-use genmesh::generators::Plane;
-use nalgebra::UnitQuaternion;
 use std::collections::HashMap;
-use std::f32::consts::PI;
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{
     HtmlCanvasElement, HtmlElement, WebGl2RenderingContext as GL, WebGlProgram,
@@ -27,8 +23,7 @@ pub enum DrawMode {
     Lines,
     PointyLines,
     Triangle,
-    Triangle_no_depth,
-    None,
+    TriangleNoDepth,
 }
 
 #[derive(Debug)]
@@ -160,8 +155,8 @@ impl Renderer {
         let meshes = storage.meshes();
         for (i, mesh) in meshes.iter().enumerate() {
             if let Some(mesh) = mesh {
-                let draw_mode = storage.info(i).draw_mode;
-                if draw_mode == DrawMode::None {
+                let info = storage.info(i);
+                if !info.render {
                     continue;
                 }
                 let vao = storage.vao(i);
@@ -183,44 +178,49 @@ impl Renderer {
                     self.ctx.active_texture(GL::TEXTURE0);
                     bind_uniform_i32(&self.ctx, program, "sampler", 0);
                 }
-                let model = storage.transform(i) * storage.parent_tranform(i);
+                let model =  storage.parent_tranform(i) * storage.transform(i);
                 bind_uniform_mat4(&self.ctx, program, "model", &model.to_homogeneous());
+                if shader_type == ShaderType::Color {
+                    bind_uniform_vec3(&self.ctx, program, "eye", &viewport.eye());
+                }
                 if shader_type != ShaderType::Simple {
                     let normal_matrix = model.inverse().to_homogeneous().transpose();
-                    bind_uniform_mat4(&self.ctx, program, "normalMatrix", &normal_matrix);
+                    bind_uniform_mat4(&self.ctx, program, "inv_transpose", &normal_matrix);
                 }
                 bind_uniform_mat4(&self.ctx, &program, "view", &viewport.view());
                 bind_uniform_mat4(&self.ctx, &program, "proj", &viewport.proj());
                 let indices = &mesh.geometry.indices;
                 bind_index_buffer(&self.ctx, &indices).expect("Can't bind index buffer!");
-                match draw_mode {
-                    DrawMode::Triangle => {
-                        self.ctx.enable(GL::DEPTH_TEST);
-                        self.ctx.draw_elements_with_i32(
-                            GL::TRIANGLES,
-                            indices.len() as i32,
-                            GL::UNSIGNED_SHORT,
-                            0,
-                        );
+                if info.render {
+                    match info.draw_mode {
+                        DrawMode::Triangle => {
+                            self.ctx.enable(GL::DEPTH_TEST);
+                            self.ctx.draw_elements_with_i32(
+                                GL::TRIANGLES,
+                                indices.len() as i32,
+                                GL::UNSIGNED_SHORT,
+                                0,
+                            );
+                        }
+                        DrawMode::TriangleNoDepth => {
+                            self.ctx.disable(GL::DEPTH_TEST);
+                            self.ctx.draw_elements_with_i32(
+                                GL::TRIANGLES,
+                                indices.len() as i32,
+                                GL::UNSIGNED_SHORT,
+                                0,
+                            );
+                        }
+                        DrawMode::Lines => {
+                            self.ctx.draw_elements_with_i32(
+                                GL::LINES,
+                                indices.len() as i32,
+                                GL::UNSIGNED_SHORT,
+                                0,
+                            );
+                        }
+                        _ => (),
                     }
-                    DrawMode::Triangle_no_depth => {
-                        self.ctx.disable(GL::DEPTH_TEST);
-                        self.ctx.draw_elements_with_i32(
-                            GL::TRIANGLES,
-                            indices.len() as i32,
-                            GL::UNSIGNED_SHORT,
-                            0,
-                        );
-                    }
-                    DrawMode::Lines => {
-                        self.ctx.draw_elements_with_i32(
-                            GL::LINES,
-                            indices.len() as i32,
-                            GL::UNSIGNED_SHORT,
-                            0,
-                        );
-                    }
-                    _ => (),
                 }
             }
         }
@@ -229,7 +229,7 @@ impl Renderer {
         self.ctx.bind_buffer(GL::ELEMENT_ARRAY_BUFFER, None);
         self.ctx.use_program(None);
     }
-    pub fn resize(&mut self, viewport: &mut Viewport) {
+    pub fn resize(&mut self) {
         log!("Renderer resized");
         self.aspect_ratio = resize_canvas(&mut self.canvas, self.config.pixel_ratio);
         // log!("New aspect ratio: {:?}", self.aspect_ratio());

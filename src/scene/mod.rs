@@ -1,7 +1,13 @@
 mod scene;
+mod node;
+mod storage;
 
 pub mod primitives;
 
 #[doc(inline)]
 pub use primitives::{Gizmo, Primitive};
-pub use scene::{Node, Scene, Storage};
+
+#[doc(inline)]
+pub use node::Node;
+pub use storage::Storage;
+pub use scene::{Scene, LightType, ObjectInfo, Light};

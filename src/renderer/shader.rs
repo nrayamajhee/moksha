@@ -3,7 +3,7 @@ use js_sys::{Float32Array, Uint16Array, Uint8Array};
 use nalgebra::Matrix4;
 use wasm_bindgen::JsValue;
 use web_sys::{
-    HtmlImageElement, WebGl2RenderingContext as GL, WebGlProgram, WebGlShader, WebGlTexture,
+    HtmlImageElement, WebGl2RenderingContext as GL, WebGlProgram, WebGlShader
 };
 
 use strum_macros::{Display, EnumIter};
@@ -45,7 +45,7 @@ pub fn create_simple_program(gl: &GL) -> Result<WebGlProgram, String> {
             out vec4 outputColor;
 
             void main() {
-				outputColor = f_color;
+                    outputColor = f_color;
             }
         "#,
     )?;
@@ -56,42 +56,48 @@ pub fn create_color_program(gl: &GL) -> Result<WebGlProgram, String> {
     let shader = create_program(
         gl,
         r#" #version 300 es
-            in vec4 position;
-            in vec3  normal;
-
-            uniform mat4 parent, model, view, proj, normalMatrix;
-            uniform vec4 color;
-
-            out vec3 light_vector;
-            out vec3 surface_normal;
-            out vec4 f_color;
+            uniform mat4 model, view, proj, inv_transpose;
+            in vec3 position, normal;
+            out vec3 surface_normal, frag_pos;
 
             void main() {
-                vec4 world_position = model * position;
-                gl_Position = proj * view * world_position;
-                f_color = color;
-                surface_normal = normalize((normalMatrix * vec4(normal, 1.0)).xyz);
-                //vec3 light_position = vec3(50.0,0.0,0.0);
-                //light_vector = normalize(light_position - world_position.xyz);
-                light_vector = normalize(vec3(0.0,0.0,5.0));
+                frag_pos = vec3(model * vec4(position, 1.0));
+                surface_normal = normalize((inv_transpose * vec4(normal, 1.0)).xyz);
+                gl_Position = proj * view * vec4(frag_pos, 1.0);
             }
         "#,
         r#" #version 300 es
             precision mediump float;
 
-            in vec3 light_vector;
-            in vec3 surface_normal;
+            uniform vec4 color;
+            uniform vec3 eye;
 
-            in vec4 f_color;
+            in vec3 surface_normal, frag_pos;
             out vec4 outputColor;
 
             void main() {
-                vec3 ambientLight = vec3(0.1, 0.1, 0.1);
-                vec3 directionalLightColor = vec3(1, 1, 1);
+                // light
+                vec3 light_pos = vec3(0.0,0.0,0.0);
+                vec3 light_dir = normalize(light_pos - frag_pos);
+                vec3 light_color = vec3(0.8, 0.8, 0.8);
 
-                float directional = max(dot(surface_normal, light_vector), 0.0);
-                vec3 lighting = ambientLight + directionalLightColor * directional;
-                outputColor = vec4(f_color.xyz * lighting, 1.0);
+                // ambient
+                float amb_fac = 0.1;
+                vec3 ambient = amb_fac * light_color;
+
+                // diffuse
+                float diff = max(dot(surface_normal, light_dir), 0.0);
+                vec3 diffuse = diff * light_color;
+
+                // specular
+                float spec_fac = 1.0;
+                vec3 view_dir = normalize(eye - frag_pos);
+                vec3 reflection = normalize(reflect(-light_dir, surface_normal));
+                float spec = pow(max(dot(view_dir, reflection), 0.0), 64.0);
+                vec3 specular = spec_fac * spec * light_color;
+
+                vec3 lighting = ambient + diffuse + specular;
+                outputColor = vec4(color.xyz * lighting, 1.0);
             }
         "#,
     )?;
@@ -106,7 +112,7 @@ pub fn create_vertex_color_program(gl: &GL) -> Result<WebGlProgram, String> {
 			in vec3  normal;
             in vec4 color;
 
-            uniform mat4 model, view, parent, proj, normalMatrix;
+            uniform mat4 model, view, parent, proj, inv_transpose;
 
             out vec4 f_color;
 			out vec3 lighting;
@@ -119,7 +125,7 @@ pub fn create_vertex_color_program(gl: &GL) -> Result<WebGlProgram, String> {
 				vec3 directionalLightColor = vec3(1, 1, 1);
 				vec3 directionalVector = normalize(vec3(0., 0., 5.0));
 
-				vec4 transformedNormal = normalMatrix * vec4(normal, 1.0);
+				vec4 transformedNormal = inv_transpose * vec4(normal, 1.0);
 
 				float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
 				lighting = ambientLight + directionalLightColor * directional;
@@ -147,7 +153,7 @@ pub fn create_texture_program(gl: &GL) -> Result<WebGlProgram, String> {
 			in vec3 normal;
             in vec2 texCoord;
 
-            uniform mat4 model, view, parent, proj, normalMatrix;
+            uniform mat4 model, view, parent, proj, inv_transpose;
 
             out vec2 f_texCoord;
 			out vec3 lighting;
@@ -160,7 +166,7 @@ pub fn create_texture_program(gl: &GL) -> Result<WebGlProgram, String> {
 				vec3 directionalLightColor = vec3(1, 1, 1);
 				vec3 directionalVector = normalize(vec3(0., 0., 5.0));
 
-				vec4 transformedNormal = normalMatrix * vec4(normal, 1.0);
+				vec4 transformedNormal = inv_transpose * vec4(normal, 1.0);
 
 				float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
 				lighting = ambientLight + directionalLightColor * directional;
