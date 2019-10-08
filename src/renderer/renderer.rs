@@ -1,7 +1,7 @@
 use super::shader::{
     bind_buffer_and_attribute, bind_index_buffer, bind_uniform_i32, bind_uniform_mat4,
     bind_uniform_vec4, bind_uniform_vec3, create_color_program, create_simple_program, create_texture_program,
-    create_vertex_color_program, ShaderType,
+    create_vertex_color_program, ShaderType, create_wire_program
 };
 use crate::dom_factory::{get_canvas, resize_canvas};
 use crate::{
@@ -20,6 +20,7 @@ use web_sys::{
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum DrawMode {
     Points,
+    Wireframe,
     Lines,
     PointyLines,
     Triangle,
@@ -57,7 +58,7 @@ impl Renderer {
         let mut shaders = HashMap::new();
         shaders.insert(
             ShaderType::Simple,
-            create_simple_program(&ctx).expect("Can't create color shader!"),
+            create_simple_program(&ctx).expect("Can't create simple shader!"),
         );
         shaders.insert(
             ShaderType::Color,
@@ -70,6 +71,10 @@ impl Renderer {
         shaders.insert(
             ShaderType::Texture,
             create_texture_program(&ctx).expect("can't create texture shader!"),
+        );
+        shaders.insert(
+            ShaderType::Wireframe,
+            create_wire_program(&ctx).expect("can't create texture shader!"),
         );
         log!("Renderer created");
         Self {
@@ -89,15 +94,49 @@ impl Renderer {
                 .expect("Can't find the program!");
             let vao = self.ctx.create_vertex_array().expect("Can't creat VAO");
             self.ctx.bind_vertex_array(Some(&vao));
-            bind_buffer_and_attribute(
-                &self.ctx,
-                &program,
-                "position",
-                &mesh.geometry.vertices,
-                3,
-            )
-            .expect("Can't bind postion");
-            if shader_type != ShaderType::Simple {
+            // bind vertices
+            if shader_type == ShaderType::Wireframe{
+                let mut vertices = Vec::new();
+                let mut bary_buffer = Vec::new();
+                let barycentric: [f32;9] = [1.0, 0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0];
+                for each in mesh.geometry.indices.iter() {
+                    let i = (each * 3) as usize;
+                    vertices.push(mesh.geometry.vertices[i]);
+                    vertices.push(mesh.geometry.vertices[i+1]);
+                    vertices.push(mesh.geometry.vertices[i+2]);
+                }
+                for _ in 0..vertices.len() / 9 {
+                    for each in &barycentric {
+                        bary_buffer.push(*each);
+                    }
+                }
+                bind_buffer_and_attribute(
+                    &self.ctx,
+                    &program,
+                    "position",
+                    &vertices,
+                    3,
+                )
+                .expect("Can't bind postion");
+                bind_buffer_and_attribute(
+                    &self.ctx,
+                    &program,
+                    "barycentric",
+                    &bary_buffer[..],
+                    3,
+                ).expect("Can't bind postion");
+            } else {
+                bind_buffer_and_attribute(
+                    &self.ctx,
+                    &program,
+                    "position",
+                    &mesh.geometry.vertices,
+                    3,
+                )
+                .expect("Can't bind postion");
+            }
+            // bind normals
+            if shader_type != ShaderType::Simple && shader_type != ShaderType::Wireframe {
                 bind_buffer_and_attribute(
                     &self.ctx,
                     &program,
@@ -106,8 +145,8 @@ impl Renderer {
                     3,
                 )
                 .expect("Can't bind normals");
-            }
-            if shader_type == ShaderType::VertexColor {
+            // bind vertex color
+            } else if shader_type == ShaderType::VertexColor {
                 bind_buffer_and_attribute(
                     &self.ctx,
                     &program,
@@ -119,6 +158,7 @@ impl Renderer {
                     4,
                 )
                 .expect("Couldn't bind vertex colors.");
+            // bind texture
             } else if shader_type == ShaderType::Texture {
                 bind_buffer_and_attribute(
                     &self.ctx,
@@ -140,12 +180,15 @@ impl Renderer {
         }
     }
     pub fn setup_renderer(&self) {
-        self.ctx.clear_color(0.1, 0.1, 0.1, 1.0);
-        self.ctx.clear_depth(1.0);
-        self.ctx.depth_func(GL::LEQUAL);
-        self.ctx.front_face(GL::CCW);
-        self.ctx.cull_face(GL::BACK);
-        self.ctx.enable(GL::CULL_FACE);
+        let gl = &self.ctx;
+        gl.clear_color(0.1, 0.1, 0.1, 1.0);
+        gl.clear_depth(1.0);
+        gl.depth_func(GL::LEQUAL);
+        gl.front_face(GL::CCW);
+        gl.cull_face(GL::BACK);
+        gl.enable(GL::CULL_FACE);
+        gl.enable(GL::DEPTH_TEST);
+        gl.blend_func(GL::SRC_ALPHA, GL::ONE_MINUS_SRC_ALPHA);
         log!("Renderer is ready to draw");
     }
     pub fn render(&self, scene: &Scene, viewport: &Viewport) {
@@ -164,7 +207,7 @@ impl Renderer {
                 let program = self.shaders.get(&shader_type).unwrap();
                 self.ctx.use_program(Some(&program));
                 self.ctx.bind_vertex_array(vao);
-                if shader_type == ShaderType::Color || shader_type == ShaderType::Simple {
+                if shader_type != ShaderType::VertexColor && shader_type != ShaderType::Texture {
                     bind_uniform_vec4(
                         &self.ctx,
                         program,
@@ -180,10 +223,7 @@ impl Renderer {
                 }
                 let model =  storage.parent_tranform(i) * storage.transform(i);
                 bind_uniform_mat4(&self.ctx, program, "model", &model.to_homogeneous());
-                if shader_type == ShaderType::Color {
-                    bind_uniform_vec3(&self.ctx, program, "eye", &viewport.eye());
-                }
-                if shader_type != ShaderType::Simple {
+                if shader_type != ShaderType::Simple && shader_type != ShaderType::Wireframe {
                     let normal_matrix = model.inverse().to_homogeneous().transpose();
                     bind_uniform_mat4(&self.ctx, program, "inv_transpose", &normal_matrix);
                 }
@@ -193,8 +233,21 @@ impl Renderer {
                 bind_index_buffer(&self.ctx, &indices).expect("Can't bind index buffer!");
                 if info.render {
                     match info.draw_mode {
+                        DrawMode::Wireframe => {
+                            let gl = &self.ctx;
+                            gl.enable(GL::BLEND);
+                            gl.depth_mask(false);
+                            gl.disable(GL::CULL_FACE);
+                            self.ctx.draw_arrays(
+                                GL::TRIANGLES,
+                                0,
+                                indices.len() as i32,
+                            );
+                            gl.enable(GL::CULL_FACE);
+                            gl.disable(GL::BLEND);
+                            gl.depth_mask(true);
+                        }
                         DrawMode::Triangle => {
-                            self.ctx.enable(GL::DEPTH_TEST);
                             self.ctx.draw_elements_with_i32(
                                 GL::TRIANGLES,
                                 indices.len() as i32,
@@ -210,6 +263,7 @@ impl Renderer {
                                 GL::UNSIGNED_SHORT,
                                 0,
                             );
+                            self.ctx.enable(GL::DEPTH_TEST);
                         }
                         DrawMode::Lines => {
                             self.ctx.draw_elements_with_i32(

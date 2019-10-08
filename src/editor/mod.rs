@@ -192,7 +192,7 @@ impl Editor {
                 let v = node.transform().isometry.translation.vector;
                 let gizmo = a_gizmo.borrow();
                 let gizmo_node = gizmo.inner().0;
-                gizmo_node.set_position([v.x, v.y, v.z]);
+                gizmo_node.set_position(v.x, v.y, v.z);
                 let mut active_node = a_active.borrow_mut();
                 *active_node = Some(a_node.clone());
                 return true;
@@ -214,7 +214,7 @@ impl Editor {
             let p_t = node.borrow().parent_transform();
             gizmo_node.set_parent_transform(p_t);
             let v = node.borrow().position();
-            gizmo_node.set_position(v);
+            gizmo_node.set_position(v.x,v.y,v.z);
             let ds =
                 1. / p_t.scale.magnitude() * view.transform().translation.vector.magnitude() / 20.;
             gizmo_node.set_scale(ds);
@@ -402,7 +402,7 @@ impl Editor {
                     let p_diff = Vector3::from(pos) - p_v;
                     let p = divide(p_diff, p_t.scale);
                     let p = p_r.inverse().transform_vector(&p);
-                    node.set_position([p.x, p.y, p.z].into());
+                    node.set_position(p.x, p.y, p.z);
                 }
             }
         });

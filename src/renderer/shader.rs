@@ -14,6 +14,7 @@ pub enum ShaderType {
     Color,
     VertexColor,
     Texture,
+    Wireframe,
 }
 
 pub fn create_program(gl: &GL, vertex: &str, fragment: &str) -> Result<WebGlProgram, String> {
@@ -27,15 +28,15 @@ pub fn create_simple_program(gl: &GL) -> Result<WebGlProgram, String> {
     let shader = create_program(
         gl,
         r#" #version 300 es
-            in vec4 position;
+            in vec3 position;
 
-            uniform mat4 parent, model, view, proj;
+            uniform mat4 model, view, proj;
             uniform vec4 color;
-
+            
             out vec4 f_color;
 
             void main() {
-                gl_Position = proj * view * model * position;
+                gl_Position = proj * view * model * vec4(position, 1.0);
                 f_color = color;
             }
         "#,
@@ -45,7 +46,57 @@ pub fn create_simple_program(gl: &GL) -> Result<WebGlProgram, String> {
             out vec4 outputColor;
 
             void main() {
-                    outputColor = f_color;
+                outputColor = f_color;
+            }
+        "#,
+    )?;
+    Ok(shader)
+}
+
+/// Creates a wireframe shader
+/// 
+/// Thanks to Florian Boesh for his tutorial on how to achieve fancy wireframe with
+/// barycentric coordinates. Please refer to the following url for further details:
+/// <http://codeflow.org/entries/2012/aug/02/easy-wireframe-display-with-barycentric-coordinates/>
+pub fn create_wire_program(gl: &GL) -> Result<WebGlProgram, String> {
+    let shader = create_program(
+        gl,
+        r#" #version 300 es
+            in vec3 position, barycentric;
+
+            uniform mat4 model, view, proj;
+            uniform vec4 color;
+            
+            out vec4 f_color;
+            out vec3 frag_bc;
+
+            void main() {
+                gl_Position = proj * view * model * vec4(position, 1.0);
+                gl_PointSize = 10.0;
+                f_color = color;
+                frag_bc = barycentric;
+            }
+        "#,
+        r#" #version 300 es
+            precision mediump float;
+            in vec4 f_color;
+            in vec3 frag_bc;
+            out vec4 outputColor;
+
+            float edgeFactor(){
+                vec3 d = fwidth(frag_bc);
+                vec3 a3 = smoothstep(vec3(0.0), d*1.5, frag_bc);
+                return min(min(a3.x, a3.y), a3.z);
+            }
+
+            void main() {
+                if(gl_FrontFacing){
+                    outputColor = vec4(f_color.xyz, (1.0-edgeFactor())*0.95);
+                }
+                else{
+                    outputColor = vec4(f_color.xyz, (1.0-edgeFactor())*0.2);
+                }
+
             }
         "#,
     )?;
@@ -58,12 +109,16 @@ pub fn create_color_program(gl: &GL) -> Result<WebGlProgram, String> {
         r#" #version 300 es
             uniform mat4 model, view, proj, inv_transpose;
             in vec3 position, normal;
-            out vec3 surface_normal, frag_pos;
+
+            out vec3 surface_normal;
+            out vec3 frag_pos;
+            out vec3 light_pos;
 
             void main() {
-                frag_pos = vec3(model * vec4(position, 1.0));
+                frag_pos = vec3(view * model * vec4(position, 1.0));
                 surface_normal = normalize((inv_transpose * vec4(normal, 1.0)).xyz);
-                gl_Position = proj * view * vec4(frag_pos, 1.0);
+                gl_Position = proj * vec4(frag_pos, 1.0);
+                light_pos = vec3(view * vec4(0.0,0.0,0.0,1.0));
             }
         "#,
         r#" #version 300 es
@@ -72,12 +127,16 @@ pub fn create_color_program(gl: &GL) -> Result<WebGlProgram, String> {
             uniform vec4 color;
             uniform vec3 eye;
 
-            in vec3 surface_normal, frag_pos;
+            in vec3 surface_normal;
+            in vec3 frag_pos;
+            in vec3 light_pos;
             out vec4 outputColor;
 
             void main() {
+                vec3 normal = normalize(cross(dFdx(frag_pos),dFdy(frag_pos)));
+
                 // light
-                vec3 light_pos = vec3(0.0,0.0,0.0);
+                //vec3 light_pos = vec3(0.0,0.0,0.0);
                 vec3 light_dir = normalize(light_pos - frag_pos);
                 vec3 light_color = vec3(0.8, 0.8, 0.8);
 
@@ -86,17 +145,17 @@ pub fn create_color_program(gl: &GL) -> Result<WebGlProgram, String> {
                 vec3 ambient = amb_fac * light_color;
 
                 // diffuse
-                float diff = max(dot(surface_normal, light_dir), 0.0);
+                float diff = max(dot(normal, light_dir), 0.0);
                 vec3 diffuse = diff * light_color;
 
                 // specular
                 float spec_fac = 1.0;
-                vec3 view_dir = normalize(eye - frag_pos);
-                vec3 reflection = normalize(reflect(-light_dir, surface_normal));
+                vec3 view_dir = normalize(-frag_pos);
+                vec3 reflection = normalize(reflect(-light_dir, normal));
                 float spec = pow(max(dot(view_dir, reflection), 0.0), 64.0);
                 vec3 specular = spec_fac * spec * light_color;
-
                 vec3 lighting = ambient + diffuse + specular;
+                
                 outputColor = vec4(color.xyz * lighting, 1.0);
             }
         "#,
@@ -112,7 +171,7 @@ pub fn create_vertex_color_program(gl: &GL) -> Result<WebGlProgram, String> {
 			in vec3  normal;
             in vec4 color;
 
-            uniform mat4 model, view, parent, proj, inv_transpose;
+            uniform mat4 model, view, proj, inv_transpose;
 
             out vec4 f_color;
 			out vec3 lighting;
@@ -150,10 +209,10 @@ pub fn create_texture_program(gl: &GL) -> Result<WebGlProgram, String> {
         gl,
         r#" #version 300 es
             in vec4 position;
-			in vec3 normal;
+            in vec3 normal;
             in vec2 texCoord;
 
-            uniform mat4 model, view, parent, proj, inv_transpose;
+            uniform mat4 model, view, proj, inv_transpose;
 
             out vec2 f_texCoord;
 			out vec3 lighting;

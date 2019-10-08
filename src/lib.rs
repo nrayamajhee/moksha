@@ -44,7 +44,7 @@ pub use crate::{
     editor::Editor,
     mesh::{Geometry, Material, Mesh, Transform},
     renderer::Renderer,
-    scene::{Node, Primitive, Scene, Storage, ObjectInfo},
+    scene::{Node, Primitive, Scene, Storage, ObjectInfo, Light, LightType},
 };
 
 use controller::ProjectionConfig;
@@ -122,15 +122,26 @@ pub fn start() -> Result<(), JsValue> {
         "Colored Cube",
     );
 
-    cube.set_position([0., 1., 0.]);
+    cube.set_position(0., 1., 0.);
     cube.set_scale(0.2);
-    cube2.set_position([4., 0., 0.]);
+    cube2.set_position(4., 0., 0.);
 
     let a_cube2 = rc_rcell(cube2);
     cube.add(a_cube2);
     let a_cube = rc_rcell(cube);
     //scene.add(a_cube.clone());
     //scene.add(a_cube2.clone());
+
+    let ambient_light = rc_rcell({
+        let amb = scene.light(
+            LightType::Ambient,
+            1.0,
+            [1.0,1.0,0.],
+        );
+        amb.set_position(10.,0.,-10.);
+        amb
+    });
+    scene.add(ambient_light.clone());
 
     let (a_sun, a_earth, a_moon) = {
         //let scene = a_scene.borrow();
@@ -150,13 +161,13 @@ pub fn start() -> Result<(), JsValue> {
         );
 
         let moon = scene.object_from_mesh_and_name(
-            Geometry::from_genmesh(&IcoSphere::subdivide(3)),
+            Geometry::from_genmesh(&IcoSphere::subdivide(1)),
             Material::single_color(1.0, 1.0, 1.0, 1.0),
             "Moon",
         );
 
-        moon.set_position([6.0, 0.0, 0.0]);
-        earth.set_position([10.0, 0.0, 0.0]);
+        moon.set_position(6.0, 0.0, 0.0);
+        earth.set_position(10.0, 0.0, 0.0);
         earth.set_scale(0.5);
         moon.set_scale(0.5);
         sun.set_scale(2.0);
@@ -177,8 +188,6 @@ pub fn start() -> Result<(), JsValue> {
     let mut editor = Editor::new(a_view.clone(), a_scene.clone(), a_rndr.clone());
     editor.set_active_node(a_moon.clone());
     let a_editor = rc_rcell(editor);
-
-    //let ambient_light = scene.light(L
 
     let f = rc_rcell(None);
     let g = f.clone();

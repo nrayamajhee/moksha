@@ -1,6 +1,7 @@
 use crate::{
     mesh::{Geometry, Material},
     scene::{Node, Scene},
+    renderer::DrawMode,
 };
 use genmesh::generators::{Circle, Cone, Cube, Cylinder, IcoSphere, Plane, SphereUv, Torus};
 use nalgebra::{UnitQuaternion, Isometry3};
@@ -90,45 +91,49 @@ impl Gizmo {
 pub fn create_arrow(scene: &Scene, color: [f32; 4], arrow_type: ArrowType, name: &str, has_stem: bool) -> Node {
     let mut node = scene.empty_w_name(name);
     if has_stem {
-        let stem = scene.object_from_mesh_and_name(
+        let stem = scene.object_from_mesh_name_and_mode(
             Geometry::from_genmesh_no_normals(&Cylinder::subdivide(8, 1)),
             Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
             "Arrow Stem",
+            DrawMode::TriangleNoDepth
         );
         stem.set_scale_vec(0.2, 0.2, 3.);
         node.own(stem);
     }
     let head = match arrow_type {
         ArrowType::Cone => {
-            let head = scene.object_from_mesh_and_name(
+            let head = scene.object_from_mesh_name_and_mode(
                 Geometry::from_genmesh(&Cone::new(8)),
                 Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
                 "Arrow Head",
+                DrawMode::TriangleNoDepth
             );
             head.set_scale(0.5);
             head
         }
         ArrowType::Cube => {
-            let head = scene.object_from_mesh_and_name(
+            let head = scene.object_from_mesh_name_and_mode(
                 Geometry::from_genmesh_no_normals(&Cube::new()),
                 Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
                 "Arrow Head",
+                DrawMode::TriangleNoDepth
             );
             head.set_scale(0.4);
             head
         }
         ArrowType::Sphere => {
-            let head = scene.object_from_mesh_and_name(
+            let head = scene.object_from_mesh_name_and_mode(
                 Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(1)),
                 Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
                 "Arrow Head",
+                DrawMode::TriangleNoDepth
             );
             head.set_scale(0.8);
             head
         }
     };
     if has_stem {
-        head.set_position([0., 0., 3.]);
+        head.set_position(0., 0., 3.);
     }
     node.own(head);
     node
@@ -143,35 +148,39 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowType) -> Node {
     let x = create_arrow(scene, [0.8, 0., 0., 1.], arrow_type, "x-axis", true);
     let y = create_arrow(scene, [0., 0.8, 0., 1.], arrow_type, "y-axis", true);
     let z = create_arrow(scene, [0., 0., 0.8, 1.], arrow_type, "z-axis", true);
-    let mut node = scene.object_from_mesh_and_name(
+    let mut node = scene.object_from_mesh_name_and_mode(
         Geometry::from_genmesh(&IcoSphere::subdivide(2)),
         Material::single_color_no_shade(0.8, 0.8, 0.8, 0.8),
         name,
+        DrawMode::TriangleNoDepth
     );
-    let x_p = scene.object_from_mesh_and_name(
+    let x_p = scene.object_from_mesh_name_and_mode(
         Geometry::from_genmesh(&Cube::new()),
         Material::single_color_no_shade(0.8, 0., 0., 1.),
         "pan_x",
+        DrawMode::TriangleNoDepth
     );
-    let y_p = scene.object_from_mesh_and_name(
+    let y_p = scene.object_from_mesh_name_and_mode(
         Geometry::from_genmesh(&Cube::new()),
         Material::single_color_no_shade(0., 0.8, 0., 1.),
         "pan_y",
+        DrawMode::TriangleNoDepth
     );
-    let z_p = scene.object_from_mesh_and_name(
+    let z_p = scene.object_from_mesh_name_and_mode(
         Geometry::from_genmesh(&Cube::new()),
         Material::single_color_no_shade(0., 0., 0.8, 1.),
         "pan_z",
+        DrawMode::TriangleNoDepth
     );
-    x.set_position([3., 0., 0.]);
-    y.set_position([0., 3., 0.]);
-    z.set_position([0., 0., 3.]);
+    x.set_position(3., 0., 0.);
+    y.set_position(0., 3., 0.);
+    z.set_position(0., 0., 3.);
     x.rotate_by(UnitQuaternion::from_euler_angles(0.0, PI / 2., 0.0));
     y.rotate_by(UnitQuaternion::from_euler_angles(-PI / 2., 0.0, 0.0));
     z.rotate_by(UnitQuaternion::from_euler_angles(0.0, 0.0, PI / 2.));
-    x_p.set_position([0., 3., 3.]);
-    y_p.set_position([3., 0., 3.]);
-    z_p.set_position([3., 3., 0.]);
+    x_p.set_position(0., 3., 3.);
+    y_p.set_position(3., 0., 3.);
+    z_p.set_position(3., 3., 0.);
     x_p.set_scale_vec(0.2,1.,1.);
     y_p.set_scale_vec(1.,0.2,1.);
     z_p.set_scale_vec(1.,1.,0.2);
@@ -185,9 +194,9 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowType) -> Node {
         let n_x = create_arrow(scene, [1.0, 0.0, 0.0, 1.0], arrow_type, "snap-x", false);
         let n_y = create_arrow(scene, [0.0, 1.0, 0.0, 1.0], arrow_type, "snap-y", false);
         let n_z = create_arrow(scene, [0.0, 0.0, 1.0, 1.0], arrow_type, "snap-z", false);
-        n_x.set_position([-6., 0., 0.]);
-        n_y.set_position([0., -6., 0.]);
-        n_z.set_position([0., 0., -6.]);
+        n_x.set_position(6., 0., 0.);
+        n_y.set_position(0., -6., 0.);
+        n_z.set_position(0., 0., -6.);
         node.own(n_x);
         node.own(n_y);
         node.own(n_z);

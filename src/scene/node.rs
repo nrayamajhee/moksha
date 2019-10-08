@@ -1,7 +1,7 @@
 use crate::{Mesh, ObjectInfo, RcRcell, Storage, Transform};
-use nalgebra::{UnitQuaternion, Vector3};
+use nalgebra::{UnitQuaternion, Vector3, Point3};
 
-/// A node is a entity in a scene that holds reference to its props in Storage, keeps tracks of
+/// An entity in the scene that holds reference to its props in Storage, keeps tracks of
 /// other nodes that are its children either borrowed or owned.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node {
@@ -20,10 +20,10 @@ impl Node {
             owned_children: Vec::new(),
         }
     }
-    pub fn position(&self) -> [f32; 3] {
+    pub fn position(&self) -> Point3<f32> {
         let transform = self.transform();
         let v = transform.isometry.translation.vector;
-        [v.x, v.y, v.z]
+        Point3::new(v.x, v.y, v.z)
     }
     pub fn global_position(&self) -> [f32; 3] {
         let transform = self.transform();
@@ -39,11 +39,11 @@ impl Node {
         let transform = self.transform();
         transform.scale
     }
-    pub fn set_position(&self, pos: [f32; 3]) {
+    pub fn set_position(&self, x: f32, y: f32, z: f32) {
         let p_transform = {
             let mut storage = self.storage.borrow_mut();
             let transform = storage.mut_transform(self.index);
-            transform.isometry.translation.vector = Vector3::from(pos);
+            transform.isometry.translation.vector = Vector3::new(x,y,z);
             *transform
         };
         self.apply_parent_transform(self.parent_transform() * p_transform);

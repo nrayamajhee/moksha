@@ -7,7 +7,7 @@ use nalgebra::{one, Isometry3, Matrix4, Translation3, Vector3};
 use wasm_bindgen::JsValue;
 use web_sys::WebGl2RenderingContext as GL;
 
-/// A 3D transform that can handle translation, rotation, and scaling.
+/// A 3D transform that can handle translation, rotation, and non-uniform scaling.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Transform {
     pub isometry: Isometry3<f32>,
@@ -166,6 +166,14 @@ impl Material {
     pub fn single_color_no_shade(r: f32, g: f32, b: f32, a: f32) -> Self {
         Self {
             shader_type: ShaderType::Simple,
+            color: Some([r, g, b, a]),
+            vertex_colors: None,
+            tex_coords: None,
+        }
+    }
+    pub fn wireframe(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self {
+            shader_type: ShaderType::Wireframe,
             color: Some([r, g, b, a]),
             vertex_colors: None,
             tex_coords: None,

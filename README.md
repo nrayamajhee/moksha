@@ -23,15 +23,16 @@ After many attempts and blunders, I have finally settled for wasm-bindgen. My fi
     - [x] Rendering component that holds, compiles, and binds shaders
     - [x] Unshaded Color
     - [x] Vertext Color
-    - [x] Albedo
-    - [ ] Per pixel shading (Flat + Smooth)
+    - [x] Per pixel shading (Flat + Smooth)
+    - [x] Albedo  Map
+	- [x] Barycentric Wireframe
     - [ ] Normal Map
     - [ ] Metallic/Roughness Map
     - [ ] Occlusion Map
-    - [ ] Fancy Wireframe (Line + Points + Depth Fade with shader based)
 	- [ ] Reflection and HDR Cubemaps
     - [ ] Volumetrics
     - [ ] Procedulal Texures
+    - [ ] Fancy Wireframe (Points + Line + Depth Fade)
   
 - Editor
     - [x] Custom logging screen
@@ -47,7 +48,7 @@ After many attempts and blunders, I have finally settled for wasm-bindgen. My fi
     - [x] Perspective Projection
     - [x] Orthographic Projection
     - [x] Third Person Controls
-    - [ ] First Person COnstrol
+    - [ ] First Person Constrol
     - [ ] Allow camera animations
     
 - Controller

@@ -5,6 +5,9 @@ use crate::{
     RcRcell,
 };
 
+use genmesh::generators::IcoSphere;
+use std::fmt;
+
 #[derive(Debug)]
 pub enum LightType {
     Ambient,
@@ -13,14 +16,21 @@ pub enum LightType {
     Spot
 }
 
-#[allow(dead_code)]
-pub struct Light {
-    light_type: LightType,
-    color: [f32;3],
-    intensity: f32,
+impl fmt::Display for LightType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
 }
 
+#[allow(dead_code)]
+pub struct Light {
+    pub light_type: LightType,
+    pub color: [f32;3],
+    pub intensity: f32,
+    pub mesh: Option<Mesh>,
+}
 
+/// Information about an object in the scene (name, render flag, drawing mode) 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ObjectInfo {
     pub name: String,
@@ -136,21 +146,42 @@ impl Scene {
     pub fn object_from_mesh(&self, geometry: Geometry, material: Material) -> Node {
         self.object_from_mesh_and_name(geometry, material, "node")
     }
-    //pub fn light(&self, light_type: LightType) -> Node {
-        //let (geometry, material) = match light_type {
-            //LightType::Ambient => (
-                //Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(2)),
-                //Material::single_color_no_shade(1.0, 1.0, 0.0, 1.0),
-            //),
-            //LightType::Directional => (
-            //),
-            //LightType::Point => (
-            //),
-            //LightType::Spot => (
-            //),
-        //};
-        //self.object_from_mesh_and_name(geometry, material, light_type.to_string().as_str())
-    //}
+    pub fn light(&self, light_type: LightType, intensity: f32, color: [f32;3]) -> Node {
+        self.light_w_config(Light{
+            light_type,
+            intensity,
+            color,
+            mesh: None,
+        })
+    }
+    pub fn light_w_config(&self, light: Light) -> Node {
+        let light_type = light.light_type;
+        if let Some(mesh) = light.mesh {
+            self.object_from_mesh_name_and_mode(
+                mesh.geometry,
+                mesh.material,
+                &light_type.to_string(),
+                DrawMode::Triangle,
+            )
+        } else {
+            let lc = light.color;
+            match light_type {
+                LightType::Ambient => self.object_from_mesh_name_and_mode(
+                    Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(1)),
+                    Material::wireframe(lc[0], lc[1], lc[2], 1.0),
+                    &light_type.to_string(),
+                    DrawMode::Wireframe,
+                ),
+                LightType::Point => self.object_from_mesh_name_and_mode(
+                    Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(2)),
+                    Material::single_color_no_shade(lc[0], lc[1], lc[2], 1.0),
+                    &light_type.to_string(),
+                    DrawMode::TriangleNoDepth,
+                ),
+                _ => self.empty_w_name(&light_type.to_string())
+            }
+        }
+    }
     pub fn storage(&self) -> RcRcell<Storage> {
         self.root.storage()
     }
