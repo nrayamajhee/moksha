@@ -139,7 +139,7 @@ canvas.grab {
 	margin: 0;
 	margin-left: calc(24px + var(--pap));
 }
-#console div i {
+#console div > i {
     margin-right: var(--pad);
     vertical-align: top;
 	float: left;

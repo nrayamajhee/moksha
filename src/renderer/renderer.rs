@@ -1,17 +1,13 @@
 use super::shader::{
-    bind_buffer_and_attribute, bind_index_buffer, bind_uniform_i32, bind_uniform_mat4,
-    bind_uniform_vec4, bind_uniform_vec3, create_color_program, create_simple_program, create_texture_program,
-    create_vertex_color_program, ShaderType, create_wire_program
+    bind_buffer_and_attribute, bind_index_buffer, create_color_program, create_simple_program,
+    create_texture_program, create_vertex_color_program, create_wire_program, set_bool, set_f32,
+    set_i32, set_mat4, set_vec3, set_vec4, ShaderType,
 };
 use crate::dom_factory::{get_canvas, resize_canvas};
-use crate::{
-    controller::Viewport,
-    log,
-    scene::{Scene},
-    mesh::Mesh,
-};
+use crate::{controller::Viewport, log, mesh::Mesh, scene::Scene, LightType};
 use std::collections::HashMap;
 use wasm_bindgen::{prelude::*, JsCast};
+use strum::IntoEnumIterator;
 use web_sys::{
     HtmlCanvasElement, HtmlElement, WebGl2RenderingContext as GL, WebGlProgram,
     WebGlVertexArrayObject,
@@ -28,7 +24,7 @@ pub enum DrawMode {
 }
 
 #[derive(Debug)]
-pub struct Config {
+pub struct RenderConfig {
     pub selector: &'static str,
     pub pixel_ratio: f64,
 }
@@ -41,11 +37,11 @@ pub struct Renderer {
     ctx: GL,
     aspect_ratio: f32,
     shaders: HashMap<ShaderType, WebGlProgram>,
-    config: Config,
+    config: RenderConfig,
 }
 
 impl Renderer {
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: RenderConfig) -> Self {
         let mut canvas = get_canvas(config.selector);
         let aspect_ratio = resize_canvas(&mut canvas, config.pixel_ratio);
         let ctx = canvas
@@ -95,36 +91,25 @@ impl Renderer {
             let vao = self.ctx.create_vertex_array().expect("Can't creat VAO");
             self.ctx.bind_vertex_array(Some(&vao));
             // bind vertices
-            if shader_type == ShaderType::Wireframe{
+            if shader_type == ShaderType::Wireframe {
                 let mut vertices = Vec::new();
                 let mut bary_buffer = Vec::new();
-                let barycentric: [f32;9] = [1.0, 0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0];
+                let barycentric: [f32; 9] = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
                 for each in mesh.geometry.indices.iter() {
                     let i = (each * 3) as usize;
                     vertices.push(mesh.geometry.vertices[i]);
-                    vertices.push(mesh.geometry.vertices[i+1]);
-                    vertices.push(mesh.geometry.vertices[i+2]);
+                    vertices.push(mesh.geometry.vertices[i + 1]);
+                    vertices.push(mesh.geometry.vertices[i + 2]);
                 }
                 for _ in 0..vertices.len() / 9 {
                     for each in &barycentric {
                         bary_buffer.push(*each);
                     }
                 }
-                bind_buffer_and_attribute(
-                    &self.ctx,
-                    &program,
-                    "position",
-                    &vertices,
-                    3,
-                )
-                .expect("Can't bind postion");
-                bind_buffer_and_attribute(
-                    &self.ctx,
-                    &program,
-                    "barycentric",
-                    &bary_buffer[..],
-                    3,
-                ).expect("Can't bind postion");
+                bind_buffer_and_attribute(&self.ctx, &program, "position", &vertices, 3)
+                    .expect("Can't bind postion");
+                bind_buffer_and_attribute(&self.ctx, &program, "barycentric", &bary_buffer[..], 3)
+                    .expect("Can't bind postion");
             } else {
                 bind_buffer_and_attribute(
                     &self.ctx,
@@ -137,14 +122,8 @@ impl Renderer {
             }
             // bind normals
             if shader_type != ShaderType::Simple && shader_type != ShaderType::Wireframe {
-                bind_buffer_and_attribute(
-                    &self.ctx,
-                    &program,
-                    "normal",
-                    &mesh.geometry.normals,
-                    3,
-                )
-                .expect("Can't bind normals");
+                bind_buffer_and_attribute(&self.ctx, &program, "normal", &mesh.geometry.normals, 3)
+                    .expect("Can't bind normals");
             // bind vertex color
             } else if shader_type == ShaderType::VertexColor {
                 bind_buffer_and_attribute(
@@ -186,15 +165,62 @@ impl Renderer {
         gl.depth_func(GL::LEQUAL);
         gl.front_face(GL::CCW);
         gl.cull_face(GL::BACK);
-        gl.enable(GL::CULL_FACE);
-        gl.enable(GL::DEPTH_TEST);
         gl.blend_func(GL::SRC_ALPHA, GL::ONE_MINUS_SRC_ALPHA);
         log!("Renderer is ready to draw");
     }
     pub fn render(&self, scene: &Scene, viewport: &Viewport) {
-        self.ctx.clear(GL::COLOR_BUFFER_BIT | GL::DEPTH_BUFFER_BIT);
+        let gl = &self.ctx;
+        gl.clear(GL::COLOR_BUFFER_BIT | GL::DEPTH_BUFFER_BIT);
         let storage = scene.storage();
         let storage = storage.borrow();
+        // bind lights per frame for only one program
+        {
+            let program = self.shaders.get(&ShaderType::Color).unwrap();
+            gl.use_program(Some(&program));
+            let mut num_l_amb = 0;
+            let mut num_l_point = 0;
+            for light in storage.lights() {
+                if !light.light {
+                    continue
+                }
+                match light.light_type {
+                    LightType::Ambient => {
+                        set_vec3(gl, program, &format!("amb_lights[{}].color",num_l_amb), &light.color);
+                        num_l_amb += 1;
+                    }
+                    LightType::Point => {
+                        let position = (storage.parent_tranform(light.node_id)
+                            * storage.transform(light.node_id))
+                        .isometry
+                        .translation
+                        .vector
+                        .data;
+                        let range = 100.;
+                        let linear = 4.5 / range;
+                        let quadratic = 7.5 / (range * range);
+                        set_f32(gl, program, &format!("point_lights[{}].linear",num_l_point), linear);
+                        set_f32(gl, program, &format!("point_lights[{}].quadratic",num_l_point), quadratic);
+                        set_vec3(gl, program, &format!("point_lights[{}].position",num_l_point), &position);
+                        set_vec3(gl, program, &format!("point_lights[{}].color",num_l_point), &light.color);
+                        num_l_point += 1;
+                    }
+                    _=>()
+                }
+            }
+            set_i32(gl, program, "num_l_amb", num_l_amb as i32);
+            set_i32(gl, program, "num_l_point", num_l_point as i32);
+            set_vec3(gl, program, "eye", &viewport.eye());
+        }
+        // bind view and projection per frame per program
+        {
+            for each in ShaderType::iter() {
+                let program = self.shaders.get(&each).unwrap();
+                gl.use_program(Some(&program));
+                set_mat4(gl, &program, "view", &viewport.view());
+                set_mat4(gl, &program, "proj", &viewport.proj());
+            }
+        }
+        // bind each mesh per frame
         let meshes = storage.meshes();
         for (i, mesh) in meshes.iter().enumerate() {
             if let Some(mesh) = mesh {
@@ -205,11 +231,14 @@ impl Renderer {
                 let vao = storage.vao(i);
                 let shader_type = mesh.material.shader_type;
                 let program = self.shaders.get(&shader_type).unwrap();
-                self.ctx.use_program(Some(&program));
-                self.ctx.bind_vertex_array(vao);
-                if shader_type != ShaderType::VertexColor && shader_type != ShaderType::Texture {
-                    bind_uniform_vec4(
-                        &self.ctx,
+                gl.use_program(Some(&program));
+                gl.bind_vertex_array(vao);
+                if shader_type == ShaderType::Simple
+                    || shader_type == ShaderType::Color
+                    || shader_type == ShaderType::Wireframe
+                {
+                    set_vec4(
+                        gl,
                         program,
                         "color",
                         &mesh
@@ -217,71 +246,63 @@ impl Renderer {
                             .color
                             .expect("Can't render a color materaial without a color!"),
                     );
-                } else if shader_type == ShaderType::Texture {
-                    self.ctx.active_texture(GL::TEXTURE0);
-                    bind_uniform_i32(&self.ctx, program, "sampler", 0);
                 }
-                let model =  storage.parent_tranform(i) * storage.transform(i);
-                bind_uniform_mat4(&self.ctx, program, "model", &model.to_homogeneous());
-                if shader_type != ShaderType::Simple && shader_type != ShaderType::Wireframe {
-                    let normal_matrix = model.inverse().to_homogeneous().transpose();
-                    bind_uniform_mat4(&self.ctx, program, "inv_transpose", &normal_matrix);
+                if shader_type == ShaderType::Color {
+                    set_bool(gl, program, "flat_shade", mesh.material.flat_shade);
                 }
-                bind_uniform_mat4(&self.ctx, &program, "view", &viewport.view());
-                bind_uniform_mat4(&self.ctx, &program, "proj", &viewport.proj());
+                if shader_type == ShaderType::Texture {
+                    gl.active_texture(GL::TEXTURE0);
+                    set_i32(gl, program, "sampler", 0);
+                }
+                let model = storage.parent_tranform(i) * storage.transform(i);
+                set_mat4(gl, program, "model", &model.to_homogeneous());
                 let indices = &mesh.geometry.indices;
-                bind_index_buffer(&self.ctx, &indices).expect("Can't bind index buffer!");
-                if info.render {
-                    match info.draw_mode {
-                        DrawMode::Wireframe => {
-                            let gl = &self.ctx;
-                            gl.enable(GL::BLEND);
-                            gl.depth_mask(false);
-                            gl.disable(GL::CULL_FACE);
-                            self.ctx.draw_arrays(
-                                GL::TRIANGLES,
-                                0,
-                                indices.len() as i32,
-                            );
-                            gl.enable(GL::CULL_FACE);
-                            gl.disable(GL::BLEND);
-                            gl.depth_mask(true);
-                        }
-                        DrawMode::Triangle => {
-                            self.ctx.draw_elements_with_i32(
-                                GL::TRIANGLES,
-                                indices.len() as i32,
-                                GL::UNSIGNED_SHORT,
-                                0,
-                            );
-                        }
-                        DrawMode::TriangleNoDepth => {
-                            self.ctx.disable(GL::DEPTH_TEST);
-                            self.ctx.draw_elements_with_i32(
-                                GL::TRIANGLES,
-                                indices.len() as i32,
-                                GL::UNSIGNED_SHORT,
-                                0,
-                            );
-                            self.ctx.enable(GL::DEPTH_TEST);
-                        }
-                        DrawMode::Lines => {
-                            self.ctx.draw_elements_with_i32(
-                                GL::LINES,
-                                indices.len() as i32,
-                                GL::UNSIGNED_SHORT,
-                                0,
-                            );
-                        }
-                        _ => (),
+                bind_index_buffer(gl, &indices).expect("Can't bind index buffer!");
+
+                gl.disable(GL::BLEND);
+                gl.depth_mask(true);
+                gl.enable(GL::CULL_FACE);
+                gl.enable(GL::DEPTH_TEST);
+                match info.draw_mode {
+                    DrawMode::Wireframe => {
+                        gl.depth_mask(false);
+                        gl.enable(GL::BLEND);
+                        gl.disable(GL::CULL_FACE);
+                        gl.draw_arrays(GL::TRIANGLES, 0, indices.len() as i32);
                     }
+                    DrawMode::Triangle => {
+                        gl.draw_elements_with_i32(
+                            GL::TRIANGLES,
+                            indices.len() as i32,
+                            GL::UNSIGNED_SHORT,
+                            0,
+                        );
+                    }
+                    DrawMode::TriangleNoDepth => {
+                        gl.disable(GL::DEPTH_TEST);
+                        gl.draw_elements_with_i32(
+                            GL::TRIANGLES,
+                            indices.len() as i32,
+                            GL::UNSIGNED_SHORT,
+                            0,
+                        );
+                    }
+                    DrawMode::Lines => {
+                        gl.draw_elements_with_i32(
+                            GL::LINES,
+                            indices.len() as i32,
+                            GL::UNSIGNED_SHORT,
+                            0,
+                        );
+                    }
+                    _ => (),
                 }
             }
         }
-        self.ctx.bind_vertex_array(None);
-        self.ctx.bind_buffer(GL::ARRAY_BUFFER, None);
-        self.ctx.bind_buffer(GL::ELEMENT_ARRAY_BUFFER, None);
-        self.ctx.use_program(None);
+        gl.bind_vertex_array(None);
+        gl.bind_buffer(GL::ARRAY_BUFFER, None);
+        gl.bind_buffer(GL::ELEMENT_ARRAY_BUFFER, None);
+        gl.use_program(None);
     }
     pub fn resize(&mut self) {
         log!("Renderer resized");

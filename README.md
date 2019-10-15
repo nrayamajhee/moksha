@@ -9,7 +9,7 @@ After many attempts and blunders, I have finally settled for wasm-bindgen. My fi
 # ToDo
 - System
     - [x] Storage to hold all the data
-    - [x] Reorganize vaos into Storage
+    - [x] Reorganize VAOs into Storage
 	- [ ] Cap the framerate for performance.
 	- [ ] Debug firefox's memory leaks.
 

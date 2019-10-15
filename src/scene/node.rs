@@ -1,5 +1,6 @@
 use crate::{Mesh, ObjectInfo, RcRcell, Storage, Transform};
 use nalgebra::{UnitQuaternion, Vector3, Point3};
+use std::rc::Rc;
 
 /// An entity in the scene that holds reference to its props in Storage, keeps tracks of
 /// other nodes that are its children either borrowed or owned.
@@ -7,7 +8,7 @@ use nalgebra::{UnitQuaternion, Vector3, Point3};
 pub struct Node {
     index: usize,
     storage: RcRcell<Storage>,
-    children: Vec<RcRcell<Node>>,
+    children: Vec<Rc<Node>>,
     owned_children: Vec<Node>,
 }
 
@@ -93,7 +94,6 @@ impl Node {
             child.apply_parent_transform(p_t);
         };
         for child in self.children.iter() {
-            let child = child.borrow();
             apply_transform(&child, transform);
         }
         for child in self.owned_children.iter() {
@@ -138,7 +138,7 @@ impl Node {
     pub fn index(&self) -> usize {
         self.index
     }
-    pub fn add(&mut self, node: RcRcell<Node>) {
+    pub fn add(&mut self, node: Rc<Node>) {
         //log!(
         //"Parent",
         //self.info().name,
@@ -155,7 +155,7 @@ impl Node {
     pub fn storage(&self) -> RcRcell<Storage> {
         self.storage.clone()
     }
-    pub fn children(&self) -> &Vec<RcRcell<Node>> {
+    pub fn children(&self) -> &Vec<Rc<Node>> {
         &self.children
     }
     pub fn owned_children(&self) -> &Vec<Node> {

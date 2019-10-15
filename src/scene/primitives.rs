@@ -1,6 +1,6 @@
 use crate::{
     mesh::{Geometry, Material},
-    scene::{Node, Scene},
+    scene::{Node, Scene, LightType},
     renderer::DrawMode,
 };
 use genmesh::generators::{Circle, Cone, Cube, Cylinder, IcoSphere, Plane, SphereUv, Torus};
@@ -137,6 +137,67 @@ pub fn create_arrow(scene: &Scene, color: [f32; 4], arrow_type: ArrowType, name:
     }
     node.own(head);
     node
+}
+
+pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32;3]) -> Node {
+    match light_type {
+        LightType::Ambient => scene.object_from_mesh_name_and_mode(
+            Geometry::from_genmesh_no_normals(&IcoSphere::new()),
+            Material::wireframe(color[0],color[1],color[2],1.),
+            &light_type.to_string(),
+            DrawMode::Wireframe,
+        ),
+        LightType::Point => {
+            let p = scene.object_from_mesh_name_and_mode(
+                Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(2)),
+                Material::single_color_no_shade(color[0],color[1],color[2],1.),
+                &light_type.to_string(),
+                DrawMode::Triangle,
+            );
+            p.set_scale(0.5);
+            p
+        }
+        LightType::Spot => scene.object_from_mesh_name_and_mode(
+            Geometry::from_genmesh_no_normals(&Cone::new(8)),
+            Material::wireframe(color[0],color[1],color[2],1.),
+            &light_type.to_string(),
+            DrawMode::Wireframe,
+        ),
+        LightType::Directional => {
+            let mut n = scene.empty_w_name("Directional");
+            let cube = scene.object_from_mesh_name_and_mode(
+                Geometry::from_genmesh_no_normals(&Cube::new()),
+                Material::single_color_no_shade(color[0],color[1],color[2],1.),
+                &light_type.to_string(),
+                DrawMode::Triangle,
+            );
+            cube.set_scale_vec(0.5, 0.5, 0.05);
+            cube.rotate_by(UnitQuaternion::from_euler_angles(0., 0., PI / 4.));
+            cube.set_position(0., 0., -1.);
+            n.own(cube);
+            for i in 0..5 {
+                let ray = create_arrow(scene, [1.,1.,0.,1.], ArrowType::Cone, "sun_ray", true);
+                ray.set_scale(0.25);
+                match i % 5 {
+                    0 => {
+                        ray.set_position(0.5, 0., 0.);
+                    }
+                    1 => {
+                        ray.set_position(-0.5, 0., 0.);
+                    }
+                    2 => {
+                        ray.set_position(0., 0.5, 0.);
+                    }
+                    3 => {
+                        ray.set_position(0., -0.5, 0.);
+                    }
+                    _ => (),
+                }
+                n.own(ray);
+            }
+            n
+        }
+    }
 }
 
 pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowType) -> Node {

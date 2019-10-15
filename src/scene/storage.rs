@@ -2,6 +2,7 @@ use crate::{
     ObjectInfo,
     Mesh,
     Transform,
+    scene::LightInfo,
 };
 
 use web_sys::WebGlVertexArrayObject;
@@ -15,6 +16,7 @@ pub struct Storage {
     transforms: Vec<Transform>,
     parent_transforms: Vec<Transform>,
     vaos: Vec<Option<WebGlVertexArrayObject>>,
+    lights: Vec<LightInfo>,
 }
 
 impl Storage {
@@ -25,7 +27,13 @@ impl Storage {
             transforms: Vec::new(),
             parent_transforms: Vec::new(),
             vaos: Vec::new(),
+            lights: Vec::new(),
         }
+    }
+    pub fn add_light(&mut self, light: LightInfo) -> usize {
+        let index = self.lights.len();
+        self.lights.push(light);
+        index
     }
     pub fn add(
         &mut self,
@@ -78,5 +86,14 @@ impl Storage {
     }
     pub fn mut_info(&mut self, indx: usize) -> &mut ObjectInfo {
         self.info.get_mut(indx).expect("No node info found!")
+    }
+    pub fn light(&self, indx: usize) -> LightInfo {
+        *self.lights.get(indx).expect("No light info found!")
+    }
+    pub fn lights(&self) -> &Vec<LightInfo> {
+        &self.lights
+    }
+    pub fn mut_light_info(&mut self, indx: usize) -> &mut LightInfo {
+        self.lights.get_mut(indx).expect("No node info found!")
     }
 }

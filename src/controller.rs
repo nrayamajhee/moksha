@@ -77,25 +77,15 @@ impl Viewport {
     pub fn new(
         proj_config: ProjectionConfig,
         aspect_ratio: f32,
-        proj_type: ProjectionType,
     ) -> Self {
         let view = Isometry3::look_at_rh(&[0., 3., 3.].into(), &[0., 0., 0.].into(), &Vector3::y());
 
-        let proj = if proj_type == ProjectionType::Perspective {
-            Projection::Perspective(Perspective3::new(
-                aspect_ratio,
-                proj_config.fov,
-                proj_config.near,
-                proj_config.far,
-            ))
-        } else {
-            Projection::Orthographic(ortho_from_persp(
-                proj_config.fov,
-                aspect_ratio,
-                view.translation.vector.magnitude(),
-                proj_config.far,
-            ))
-        };
+        let proj = Projection::Perspective(Perspective3::new(
+            aspect_ratio,
+            proj_config.fov,
+            proj_config.near,
+            proj_config.far,
+        ));
 
         let button = Some(MouseButton::LEFT);
         let target = Isometry3::identity();
@@ -143,7 +133,7 @@ impl Viewport {
         let v = v.normalize();
         [v.x, v.y, v.z]
     }
-    pub fn update_rot(&mut self, dx: i32, dy: i32, dt: f32) {
+    pub fn update_rot(&mut self, dx: i32, dy: i32, _dt: f32) {
         if self.rotate {
             let pitch = dy as f32 * 0.01 * self.speed;
             let yaw = dx as f32 * 0.01 * self.speed;

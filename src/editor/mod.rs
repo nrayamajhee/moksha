@@ -18,8 +18,7 @@ use genmesh::generators::Plane;
 use maud::{html, Markup};
 use nalgebra::{Isometry3, Point3, UnitQuaternion, Vector3};
 use std::f32::consts::PI;
-//use std::cell::RefCell;
-//use std::rc::Rc;
+use std::rc::Rc;
 use ncollide3d::{
     query::Ray,
     query::RayCast,
@@ -35,7 +34,7 @@ pub struct Editor {
     scene: RcRcell<Scene>,
     renderer: RcRcell<Renderer>,
     gizmo: RcRcell<Gizmo>,
-    active_node: RcRcell<Option<RcRcell<Node>>>,
+    active_node: RcRcell<Option<Rc<Node>>>,
 }
 
 impl Editor {
@@ -78,7 +77,7 @@ impl Editor {
         editor.add_events();
         editor
     }
-    pub fn set_active_node(&mut self, node: RcRcell<Node>) {
+    pub fn set_active_node(&mut self, node: Rc<Node>) {
         let mut a_n = self.active_node.borrow_mut();
         *a_n = Some(node);
     }
@@ -98,7 +97,7 @@ impl Editor {
                 @if children.len() > 0 {
                     ul {
                         @for child in children {
-                            (Self::recurse_tree(&child.borrow()))
+                            (Self::recurse_tree(&child))
                         }
                     }
                 }
@@ -156,24 +155,21 @@ impl Editor {
         let c_t = node.transform();
         let p_t = node.parent_transform();
         let s = multiply(c_t.scale, p_t.scale);
-        let verts: Vec<Point3<f32>> = node
-            .mesh()
-            .unwrap()
-            .geometry
-            .vertices
-            .chunks(3)
-            .map(|c| Point3::new(c[0] * s.x, c[1] * s.y, c[2] * s.z))
-            .collect();
-        if let Some(target) = ConvexHull::try_from_points(&verts) {
-            let transform = (p_t * c_t).isometry;
-            if target.intersects_ray(&transform, &ray) {
-                Some(transform)
-            } else {
-                None
+        if let Some(mesh) = node.mesh() {
+            let verts: Vec<Point3<f32>> = mesh
+                .geometry
+                .vertices
+                .chunks(3)
+                .map(|c| Point3::new(c[0] * s.x, c[1] * s.y, c[2] * s.z))
+                .collect();
+            if let Some(target) = ConvexHull::try_from_points(&verts) {
+                let transform = (p_t * c_t).isometry;
+                if target.intersects_ray(&transform, &ray) {
+                    return Some(transform);
+                }
             }
-        } else {
-            None
         }
+        return None;
     }
     fn change_color(node: &Node, color: [f32; 3]) {
         let mut mesh = node.mesh().unwrap();
@@ -182,11 +178,10 @@ impl Editor {
     }
     fn check_collision(
         ray: &Ray<f32>,
-        a_node: RcRcell<Node>,
-        a_active: RcRcell<Option<RcRcell<Node>>>,
+        node: Rc<Node>,
+        a_active: RcRcell<Option<Rc<Node>>>,
         a_gizmo: RcRcell<Gizmo>,
     ) -> bool {
-        let node = a_node.borrow();
         {
             if let Some(_) = Self::ray_collides_w_node(ray, &node) {
                 let v = node.transform().isometry.translation.vector;
@@ -194,7 +189,7 @@ impl Editor {
                 let gizmo_node = gizmo.inner().0;
                 gizmo_node.set_position(v.x, v.y, v.z);
                 let mut active_node = a_active.borrow_mut();
-                *active_node = Some(a_node.clone());
+                *active_node = Some(node.clone());
                 return true;
             }
         }
@@ -208,12 +203,12 @@ impl Editor {
     pub fn update(&mut self, view: &mut Viewport) {
         let node = self.active_node.borrow();
         if let Some(node) = node.as_ref() {
-            view.focus(&node.borrow());
+            view.focus(&node);
             let gizmo = self.gizmo.borrow();
             let gizmo_node = gizmo.inner().0;
-            let p_t = node.borrow().parent_transform();
+            let p_t = node.parent_transform();
             gizmo_node.set_parent_transform(p_t);
-            let v = node.borrow().position();
+            let v = node.position();
             gizmo_node.set_position(v.x,v.y,v.z);
             let ds =
                 1. / p_t.scale.magnitude() * view.transform().translation.vector.magnitude() / 20.;
@@ -265,7 +260,7 @@ impl Editor {
                             .dyn_into::<HtmlElement>()
                             .unwrap()
                             .inner_html();
-                        rc_rcell(create_primitive_node(&scene, selected_prim.as_str().into()))
+                        Rc::new(create_primitive_node(&scene, selected_prim.as_str().into()))
                     };
                     {
                         let mut scene = a_scene.borrow_mut();
@@ -395,7 +390,6 @@ impl Editor {
                 if let Some(node) = active_node.as_ref() {
                     // do calculation relative to parent element
                     // then set the calculated position
-                    let node = node.borrow();
                     let p_t = node.parent_transform();
                     let p_v = p_t.isometry.translation.vector;
                     let p_r = p_t.isometry.rotation;

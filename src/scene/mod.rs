@@ -10,4 +10,4 @@ pub use primitives::{Gizmo, Primitive};
 #[doc(inline)]
 pub use node::Node;
 pub use storage::Storage;
-pub use scene::{Scene, LightType, ObjectInfo, Light};
+pub use scene::{Scene, LightType, ObjectInfo, LightInfo, Light};

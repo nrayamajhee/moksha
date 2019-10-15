@@ -1,10 +1,11 @@
-use crate::{dom_factory::add_event, rc_rcell};
+use crate::{
+    dom_factory::{add_event, window},
+    rc_rcell,
+};
 use js_sys::{Float32Array, Uint16Array, Uint8Array};
 use nalgebra::Matrix4;
 use wasm_bindgen::JsValue;
-use web_sys::{
-    HtmlImageElement, WebGl2RenderingContext as GL, WebGlProgram, WebGlShader
-};
+use web_sys::{HtmlImageElement, WebGl2RenderingContext as GL, WebGlProgram, WebGlShader};
 
 use strum_macros::{Display, EnumIter};
 
@@ -12,9 +13,9 @@ use strum_macros::{Display, EnumIter};
 pub enum ShaderType {
     Simple,
     Color,
+    Wireframe,
     VertexColor,
     Texture,
-    Wireframe,
 }
 
 pub fn create_program(gl: &GL, vertex: &str, fragment: &str) -> Result<WebGlProgram, String> {
@@ -27,78 +28,22 @@ pub fn create_program(gl: &GL, vertex: &str, fragment: &str) -> Result<WebGlProg
 pub fn create_simple_program(gl: &GL) -> Result<WebGlProgram, String> {
     let shader = create_program(
         gl,
-        r#" #version 300 es
-            in vec3 position;
-
-            uniform mat4 model, view, proj;
-            uniform vec4 color;
-            
-            out vec4 f_color;
-
-            void main() {
-                gl_Position = proj * view * model * vec4(position, 1.0);
-                f_color = color;
-            }
-        "#,
-        r#" #version 300 es
-            precision mediump float;
-            in vec4 f_color;
-            out vec4 outputColor;
-
-            void main() {
-                outputColor = f_color;
-            }
-        "#,
+        include_str!("shaders/simple.vs"),
+        include_str!("shaders/simple.fs"),
     )?;
     Ok(shader)
 }
 
 /// Creates a wireframe shader
-/// 
+///
 /// Thanks to Florian Boesh for his tutorial on how to achieve fancy wireframe with
 /// barycentric coordinates. Please refer to the following url for further details:
 /// <http://codeflow.org/entries/2012/aug/02/easy-wireframe-display-with-barycentric-coordinates/>
 pub fn create_wire_program(gl: &GL) -> Result<WebGlProgram, String> {
     let shader = create_program(
         gl,
-        r#" #version 300 es
-            in vec3 position, barycentric;
-
-            uniform mat4 model, view, proj;
-            uniform vec4 color;
-            
-            out vec4 f_color;
-            out vec3 frag_bc;
-
-            void main() {
-                gl_Position = proj * view * model * vec4(position, 1.0);
-                gl_PointSize = 10.0;
-                f_color = color;
-                frag_bc = barycentric;
-            }
-        "#,
-        r#" #version 300 es
-            precision mediump float;
-            in vec4 f_color;
-            in vec3 frag_bc;
-            out vec4 outputColor;
-
-            float edgeFactor(){
-                vec3 d = fwidth(frag_bc);
-                vec3 a3 = smoothstep(vec3(0.0), d*1.5, frag_bc);
-                return min(min(a3.x, a3.y), a3.z);
-            }
-
-            void main() {
-                if(gl_FrontFacing){
-                    outputColor = vec4(f_color.xyz, (1.0-edgeFactor())*0.95);
-                }
-                else{
-                    outputColor = vec4(f_color.xyz, (1.0-edgeFactor())*0.2);
-                }
-
-            }
-        "#,
+        include_str!("shaders/wire.vs"),
+        include_str!("shaders/wire.fs"),
     )?;
     Ok(shader)
 }
@@ -106,59 +51,8 @@ pub fn create_wire_program(gl: &GL) -> Result<WebGlProgram, String> {
 pub fn create_color_program(gl: &GL) -> Result<WebGlProgram, String> {
     let shader = create_program(
         gl,
-        r#" #version 300 es
-            uniform mat4 model, view, proj, inv_transpose;
-            in vec3 position, normal;
-
-            out vec3 surface_normal;
-            out vec3 frag_pos;
-            out vec3 light_pos;
-
-            void main() {
-                frag_pos = vec3(view * model * vec4(position, 1.0));
-                surface_normal = normalize((inv_transpose * vec4(normal, 1.0)).xyz);
-                gl_Position = proj * vec4(frag_pos, 1.0);
-                light_pos = vec3(view * vec4(0.0,0.0,0.0,1.0));
-            }
-        "#,
-        r#" #version 300 es
-            precision mediump float;
-
-            uniform vec4 color;
-            uniform vec3 eye;
-
-            in vec3 surface_normal;
-            in vec3 frag_pos;
-            in vec3 light_pos;
-            out vec4 outputColor;
-
-            void main() {
-                vec3 normal = normalize(cross(dFdx(frag_pos),dFdy(frag_pos)));
-
-                // light
-                //vec3 light_pos = vec3(0.0,0.0,0.0);
-                vec3 light_dir = normalize(light_pos - frag_pos);
-                vec3 light_color = vec3(0.8, 0.8, 0.8);
-
-                // ambient
-                float amb_fac = 0.1;
-                vec3 ambient = amb_fac * light_color;
-
-                // diffuse
-                float diff = max(dot(normal, light_dir), 0.0);
-                vec3 diffuse = diff * light_color;
-
-                // specular
-                float spec_fac = 1.0;
-                vec3 view_dir = normalize(-frag_pos);
-                vec3 reflection = normalize(reflect(-light_dir, normal));
-                float spec = pow(max(dot(view_dir, reflection), 0.0), 64.0);
-                vec3 specular = spec_fac * spec * light_color;
-                vec3 lighting = ambient + diffuse + specular;
-                
-                outputColor = vec4(color.xyz * lighting, 1.0);
-            }
-        "#,
+        include_str!("shaders/color.vs"),
+        include_str!("shaders/color.fs"),
     )?;
     Ok(shader)
 }
@@ -356,46 +250,10 @@ pub fn bind_texture(gl: &GL, url: &str) -> Result<(), JsValue> {
     img.borrow_mut().set_src(url);
     Ok(())
 }
-pub fn bind_uniform_mat4(gl: &GL, program: &WebGlProgram, attribute: &str, matrix: &Matrix4<f32>) {
-    let mat = matrix.as_slice();
-    let mat_attrib = gl
-        .get_uniform_location(program, attribute)
-        .expect(format!("Can't bind uniform: {}", attribute).as_str());
-    gl.uniform_matrix4fv_with_f32_array(Some(&mat_attrib), false, &mat);
-}
-pub fn bind_buffer_and_attribute(
-    gl: &GL,
-    program: &WebGlProgram,
-    attribute: &str,
-    data: &[f32],
-    size: i32,
-) -> Result<(), JsValue> {
-    bind_buffer_f32(gl, data)?;
-    bind_attribute(gl, program, attribute, size);
-    Ok(())
-}
-pub fn bind_uniform_vec4(gl: &GL, program: &WebGlProgram, attribute: &str, vector: &[f32]) {
-    let mat_attrib = gl
-        .get_uniform_location(program, attribute)
-        .expect(format!("Can't bind uniform: {}", attribute).as_str());
-    gl.uniform4f(
-        Some(&mat_attrib),
-        vector[0],
-        vector[1],
-        vector[2],
-        vector[3],
-    );
-}
-pub fn bind_uniform_vec3(gl: &GL, program: &WebGlProgram, attribute: &str, vector: &[f32]) {
-    let mat_attrib = gl
-        .get_uniform_location(program, attribute)
-        .expect(format!("Can't bind uniform: {}", attribute).as_str());
-    gl.uniform3f(
-        Some(&mat_attrib),
-        vector[0],
-        vector[1],
-        vector[2],
-    );
+pub fn bind_attribute(gl: &GL, program: &WebGlProgram, name: &str, size: i32) {
+    let attribute = gl.get_attrib_location(program, name);
+    gl.vertex_attrib_pointer_with_i32(attribute as u32, size, GL::FLOAT, false, 0, 0);
+    gl.enable_vertex_attrib_array(attribute as u32);
 }
 pub fn bind_buffer_f32(gl: &GL, data: &[f32]) -> Result<(), JsValue> {
     let buffer = gl.create_buffer().ok_or("failed to create buffer")?;
@@ -411,14 +269,60 @@ pub fn bind_index_buffer(gl: &GL, data: &[u16]) -> Result<(), JsValue> {
     gl.buffer_data_with_array_buffer_view(GL::ELEMENT_ARRAY_BUFFER, &buffer_array, GL::STATIC_DRAW);
     Ok(())
 }
-pub fn bind_attribute(gl: &GL, program: &WebGlProgram, name: &str, size: i32) {
-    let attribute = gl.get_attrib_location(program, name);
-    gl.vertex_attrib_pointer_with_i32(attribute as u32, size, GL::FLOAT, false, 0, 0);
-    gl.enable_vertex_attrib_array(attribute as u32);
+pub fn bind_buffer_and_attribute(
+    gl: &GL,
+    program: &WebGlProgram,
+    attribute: &str,
+    data: &[f32],
+    size: i32,
+) -> Result<(), JsValue> {
+    bind_buffer_f32(gl, data)?;
+    bind_attribute(gl, program, attribute, size);
+    Ok(())
 }
-pub fn bind_uniform_i32(gl: &GL, program: &WebGlProgram, name: &str, value: i32) {
+pub fn set_bool(gl: &GL, program: &WebGlProgram, name: &str, value: bool) {
+    set_u32(gl, program, name, value as u32);
+}
+pub fn set_u32(gl: &GL, program: &WebGlProgram, name: &str, value: u32) {
+    let attrib = gl
+        .get_uniform_location(program, name)
+        .expect(format!("Can't bind uniform: {}", name).as_str());
+    gl.uniform1ui(Some(&attrib), value);
+}
+pub fn set_i32(gl: &GL, program: &WebGlProgram, name: &str, value: i32) {
     let attrib = gl
         .get_uniform_location(program, name)
         .expect(format!("Can't bind uniform: {}", name).as_str());
     gl.uniform1i(Some(&attrib), value);
+}
+pub fn set_f32(gl: &GL, program: &WebGlProgram, name: &str, value: f32) {
+    let attrib = gl
+        .get_uniform_location(program, name)
+        .expect(format!("Can't bind uniform: {}", name).as_str());
+    gl.uniform1f(Some(&attrib), value);
+}
+pub fn set_vec3(gl: &GL, program: &WebGlProgram, attribute: &str, vector: &[f32]) {
+    let mat_attrib = gl
+        .get_uniform_location(program, attribute)
+        .expect(format!("Can't bind uniform: {}", attribute).as_str());
+    gl.uniform3f(Some(&mat_attrib), vector[0], vector[1], vector[2]);
+}
+pub fn set_vec4(gl: &GL, program: &WebGlProgram, attribute: &str, vector: &[f32]) {
+    let mat_attrib = gl
+        .get_uniform_location(program, attribute)
+        .expect(format!("Can't bind uniform: {}", attribute).as_str());
+    gl.uniform4f(
+        Some(&mat_attrib),
+        vector[0],
+        vector[1],
+        vector[2],
+        vector[3],
+    );
+}
+pub fn set_mat4(gl: &GL, program: &WebGlProgram, attribute: &str, matrix: &Matrix4<f32>) {
+    let mat = matrix.as_slice();
+    let mat_attrib = gl
+        .get_uniform_location(program, attribute)
+        .expect(format!("Can't bind uniform: {}", attribute).as_str());
+    gl.uniform_matrix4fv_with_f32_array(Some(&mat_attrib), false, &mat);
 }
