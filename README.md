@@ -10,8 +10,8 @@ After many attempts and blunders, I have finally settled for wasm-bindgen. My fi
 - System
     - [x] Storage to hold all the data
     - [x] Reorganize VAOs into Storage
-	- [ ] Cap the framerate for performance.
-	- [ ] Debug firefox's memory leaks.
+    - [ ] Cap the framerate for performance.
+    - [ ] Debug firefox's memory leaks.
 
 - Scene
     - [x] Scene tree that allows node creations
@@ -25,23 +25,24 @@ After many attempts and blunders, I have finally settled for wasm-bindgen. My fi
     - [x] Vertext Color
     - [x] Per pixel shading (Flat + Smooth)
     - [x] Albedo  Map
-	- [x] Barycentric Wireframe
+    - [x] Barycentric Wireframe
+    - [x] Lights (Ambient, Point, Directional, Spot)
     - [ ] Normal Map
     - [ ] Metallic/Roughness Map
     - [ ] Occlusion Map
-	- [ ] Reflection and HDR Cubemaps
+    - [ ] Reflection and HDR Cubemaps
     - [ ] Volumetrics
-    - [ ] Procedulal Texures
+    - [ ] Procedulal Texures (Cloud, Fbm, Perlin, Voronoi, etc.)
     - [ ] Fancy Wireframe (Points + Line + Depth Fade)
   
 - Editor
     - [x] Custom logging screen
     - [x] Zoom and Switch Perspective controls
-	- [ ] Fancy mesh outline while selecting
+    - [ ] Fancy mesh outline while selecting
     - [ ] Configuration Editor
-    - [ ] Create a fps and debug text screen
+    - [ ] Create a fps meter
     - [ ] Implement all transformational gizmos.
-	- [ ] Implement a pan guide gizmo. (This might need rendering on a separate framebuffer)
+    - [ ] Implement a pan guide gizmo. (This might need rendering on a separate framebuffer)
   
   
 - Viewport
@@ -58,7 +59,7 @@ After many attempts and blunders, I have finally settled for wasm-bindgen. My fi
 
 - World
     - [ ] Load milkyway skybox
-    - [ ] Load Sky Model for Day/Night cycle
+    - [ ] Render Sky Model for Day/Night cycle
     - [ ] Displace the icosphere vertices with noise function
     - [ ] Implement level of detail for icosphere vertices.
     - [ ] Add plane model.
@@ -67,7 +68,7 @@ After many attempts and blunders, I have finally settled for wasm-bindgen. My fi
 
 - Physics
     - [ ] Gravity
-	- [ ] Collision with the surface
+    - [ ] Collision with surfaces
 
 ## How to?
 
@@ -96,9 +97,8 @@ curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 ```bash
 git clone https://gitlab.com/nrayamajhee/moksha.git
 cd moksha
-wasm-pack build
-cd www
-npm run start
+./moksha build
+./mksha serve
 ```
 ### Run all tests:
 ```bash
