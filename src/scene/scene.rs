@@ -12,10 +12,10 @@ use web_sys::{KeyboardEvent, MouseEvent, WheelEvent};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum LightType {
-    Ambient = 1,
-    Point = 2,
-    Directional = 3,
-    Spot = 4,
+    Ambient,
+    Point,
+    Directional,
+    Spot,
 }
 
 impl fmt::Display for LightType {
@@ -27,6 +27,7 @@ impl fmt::Display for LightType {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct LightInfo {
     pub light_type: LightType,
+    pub intensity: f32,
     pub color: [f32; 3],
     pub node_id: usize,
     pub light: bool,
@@ -133,10 +134,11 @@ impl Scene {
         let index = a_storage.add(mesh, vao, transform, info);
         Node::new(index, storage)
     }
-    pub fn light(&self, light_type: LightType, color: [f32; 3]) -> Light {
+    pub fn light(&self, light_type: LightType, color: [f32; 3], intensity: f32) -> Light {
         let node = Rc::new(create_light_node(&self, light_type, color));
         let light_id = self.storage().borrow_mut().add_light(LightInfo {
             light_type,
+            intensity,
             color,
             node_id: node.index(),
             light: false,
@@ -178,6 +180,21 @@ impl Scene {
             Mesh { geometry, material },
             ObjectInfo {
                 name: name.into(),
+                draw_mode,
+                ..Default::default()
+            },
+        )
+    }
+    pub fn object_from_mesh_and_mode(
+        &self,
+        geometry: Geometry,
+        material: Material,
+        draw_mode: DrawMode,
+    ) -> Node {
+        self.object_from_mesh_and_info(
+            Mesh { geometry, material },
+            ObjectInfo {
+                name: "node".into(),
                 draw_mode,
                 ..Default::default()
             },

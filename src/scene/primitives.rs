@@ -163,12 +163,17 @@ pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) 
             p.set_scale(0.5);
             p
         }
-        LightType::Spot => scene.object_from_mesh_name_and_mode(
-            Geometry::from_genmesh_no_normals(&Cone::new(8)),
-            Material::wireframe(color[0], color[1], color[2], 1.),
-            &light_type.to_string(),
-            DrawMode::Wireframe,
-        ),
+        LightType::Spot => {
+            let mut e = scene.empty_w_name(&light_type.to_string());
+            let s = scene.object_from_mesh_and_mode(
+                Geometry::from_genmesh_no_normals(&Cone::new(8)),
+                Material::wireframe(color[0], color[1], color[2], 1.),
+                DrawMode::Wireframe,
+            );
+            s.rotate_by(UnitQuaternion::from_euler_angles(0., -PI / 2., 0.));
+            e.own(s);
+            e
+        }
         LightType::Directional => {
             let mut n = scene.empty_w_name("Directional");
             let cube = scene.object_from_mesh_name_and_mode(

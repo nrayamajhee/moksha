@@ -140,6 +140,7 @@ impl Geometry {
 pub struct Material {
     pub shader_type: ShaderType,
     pub flat_shade: bool,
+    pub wire_overlay: bool,
     pub color: Option<[f32; 4]>,
     pub vertex_colors: Option<Vec<f32>>,
     pub tex_coords: Option<Vec<f32>>,
@@ -152,6 +153,7 @@ impl Material {
         Ok(Self {
             shader_type: ShaderType::Texture,
             flat_shade: false,
+            wire_overlay: false,
             color: None,
             vertex_colors: None,
             tex_coords,
@@ -161,6 +163,7 @@ impl Material {
         Self {
             shader_type: ShaderType::Color,
             flat_shade: false,
+            wire_overlay: false,
             color: Some([r, g, b, a]),
             vertex_colors: None,
             tex_coords: None,
@@ -170,6 +173,7 @@ impl Material {
         Self {
             shader_type: ShaderType::Simple,
             flat_shade: false,
+            wire_overlay: false,
             color: Some([r, g, b, a]),
             vertex_colors: None,
             tex_coords: None,
@@ -177,8 +181,9 @@ impl Material {
     }
     pub fn single_color_wired(r: f32, g: f32, b: f32, a: f32) -> Self {
         Self {
-            shader_type: ShaderType::ColorWithWire,
+            shader_type: ShaderType::Color,
             flat_shade: false,
+            wire_overlay: true,
             color: Some([r, g, b, a]),
             vertex_colors: None,
             tex_coords: None,
@@ -188,6 +193,7 @@ impl Material {
         Self {
             shader_type: ShaderType::Color,
             flat_shade: true,
+            wire_overlay: false,
             color: Some([r, g, b, a]),
             vertex_colors: None,
             tex_coords: None,
@@ -197,6 +203,7 @@ impl Material {
         Self {
             shader_type: ShaderType::Wireframe,
             flat_shade: false,
+            wire_overlay: false,
             color: Some([r, g, b, a]),
             vertex_colors: None,
             tex_coords: None,
@@ -206,6 +213,7 @@ impl Material {
         Self {
             shader_type: ShaderType::VertexColor,
             flat_shade: false,
+            wire_overlay: false,
             color: None,
             vertex_colors: Some(vertex_color),
             tex_coords: None,

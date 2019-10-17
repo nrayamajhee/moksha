@@ -18,6 +18,8 @@ use web_sys::{
     HtmlCanvasElement, HtmlElement, WebGl2RenderingContext as GL, WebGlProgram,
     WebGlVertexArrayObject,
 };
+use nalgebra::Vector3;
+
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum DrawMode {
@@ -85,15 +87,6 @@ impl Renderer {
             .expect("Can't create wire shader!"),
         );
         shaders.insert(
-            ShaderType::ColorWithWire,
-            create_program(
-                &ctx,
-                include_str!("shaders/color_wire.vert"),
-                include_str!("shaders/color_wire.frag"),
-            )
-            .expect("Can't create wired color shader!"),
-        );
-        shaders.insert(
             ShaderType::VertexColor,
             create_vertex_color_program(&ctx).expect("Can't create vertex color shader!"),
         );
@@ -120,7 +113,7 @@ impl Renderer {
             let vao = self.ctx.create_vertex_array().expect("Can't creat VAO");
             self.ctx.bind_vertex_array(Some(&vao));
             // bind vertices
-            if shader_type == ShaderType::Wireframe || shader_type == ShaderType::ColorWithWire {
+            if mesh.material.wire_overlay || shader_type == ShaderType::Wireframe {
                 let mut vertices = Vec::new();
                 let mut bary_buffer = Vec::new();
                 let barycentric: [f32; 9] = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
@@ -136,7 +129,7 @@ impl Renderer {
                     }
                 }
                 bind_buffer_and_attribute(&self.ctx, &program, "position", &vertices, 3)
-                    .expect("Can't bind postion");
+                .expect("Can't bind postion");
                 bind_buffer_and_attribute(&self.ctx, &program, "barycentric", &bary_buffer[..], 3)
                     .expect("Can't bind postion");
             } else {
@@ -150,7 +143,7 @@ impl Renderer {
                 .expect("Can't bind postion");
             }
             // bind normals
-            if shader_type == ShaderType::ColorWithWire {
+            if shader_type == ShaderType::Color && mesh.material.wire_overlay {
                 let mut normals = Vec::new();
                 for each in mesh.geometry.indices.iter() {
                     let i = (each * 3) as usize;
@@ -211,85 +204,125 @@ impl Renderer {
     }
     fn setup_lights(&self, storage: &Storage) {
         let gl = &self.ctx;
-        for each in ShaderType::iter() {
-            if each == ShaderType::Color || each == ShaderType::ColorWithWire {
-                let program = self.shaders.get(&each).unwrap();
-                gl.use_program(Some(&program));
-                let mut num_l_amb = 0;
-                let mut num_l_point = 0;
-                let mut num_l_dir = 0;
-                for light in storage.lights() {
-                    if !light.light {
-                        continue;
-                    }
-                    match light.light_type {
-                        LightType::Ambient => {
-                            set_vec3(
-                                gl,
-                                program,
-                                &format!("amb_lights[{}].color", num_l_amb),
-                                &light.color,
-                            );
-                            num_l_amb += 1;
-                        }
-                        LightType::Point | LightType::Directional => {
-                            let attrib = if light.light_type == LightType::Point {
-                                "point_lights"
-                            } else {
-                                "dir_lights"
-                            };
-                            let index = if light.light_type == LightType::Point {
-                                num_l_point
-                            } else {
-                                num_l_dir
-                            };
-                            let position = (storage.parent_tranform(light.node_id)
-                                * storage.transform(light.node_id))
-                            .isometry
-                            .translation
-                            .vector
-                            .data;
-                            let range = 100.;
-                            let linear = 4.5 / range;
-                            let quadratic = 7.5 / (range * range);
-                            set_f32(
-                                gl,
-                                program,
-                                &format!("{}[{}].linear", attrib, index),
-                                linear,
-                            );
-                            set_f32(
-                                gl,
-                                program,
-                                &format!("{}[{}].quadratic", attrib, index),
-                                quadratic,
-                            );
-                            set_vec3(
-                                gl,
-                                program,
-                                &format!("{}[{}].position", attrib, index),
-                                &position,
-                            );
-                            set_vec3(
-                                gl,
-                                program,
-                                &format!("{}[{}].color", attrib, index),
-                                &light.color,
-                            );
-                            if light.light_type == LightType::Point {
-                                num_l_point += 1;
-                            } else {
-                                num_l_dir += 1;
-                            };
-                        }
-                        _ => (),
-                    }
+        let program = self.shaders.get(&ShaderType::Color).unwrap();
+        gl.use_program(Some(&program));
+        let mut num_l_amb = 0;
+        let mut num_l_point = 0;
+        let mut num_l_dir = 0;
+        let mut num_l_spot = 0;
+        for light in storage.lights() {
+            if !light.light {
+                continue;
+            }
+            match light.light_type {
+                LightType::Ambient => {
+                    set_vec3(
+                        gl,
+                        program,
+                        &format!("amb_lights[{}].color", num_l_amb),
+                        &light.color,
+                    );
+                    set_f32(
+                        gl,
+                        program,
+                        &format!("amb_lights[{}].intensity", num_l_amb),
+                        light.intensity,
+                    );
+                    num_l_amb += 1;
                 }
-                set_i32(gl, program, "num_l_amb", num_l_amb as i32);
-                set_i32(gl, program, "num_l_point", num_l_point as i32);
-                set_i32(gl, program, "num_l_dir", num_l_dir as i32);
+                LightType::Point | LightType::Directional | LightType::Spot => {
+                    let attrib = if light.light_type == LightType::Point {
+                        "point_lights"
+                    } else if light.light_type == LightType::Spot {
+                        "spot_lights"
+                    } else {
+                        "dir_lights"
+                    };
+                    let index = if light.light_type == LightType::Point {
+                        num_l_point
+                    } else if light.light_type == LightType::Point {
+                        num_l_spot
+                    } else {
+                        num_l_dir
+                    };
+                    let position = (storage.parent_tranform(light.node_id)
+                        * storage.transform(light.node_id))
+                    .isometry
+                    .translation
+                    .vector
+                    .data;
+                    let range = 100.;
+                    let linear = 4.5 / range;
+                    let quadratic = 7.5 / (range * range);
+                    set_f32(
+                        gl,
+                        program,
+                        &format!("{}[{}].linear", attrib, index),
+                        linear,
+                    );
+                    set_f32(
+                        gl,
+                        program,
+                        &format!("{}[{}].quadratic", attrib, index),
+                        quadratic,
+                    );
+                    set_vec3(
+                        gl,
+                        program,
+                        &format!("{}[{}].position", attrib, index),
+                        &position,
+                    );
+                    if light.light_type == LightType::Spot {
+                        let direction = (storage.parent_tranform(light.node_id)
+                            * storage.transform(light.node_id))
+                        .isometry
+                        .rotation.transform_vector(&Vector3::identity())
+                        .data;
+                        set_vec3(
+                            gl,
+                            program,
+                            &format!("{}[{}].direction", attrib, index),
+                            &direction,
+                        );
+                        set_f32(
+                            gl,
+                            program,
+                            &format!("{}[{}].cutoff", attrib, index),
+                            f32::cos(std::f32::consts::PI / 30.),
+                        );
+                        set_f32(
+                            gl,
+                            program,
+                            &format!("{}[{}].outer_cutoff", attrib, index),
+                            f32::cos(std::f32::consts::PI / 25.),
+                        );
+                    }
+                    set_vec3(
+                        gl,
+                        program,
+                        &format!("{}[{}].color", attrib, index),
+                        &light.color,
+                    );
+                    set_f32(
+                        gl,
+                        program,
+                        &format!("{}[{}].intensity", attrib, index),
+                        light.intensity,
+                    );
+                    if light.light_type == LightType::Point {
+                        num_l_point += 1;
+                    } else if light.light_type == LightType::Spot {
+                        num_l_spot += 1;
+                    } else {
+                        num_l_dir += 1;
+                    };
+                }
             }
         }
+        set_i32(gl, program, "num_l_amb", num_l_amb as i32);
+        set_i32(gl, program, "num_l_point", num_l_point as i32);
+        set_i32(gl, program, "num_l_dir", num_l_dir as i32);
+        set_i32(gl, program, "num_l_spot", num_l_spot as i32);
     }
     fn update_viewport(&self, viewport: &Viewport) {
         for each in ShaderType::iter() {
@@ -298,7 +331,7 @@ impl Renderer {
                 gl.use_program(Some(&program));
                 set_mat4(gl, &program, "view", &viewport.view());
                 set_mat4(gl, &program, "proj", &viewport.proj());
-                if each == ShaderType::Color || each == ShaderType::ColorWithWire {
+                if each == ShaderType::Color {
                     set_vec3(gl, program, "eye", &viewport.eye());
                 }
             }
@@ -328,7 +361,6 @@ impl Renderer {
                 if shader_type == ShaderType::Simple
                     || shader_type == ShaderType::Color
                     || shader_type == ShaderType::Wireframe
-                    || shader_type == ShaderType::ColorWithWire
                 {
                     set_vec4(
                         gl,
@@ -340,8 +372,9 @@ impl Renderer {
                             .expect("Can't render a color materaial without a color!"),
                     );
                 }
-                if shader_type == ShaderType::Color || shader_type == ShaderType::ColorWithWire {
+                if shader_type == ShaderType::Color {
                     set_bool(gl, program, "flat_shade", mesh.material.flat_shade);
+                    set_bool(gl, program, "wire_overlay", mesh.material.wire_overlay);
                 }
                 if shader_type == ShaderType::Texture {
                     gl.active_texture(GL::TEXTURE0);
@@ -380,7 +413,7 @@ impl Renderer {
                             gl.enable(GL::BLEND);
                             gl.disable(GL::CULL_FACE);
                             gl.draw_arrays(GL::TRIANGLES, 0, indices.len() as i32);
-                        } else if shader_type == ShaderType::ColorWithWire {
+                        } else if mesh.material.wire_overlay {
                             gl.draw_arrays(GL::TRIANGLES, 0, indices.len() as i32);
                         } else {
                             gl.draw_elements_with_i32(

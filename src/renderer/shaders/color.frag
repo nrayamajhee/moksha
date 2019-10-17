@@ -1,27 +1,40 @@
 #version 300 es
-// Thanks to Florian Boesh for his tutorial on how to achieve fancy wireframe with
-// barycentric coordinates. Please refer to the following url for further details:
-// <http://codeflow.org/entries/2012/aug/02/easy-wireframe-display-with-barycentric-coordinates/>
 precision mediump float;
-in vec3 object_pos, surface_normal, view_dir;
+in vec3 object_pos, surface_normal, view_dir, frag_bc;
 uniform vec4 color;
+uniform bool wire_overlay;
 
+float edgeFactor(){
+	vec3 d = fwidth(frag_bc);
+	vec3 a3 = smoothstep(vec3(0.0), d*1.5, frag_bc);
+	return min(min(a3.x, a3.y), a3.z);
+}
+
+#define DIR 0
+#define POINT 1
+#define SPOT 2
+#define MAX_NUM_LIGHTS 20
 
 struct Light {
 	vec3 position;
 	vec3 color;
+
+	vec3 direction;
+	float cutoff;
+	float outer_cutoff;
+
 	float linear;
+	float intensity;
 	float quadratic;
 };
 
 vec3 calc_amb_light(Light light) {
-	return light.color * color.rgb;
+	return light.color * color.rgb * light.intensity;
 }
 
-vec3 calc_light(Light light, vec3 normal, bool dir) {
+vec3 calc_light(Light light, vec3 normal, int type) {
 	// light
-	//vec3 light_dir = dir? normalize(-light.position): normalize(light.position - object_pos); 
-	vec3 light_dir = normalize(light.position - object_pos); 
+	vec3 light_dir = (type == DIR) ? normalize(-light.position): normalize(light.position - object_pos); 
 	
 	// diffuse
 	float diff = max(dot(normal, light_dir), 0.0);
@@ -37,13 +50,22 @@ vec3 calc_light(Light light, vec3 normal, bool dir) {
 	float distance = length(light.position - object_pos);
 	float attenuation = 1.0 / (1.0 + light.linear * distance + light.quadratic * (distance * distance));
 
-	return (diffuse + specular) * attenuation * color.rgb;
+	// spot
+	if (type == SPOT) {
+		float theta = dot(light_dir , normalize(-light.direction));
+		float epsilon = light.cutoff - light.outer_cutoff;
+		float intensity = clamp((theta - light.outer_cutoff) / epsilon, 0.0, 1.0);
+		return (diffuse + specular) * attenuation * color.rgb * light.intensity * intensity;
+	}
+
+	return (diffuse + specular) * attenuation * color.rgb * light.intensity;
 }
 
-uniform int num_l_amb, num_l_point, num_l_dir;
-uniform Light amb_lights[10];
-uniform Light point_lights[10];
-uniform Light dir_lights[10];
+uniform int num_l_amb, num_l_point, num_l_dir, num_l_spot;
+uniform Light amb_lights[MAX_NUM_LIGHTS];
+uniform Light point_lights[MAX_NUM_LIGHTS];
+uniform Light dir_lights[MAX_NUM_LIGHTS];
+uniform Light spot_lights[MAX_NUM_LIGHTS];
 uniform bool flat_shade;
 
 out vec4 outputColor;
@@ -57,11 +79,14 @@ void main() {
 		result += calc_amb_light(amb_lights[i]);
 	}
 	for (int i = 0; i < num_l_dir; i++) {
-		result += calc_light(dir_lights[i], normal, true);
+		result += calc_light(dir_lights[i], normal, DIR);
 	}
 	for (int i = 0; i < num_l_point; i++) {
-		result += calc_light(point_lights[i], normal, false);
+		result += calc_light(point_lights[i], normal, POINT);
+	}
+	for (int i = 0; i < num_l_spot; i++) {
+		result += calc_light(spot_lights[i], normal, SPOT);
 	}
 	
-	outputColor = vec4(result, 1.0);
+	outputColor = wire_overlay? vec4(mix(color.xyz,result, edgeFactor()), 1.0): vec4(result, 1.0);
 }

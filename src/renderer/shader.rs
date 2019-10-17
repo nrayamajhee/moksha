@@ -10,7 +10,6 @@ use strum_macros::{Display, EnumIter};
 pub enum ShaderType {
     Simple,
     Color,
-    ColorWithWire,
     Wireframe,
     VertexColor,
     Texture,

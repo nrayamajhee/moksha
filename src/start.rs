@@ -10,6 +10,7 @@ use crate::{
 use genmesh::generators::{Cube, IcoSphere};
 use maud::html;
 use std::f32::consts::PI;
+use nalgebra::UnitQuaternion;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
@@ -131,23 +132,24 @@ pub fn start() -> Result<(), JsValue> {
         (sun, earth, moon)
     };
 
-    let ambient = scene.light(LightType::Ambient, [0.1, 0.1, 0.1]);
+    let ambient = scene.light(LightType::Ambient, [1.0, 1.0, 1.0], 0.12);
     let amb_node = ambient.node();
     amb_node.set_position(10., 0., 10.);
 
-    let spot = scene.light(LightType::Spot, [1., 1., 0.5]);
+    let spot = scene.light(LightType::Spot, [1., 0.5, 0.5], 1.0);
     let spot_node = spot.node();
     spot_node.set_position(25., 0., 10.);
+    spot_node.rotate_by(UnitQuaternion::from_euler_angles(0., PI / 2., 0.));
 
-    let point = scene.light(LightType::Point, [1., 0.5, 0.5]);
+    let point = scene.light(LightType::Point, [1., 0.5, 0.5], 1.0);
     let point_node = point.node();
     point_node.set_position(15., 0., 10.);
 
-    let point2 = scene.light(LightType::Point, [0.5, 1., 0.5]);
+    let point2 = scene.light(LightType::Point, [0.5, 1., 0.5], 1.0);
     let point2_node = point2.node();
     point2_node.set_position(15., 0., -10.);
 
-    let directional = scene.light(LightType::Directional, [0.5, 0.5, 1.]);
+    let directional = scene.light(LightType::Directional, [1., 1., 1.], 2.0);
     let dir_node = directional.node();
     dir_node.set_position(30., 0., -10.);
 
@@ -156,8 +158,8 @@ pub fn start() -> Result<(), JsValue> {
     scene.add_light(ambient);
     //scene.add_light(point2);
     //scene.add_light(point);
-    scene.add_light(directional);
-    //scene.add_light(spot);
+    //scene.add_light(directional);
+    scene.add_light(spot);
 
     let a_scene = rc_rcell(scene);
     let mut editor = Editor::new(a_view.clone(), a_scene.clone(), a_rndr.clone());
