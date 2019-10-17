@@ -1,5 +1,5 @@
-mod scene;
 mod node;
+mod scene;
 mod storage;
 
 pub mod primitives;
@@ -9,5 +9,5 @@ pub use primitives::{Gizmo, Primitive};
 
 #[doc(inline)]
 pub use node::Node;
+pub use scene::{Light, LightInfo, LightType, ObjectInfo, Scene};
 pub use storage::Storage;
-pub use scene::{Scene, LightType, ObjectInfo, LightInfo, Light};

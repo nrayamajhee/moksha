@@ -1,7 +1,4 @@
-use crate::{
-    dom_factory::{add_event, window},
-    rc_rcell,
-};
+use crate::{dom_factory::add_event, rc_rcell};
 use js_sys::{Float32Array, Uint16Array, Uint8Array};
 use nalgebra::Matrix4;
 use wasm_bindgen::JsValue;
@@ -13,6 +10,7 @@ use strum_macros::{Display, EnumIter};
 pub enum ShaderType {
     Simple,
     Color,
+    ColorWithWire,
     Wireframe,
     VertexColor,
     Texture,
@@ -23,38 +21,6 @@ pub fn create_program(gl: &GL, vertex: &str, fragment: &str) -> Result<WebGlProg
     let frag_shader = compile_shader(gl, GL::FRAGMENT_SHADER, fragment)?;
     let program = link_program(gl, &vert_shader, &frag_shader, true)?;
     Ok(program)
-}
-
-pub fn create_simple_program(gl: &GL) -> Result<WebGlProgram, String> {
-    let shader = create_program(
-        gl,
-        include_str!("shaders/simple.vs"),
-        include_str!("shaders/simple.fs"),
-    )?;
-    Ok(shader)
-}
-
-/// Creates a wireframe shader
-///
-/// Thanks to Florian Boesh for his tutorial on how to achieve fancy wireframe with
-/// barycentric coordinates. Please refer to the following url for further details:
-/// <http://codeflow.org/entries/2012/aug/02/easy-wireframe-display-with-barycentric-coordinates/>
-pub fn create_wire_program(gl: &GL) -> Result<WebGlProgram, String> {
-    let shader = create_program(
-        gl,
-        include_str!("shaders/wire.vs"),
-        include_str!("shaders/wire.fs"),
-    )?;
-    Ok(shader)
-}
-
-pub fn create_color_program(gl: &GL) -> Result<WebGlProgram, String> {
-    let shader = create_program(
-        gl,
-        include_str!("shaders/color.vs"),
-        include_str!("shaders/color.fs"),
-    )?;
-    Ok(shader)
 }
 
 pub fn create_vertex_color_program(gl: &GL) -> Result<WebGlProgram, String> {

@@ -1,5 +1,5 @@
 mod console;
-pub use console::console_setup;
+pub use console::{console_setup, ConsoleConfig};
 
 use crate::{
     dom_factory::{
@@ -17,13 +17,13 @@ use crate::{
 use genmesh::generators::Plane;
 use maud::{html, Markup};
 use nalgebra::{Isometry3, Point3, UnitQuaternion, Vector3};
-use std::f32::consts::PI;
-use std::rc::Rc;
 use ncollide3d::{
     query::Ray,
     query::RayCast,
     shape::{Ball, ConvexHull, Plane as CollidePlane},
 };
+use std::f32::consts::PI;
+use std::rc::Rc;
 use wasm_bindgen::JsCast;
 use web_sys::{EventTarget, HtmlCanvasElement, HtmlElement, KeyboardEvent, MouseEvent};
 
@@ -209,7 +209,7 @@ impl Editor {
             let p_t = node.parent_transform();
             gizmo_node.set_parent_transform(p_t);
             let v = node.position();
-            gizmo_node.set_position(v.x,v.y,v.z);
+            gizmo_node.set_position(v.x, v.y, v.z);
             let ds =
                 1. / p_t.scale.magnitude() * view.transform().translation.vector.magnitude() / 20.;
             gizmo_node.set_scale(ds);

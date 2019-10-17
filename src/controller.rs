@@ -74,10 +74,7 @@ pub struct Viewport {
 }
 
 impl Viewport {
-    pub fn new(
-        proj_config: ProjectionConfig,
-        aspect_ratio: f32,
-    ) -> Self {
+    pub fn new(proj_config: ProjectionConfig, aspect_ratio: f32) -> Self {
         let view = Isometry3::look_at_rh(&[0., 3., 3.].into(), &[0., 0., 0.].into(), &Vector3::y());
 
         let proj = Projection::Perspective(Perspective3::new(

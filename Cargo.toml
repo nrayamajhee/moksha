@@ -62,6 +62,9 @@ features = [
   'EventTarget',
   'Event',
   'WheelEvent',
+  'PopStateEvent',
+  'Location',
+  'History',
   'CssStyleDeclaration'
 ]
 

@@ -12,10 +12,10 @@ use web_sys::{KeyboardEvent, MouseEvent, WheelEvent};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum LightType {
-    Ambient,
-    Point,
-    Directional,
-    Spot,
+    Ambient = 1,
+    Point = 2,
+    Directional = 3,
+    Spot = 4,
 }
 
 impl fmt::Display for LightType {
@@ -141,10 +141,7 @@ impl Scene {
             node_id: node.index(),
             light: false,
         });
-        Light {
-            light_id,
-            node,
-        }
+        Light { light_id, node }
     }
     pub fn empty(&self) -> Node {
         self.empty_w_name("Empty")

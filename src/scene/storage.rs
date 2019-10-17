@@ -1,9 +1,4 @@
-use crate::{
-    ObjectInfo,
-    Mesh,
-    Transform,
-    scene::LightInfo,
-};
+use crate::{scene::LightInfo, Mesh, ObjectInfo, Transform};
 
 use web_sys::WebGlVertexArrayObject;
 

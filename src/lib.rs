@@ -22,8 +22,8 @@ pub fn rc_rcell<T>(inner: T) -> RcRcell<T> {
     Rc::new(RefCell::new(inner))
 }
 
-pub mod dom_factory;
 pub mod controller;
+pub mod dom_factory;
 pub mod editor;
 pub mod mesh;
 pub mod renderer;
@@ -35,7 +35,7 @@ pub use crate::{
     editor::Editor,
     mesh::{Geometry, Material, Mesh, Transform},
     renderer::Renderer,
-    scene::{Node, Primitive, Scene, Storage, ObjectInfo, Light, LightType},
+    scene::{Light, LightType, Node, ObjectInfo, Primitive, Scene, Storage},
 };
 
 mod start;

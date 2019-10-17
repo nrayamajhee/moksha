@@ -21,7 +21,7 @@ impl Transform {
     pub fn inverse(&self) -> Self {
         Self {
             isometry: self.isometry.inverse(),
-            scale: divide([1.,1.,1.].into(), self.scale),
+            scale: divide([1., 1., 1.].into(), self.scale),
         }
     }
 }
@@ -160,7 +160,7 @@ impl Material {
     pub fn single_color(r: f32, g: f32, b: f32, a: f32) -> Self {
         Self {
             shader_type: ShaderType::Color,
-            flat_shade: true,
+            flat_shade: false,
             color: Some([r, g, b, a]),
             vertex_colors: None,
             tex_coords: None,
@@ -170,6 +170,24 @@ impl Material {
         Self {
             shader_type: ShaderType::Simple,
             flat_shade: false,
+            color: Some([r, g, b, a]),
+            vertex_colors: None,
+            tex_coords: None,
+        }
+    }
+    pub fn single_color_wired(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self {
+            shader_type: ShaderType::ColorWithWire,
+            flat_shade: false,
+            color: Some([r, g, b, a]),
+            vertex_colors: None,
+            tex_coords: None,
+        }
+    }
+    pub fn single_color_flat(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self {
+            shader_type: ShaderType::Color,
+            flat_shade: true,
             color: Some([r, g, b, a]),
             vertex_colors: None,
             tex_coords: None,

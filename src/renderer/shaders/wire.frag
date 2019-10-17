@@ -1,4 +1,7 @@
 #version 300 es
+// Thanks to Florian Boesh for his tutorial on how to achieve fancy wireframe with
+// barycentric coordinates. Please refer to the following url for further details:
+// <http://codeflow.org/entries/2012/aug/02/easy-wireframe-display-with-barycentric-coordinates/>
 precision mediump float;
 in vec4 f_color;
 in vec3 frag_bc;

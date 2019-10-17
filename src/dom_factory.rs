@@ -125,3 +125,19 @@ fn button(id: &str, label: Option<&str>, hint: &str, icon_name: &str, hotkey: &s
         button class=(class) id=(id) aria-label=(hint) {i.material-icons-outlined{(icon_name)} (label_span) span.hint {(&format!("{}: [ {} ]",hint,hotkey))}}
     }
 }
+
+pub fn push_history(title: &str) -> Result<(), JsValue> {
+    window().history().unwrap().push_state_with_url(
+        &JsValue::from_str(title),
+        "",
+        Some(&format!("/{}", title)),
+    )
+}
+
+pub fn replace_history(title: &str) -> Result<(), JsValue> {
+    window().history().unwrap().replace_state_with_url(
+        &JsValue::from_str(title),
+        "",
+        Some(&format!("/{}", title)),
+    )
+}

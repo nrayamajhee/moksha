@@ -1,25 +1,27 @@
-use genmesh::generators::{IcoSphere, Cube};
-use maud::html;
-use std::f32::consts::PI;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsValue;
-use std::rc::Rc;
-
 use crate::{
-    rc_rcell,
-    editor::console_setup,
     controller::ProjectionConfig,
     dom_factory::{body, document, request_animation_frame},
-    Geometry, Material, Scene, Viewport, Editor,
+    editor::{console_setup, ConsoleConfig},
+    rc_rcell,
+    renderer::{RenderConfig, Renderer},
     scene::LightType,
-    renderer::{Renderer, RenderConfig}
+    Editor, Geometry, Material, Scene, Viewport,
 };
+use genmesh::generators::{Cube, IcoSphere};
+use maud::html;
+use std::f32::consts::PI;
+use std::rc::Rc;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsValue;
 
 /// The main entrypoint that is automatically executed on page load.
 #[wasm_bindgen(start)]
 #[allow(dead_code)]
 pub fn start() -> Result<(), JsValue> {
-    console_setup(true);
+    console_setup(ConsoleConfig {
+        ui_button: true,
+        change_history: true,
+    });
     let dom = html! {
         canvas #gl-canvas oncontextmenu="return false;" {}
     };
@@ -27,7 +29,6 @@ pub fn start() -> Result<(), JsValue> {
     body()
         .insert_adjacent_html("beforeend", dom.into_string().as_str())
         .expect("Couldn't insert markup into the DOM!");
-
     let renderer = Renderer::new(RenderConfig {
         selector: "#gl-canvas",
         pixel_ratio: 1.0,
@@ -77,7 +78,8 @@ pub fn start() -> Result<(), JsValue> {
             "/assets/img/box_tex.png",
             tex_coords,
         )?;
-        let mut cube = scene.object_from_mesh_and_name(cube_geometry.clone(), cube_tex, "Wooden Cube");
+        let mut cube =
+            scene.object_from_mesh_and_name(cube_geometry.clone(), cube_tex, "Wooden Cube");
         let cube2 = scene.object_from_mesh_and_name(
             cube_geometry.clone(),
             Material::vertex_colors(colors),
@@ -104,13 +106,13 @@ pub fn start() -> Result<(), JsValue> {
 
         let mut earth = scene.object_from_mesh_and_name(
             Geometry::from_genmesh(&IcoSphere::subdivide(2)),
-            Material::single_color(0.0, 0.0, 1.0, 1.0),
+            Material::single_color_wired(0.0, 0.0, 1.0, 1.0),
             "Earth",
         );
 
         let moon = scene.object_from_mesh_and_name(
-            Geometry::from_genmesh(&IcoSphere::subdivide(1)),
-            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            Geometry::from_genmesh(&IcoSphere::subdivide(3)),
+            Material::single_color_flat(1.0, 1.0, 1.0, 1.0),
             "Moon",
         );
 
@@ -129,33 +131,33 @@ pub fn start() -> Result<(), JsValue> {
         (sun, earth, moon)
     };
 
-    let ambient = scene.light(LightType::Ambient,[0.1,0.1,0.1]);
+    let ambient = scene.light(LightType::Ambient, [0.1, 0.1, 0.1]);
     let amb_node = ambient.node();
-    amb_node.set_position(10.,0.,10.);
+    amb_node.set_position(10., 0., 10.);
 
-    let spot = scene.light(LightType::Spot,[1.,1.,0.5]);
+    let spot = scene.light(LightType::Spot, [1., 1., 0.5]);
     let spot_node = spot.node();
-    spot_node.set_position(25.,0.,10.);
+    spot_node.set_position(25., 0., 10.);
 
-    let point = scene.light(LightType::Point,[1.,0.1,0.1]);
+    let point = scene.light(LightType::Point, [1., 0.5, 0.5]);
     let point_node = point.node();
-    point_node.set_position(15.,0.,10.);
+    point_node.set_position(15., 0., 10.);
 
-    let point2 = scene.light(LightType::Point,[0.1,1.,0.1]);
+    let point2 = scene.light(LightType::Point, [0.5, 1., 0.5]);
     let point2_node = point2.node();
-    point2_node.set_position(15.,0.,-10.);
-    
-    let directional = scene.light(LightType::Directional,[1.,1.,0.5]);
+    point2_node.set_position(15., 0., -10.);
+
+    let directional = scene.light(LightType::Directional, [0.5, 0.5, 1.]);
     let dir_node = directional.node();
-    dir_node.set_position(20.,0.,10.);
+    dir_node.set_position(30., 0., -10.);
 
     scene.add(cube.clone());
     scene.add(sun.clone());
     scene.add_light(ambient);
-    scene.add_light(point2);
-    scene.add_light(point);
+    //scene.add_light(point2);
+    //scene.add_light(point);
     scene.add_light(directional);
-    scene.add_light(spot);
+    //scene.add_light(spot);
 
     let a_scene = rc_rcell(scene);
     let mut editor = Editor::new(a_view.clone(), a_scene.clone(), a_rndr.clone());

@@ -1,5 +1,5 @@
 use crate::{Mesh, ObjectInfo, RcRcell, Storage, Transform};
-use nalgebra::{UnitQuaternion, Vector3, Point3};
+use nalgebra::{Point3, UnitQuaternion, Vector3};
 use std::rc::Rc;
 
 /// An entity in the scene that holds reference to its props in Storage, keeps tracks of
@@ -44,7 +44,7 @@ impl Node {
         let p_transform = {
             let mut storage = self.storage.borrow_mut();
             let transform = storage.mut_transform(self.index);
-            transform.isometry.translation.vector = Vector3::new(x,y,z);
+            transform.isometry.translation.vector = Vector3::new(x, y, z);
             *transform
         };
         self.apply_parent_transform(self.parent_transform() * p_transform);
