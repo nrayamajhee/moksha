@@ -6,6 +6,71 @@ This is an experimental video game written in rust. Building an editor of some s
 
 After many attempts and blunders, I have finally settled for wasm-bindgen. My first attempt was to try three-rs (<https://gitlab.com/nrayamajhee/moksha-three>). It was a good starting point, but I eventually learnt some webgl and GLSLS, which led me to abandon three-rs's three-js like abstraction. I then thought, I would instead write my own vulkan based renderer (<https://gitlab.com/nrayamajhee/moksha-vk>), which turned out to be an agonizing journery that was well beyond my capabilities. Hence, I am here, using wasm-bindgen's webgl binding. Hopefully someday WebGPU kicks off and drags me back to vulkan like code base. 
 
+## How to?
+
+### Setup:
+
+To install rust. Follow the custom setup and install nightly because I use `maud` for templating which uses procedural macros.
+
+```bash
+curl https://sh.rustup.rs -sSf | sh
+```
+
+(Alternative) If you run Arch Linux, the following will do.
+
+```bash
+pacman -S rustup
+rustup default nightly
+```
+
+To install wasm-pack:
+
+```bash
+curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh 
+```
+
+### Run the game:
+```bash
+git clone https://gitlab.com/nrayamajhee/moksha.git
+cd moksha
+./moksha build
+./mksha serve
+```
+### Run all tests:
+```bash
+wasm-pack test --headless --firefox
+```
+
+or
+
+```bash
+wasm-pack test --headless --chrome
+```
+
+### Generate docs:
+
+```bash
+cargo doc --open
+```
+
+## Preview 
+
+The entire project is deployed at <http://moksha.rayamajhee.com>. This is continuously deployed with every commit in `master`, so expect it to be broken.
+
+This was the initial setup for moksha-three. My goal is to eventually write abstractions (editors, shdaers, etc.) to be able to recreate this:
+
+![screenshot](data/img/flight.png)
+
+This is what the editor currently looks like:
+
+![screenshot](data/img/editor.png)
+
+## Rust-lang usages
+
+Although, I have been learning rust for a while and was writing some C/C++ in the past, I am in no capability to judge how idiomatic my code is nor how healthy its memory management is. This program, although robust to my eyes does have some memory issues. I can't quite figure out if its my code, or firefox's WebGL driver, but I suspect there's some memory leaks as firefox's memory usage only climbs when run. Chrome, on the other hand, works perfectly fine.
+
+Due to wasm-bingen's lack of support for rust lifetime annotations, I make heavy use of Rc<RefCell> to pass around the various structs to event handlers. Although, I can ditch wasm-bindgen endpoint and use lifetimes, I think it is better to expose all my structs and functions to javascript so that if anyone wants to use this library from javascript, it is as feature rich and complete.
+
 # Done
 
 - System
@@ -95,72 +160,7 @@ After many attempts and blunders, I have finally settled for wasm-bindgen. My fi
 - Physics
     - Gravity
     - Collision with surfaces
-
-## How to?
-
-### Setup:
-
-To install rust. Follow the custom setup and install nightly because I use `maud` for templating which uses procedural macros.
-
-```bash
-curl https://sh.rustup.rs -sSf | sh
-```
-
-(Alternative) If you run Arch Linux, the following will do.
-
-```bash
-pacman -S rustup
-rustup default nightly
-```
-
-To install wasm-pack:
-
-```bash
-curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh 
-```
-
-### Run the game:
-```bash
-git clone https://gitlab.com/nrayamajhee/moksha.git
-cd moksha
-./moksha build
-./mksha serve
-```
-### Run all tests:
-```bash
-wasm-pack test --headless --firefox
-```
-
-or
-
-```bash
-wasm-pack test --headless --chrome
-```
-
-### Generate docs:
-
-```bash
-cargo doc --open
-```
-
-## Preview 
-
-The entire project is deployed at <http://moksha.rayamajhee.com>. This is continuously deployed with every commit in `master`, so expect it to be broken.
-
-This was the initial setup for moksha-three. My goal is to eventually write abstractions (editors, shdaers, etc.) to be able to recreate this:
-
-![screenshot](data/img/flight.png)
-
-This is what the editor currently looks like:
-
-![screenshot](data/img/editor.png)
-
-## Rust-lang usages
-
-Although, I have been learning rust for a while and was writing some C/C++ in the past, I am in no capability to judge how idiomatic my code is nor how healthy its memory management is. This program, although robust to my eyes does have some memory issues. I can't quite figure out if its my code, or firefox's WebGL driver, but I suspect there's some memory leaks as firefox's memory usage only climbs when run. Chrome, on the other hand, works perfectly fine.
-
-Due to wasm-bingen's lack of support for rust lifetime annotations, I make heavy use of Rc<RefCell> to pass around the various structs to event handlers. Although, I can ditch wasm-bindgen endpoint and use lifetimes, I think it is better to expose all my structs and functions to javascript so that if anyone wants to use this library from javascript, it is as feature rich and complete.
-
+    
 ## License
 
 Licensed under either of the following terms at your choice:
