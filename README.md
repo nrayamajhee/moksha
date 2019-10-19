@@ -69,7 +69,7 @@ This is what the editor currently looks like:
 
 Although, I have been learning rust for a while and was writing some C/C++ in the past, I am in no capability to judge how idiomatic my code is nor how healthy its memory management is. This program, although robust to my eyes does have some memory issues. I can't quite figure out if its my code, or firefox's WebGL driver, but I suspect there's some memory leaks as firefox's memory usage only climbs when run. Chrome, on the other hand, works perfectly fine.
 
-Due to wasm-bingen's lack of support for rust lifetime annotations, I make heavy use of Rc<RefCell> to pass around the various structs to event handlers. Although, I can ditch wasm-bindgen endpoint and use lifetimes, I think it is better to expose all my structs and functions to javascript so that if anyone wants to use this library from javascript, it is as feature rich and complete.
+Due to wasm-bingen's lack of support for rust lifetime annotations, I make heavy use of Rc<RefCell> to pass around the various structs to event handlers. Although, I can ditch wasm-bindgen endpoint and use lifetimes notations, I think it is better to expose all my structs and functions to javascript so that if anyone wants to use this library from javascript, it is as feature rich and complete.
 
 # Done
 
