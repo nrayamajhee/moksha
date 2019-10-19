@@ -6,69 +6,95 @@ This is an experimental video game written in rust. Building an editor of some s
 
 After many attempts and blunders, I have finally settled for wasm-bindgen. My first attempt was to try three-rs (<https://gitlab.com/nrayamajhee/moksha-three>). It was a good starting point, but I eventually learnt some webgl and GLSLS, which led me to abandon three-rs's three-js like abstraction. I then thought, I would instead write my own vulkan based renderer (<https://gitlab.com/nrayamajhee/moksha-vk>), which turned out to be an agonizing journery that was well beyond my capabilities. Hence, I am here, using wasm-bindgen's webgl binding. Hopefully someday WebGPU kicks off and drags me back to vulkan like code base. 
 
-# ToDo
+# Done
+
 - System
-    - [x] Storage to hold all the data
-    - [x] Reorganize VAOs into Storage
-    - [ ] Cap the framerate for performance.
-    - [ ] Debug firefox's memory leaks.
+    - Storage to hold all the data
+    - Reorganize VAOs into Storage
 
 - Scene
-    - [x] Scene tree that allows node creations
-    - [x] Add primitive meshes
-    - [ ] load obj
-    - [ ] load gltf
+    - Scene tree that allows node creations
+    - Add primitive meshes
+    
+- Renderer
+    - Rendering component that holds, compiles, and binds shaders
+    - Unshaded Color
+    - Vertext Color
+    - Per pixel shading (Flat + Smooth)
+    - Albedo  Map
+    - Barycentric Wireframe
+    - Lights (Ambient, Point, Directional, Spot)
+    
+ - Editor
+    - Custom logging screen
+    - Node tree viewer
+    - Zoom and Switch Perspective controls
+    - Menu for adding objects
+
+- Viewport
+    - Perspective Projection
+    - Orthographic Projection
+    - Third Person Controls
+
+# Doing
+
+- Scene
+  - load obj (geometry + albedo texure)
+
+- Editor
+  - Fix translation gizmo's offset (currently buggy).
+  - Add lights to "Add Menu"
+  - Make node tree viewer clickable to allow selection, disable rendering, etc.
+
+# ToDo
+- System
+    - Cap the framerate for performance.
+    - Debug firefox's memory leaks.
+
+- Scene
+    - load obj
+    - load gltf
 
 - Renderer
-    - [x] Rendering component that holds, compiles, and binds shaders
-    - [x] Unshaded Color
-    - [x] Vertext Color
-    - [x] Per pixel shading (Flat + Smooth)
-    - [x] Albedo  Map
-    - [x] Barycentric Wireframe
-    - [x] Lights (Ambient, Point, Directional, Spot)
-    - [ ] Normal Map
-    - [ ] Metallic/Roughness Map
-    - [ ] Occlusion Map
-    - [ ] Reflection and HDR Cubemaps
-    - [ ] Volumetrics
-    - [ ] Procedulal Texures (Cloud, Fbm, Perlin, Voronoi, etc.)
-    - [ ] Fancy Wireframe (Points + Line + Depth Fade)
+    - Normal Map
+    - Metallic/Roughness Map
+    - Occlusion Map
+    - Reflection and HDR Cubemaps
+    - Volumetrics
+    - Procedulal Texures (Cloud, Fbm, Perlin, Voronoi, etc.)
+    - Fancy Wireframe (Points + Line + Depth Fade)
   
 - Editor
-    - [x] Custom logging screen
-    - [x] Zoom and Switch Perspective controls
-    - [ ] Fancy mesh outline while selecting
-    - [ ] Configuration Editor
-    - [ ] Create a fps meter
-    - [ ] Implement all transformational gizmos.
-    - [ ] Implement a pan guide gizmo. (This might need rendering on a separate framebuffer)
+    - Fancy mesh outline while selecting
+    - Configuration Editor
+    - Create a fps meter
+    - Implement translation gizmo.
+    - Implement rotational gizmo.
+    - IMplement scaling gizmo.
+    - Implement a pan guide gizmo. (This might need rendering on a separate framebuffer)
   
   
 - Viewport
-    - [x] Perspective Projection
-    - [x] Orthographic Projection
-    - [x] Third Person Controls
-    - [ ] First Person Constrol
-    - [ ] Allow camera animations
+    - First Person Constrol
+    - Allow camera animations
     
 - Controller
-    - [ ] Fly Navigation: accelerate, Deaccelerate, Roll, Pitch, and yaw movements
-    - [ ] Walk Navigation: Acceleraete, Deaccelerate, Turn, Jump, Roll, Crouch, Crawl
-    - [ ] Drive Navigation: Acceleraete, Deaccelerate, Turn
+    - Fly Navigation: accelerate, Deaccelerate, Roll, Pitch, and yaw movements
+    - Walk Navigation: Acceleraete, Deaccelerate, Turn, Jump, Roll, Crouch, Crawl
+    - Drive Navigation: Acceleraete, Deaccelerate, Turn
 
 - World
-    - [ ] Load milkyway skybox
-    - [ ] Render Sky Model for Day/Night cycle
-    - [ ] Displace the icosphere vertices with noise function
-    - [ ] Implement level of detail for icosphere vertices.
-    - [ ] Add plane model.
-    - [ ] Volumetric Clouds
-    - [ ] Instanced Trees
+    - Load milkyway skybox
+    - Render Sky Model for Day/Night cycle
+    - Displace the icosphere vertices with noise function
+    - Implement level of detail for icosphere vertices.
+    - Add plane model.
+    - Volumetric Clouds
+    - Instanced Trees
 
 - Physics
-    - [ ] Gravity
-    - [ ] Collision with surfaces
+    - Gravity
+    - Collision with surfaces
 
 ## How to?
 
