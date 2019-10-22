@@ -65,7 +65,8 @@ impl Default for ObjectInfo {
     }
 }
 
-/// A Scene tree that facilitates creation of varieties of Nodes; this also owns the Storage.
+/// A Scene tree that facilitates creation of varieties of Nodes. Scene creates Storage that is
+/// then shared by all nodes.
 pub struct Scene {
     root: Node,
     renderer: RcRcell<Renderer>,

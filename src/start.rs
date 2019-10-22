@@ -112,8 +112,8 @@ pub fn start() -> Result<(), JsValue> {
         );
 
         let moon = scene.object_from_mesh_and_name(
-            Geometry::from_genmesh(&IcoSphere::subdivide(3)),
-            Material::single_color_flat(1.0, 1.0, 1.0, 1.0),
+            Geometry::from_genmesh(&IcoSphere::subdivide(2)),
+            Material::single_color(1.0, 1.0, 1.0, 1.0),
             "Moon",
         );
 
@@ -164,7 +164,7 @@ pub fn start() -> Result<(), JsValue> {
     let a_scene = rc_rcell(scene);
     let mut editor = Editor::new(a_view.clone(), a_scene.clone(), a_rndr.clone());
     editor.set_active_node(_moon.clone());
-    let a_editor = rc_rcell(editor);
+    //let a_editor = rc_rcell(editor);
 
     let f = rc_rcell(None);
     let g = f.clone();
@@ -175,8 +175,8 @@ pub fn start() -> Result<(), JsValue> {
             //a_sun.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.01, 0.));
         }
         {
-            let mut view = a_view.borrow_mut();
-            a_editor.borrow_mut().update(&mut view);
+            let view = a_view.borrow_mut();
+            //a_editor.borrow_mut().update(&mut view);
             a_rndr.borrow_mut().render(&a_scene.borrow(), &view);
         }
         request_animation_frame(f.borrow().as_ref().unwrap());

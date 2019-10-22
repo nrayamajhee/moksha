@@ -4,7 +4,7 @@ use crate::{
     scene::{LightType, Node, Scene},
 };
 use genmesh::generators::{Circle, Cone, Cube, Cylinder, IcoSphere, Plane, SphereUv, Torus};
-use nalgebra::{Isometry3, UnitQuaternion};
+use nalgebra::{UnitQuaternion};
 use std::f32::consts::PI;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -62,30 +62,6 @@ pub enum GizmoGrab {
     ZPlane,
     ViewPlane,
     None,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Gizmo {
-    Translate(Node, GizmoGrab, Isometry3<f32>),
-    Scale(Node, GizmoGrab, Isometry3<f32>),
-    Rotate(Node, GizmoGrab, Isometry3<f32>),
-}
-
-impl Gizmo {
-    pub fn inner(&self) -> (&Node, &GizmoGrab, &Isometry3<f32>) {
-        match self {
-            Gizmo::Translate(n, s, i) => (n, s, i),
-            Gizmo::Scale(n, s, i) => (n, s, i),
-            Gizmo::Rotate(n, s, i) => (n, s, i),
-        }
-    }
-    pub fn inner_mut(&mut self) -> (&Node, &mut GizmoGrab, &mut Isometry3<f32>) {
-        match self {
-            Gizmo::Translate(n, s, i) => (n, s, i),
-            Gizmo::Scale(n, s, i) => (n, s, i),
-            Gizmo::Rotate(n, s, i) => (n, s, i),
-        }
-    }
 }
 
 pub fn create_arrow(

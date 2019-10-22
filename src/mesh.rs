@@ -189,6 +189,16 @@ impl Material {
             tex_coords: None,
         }
     }
+    pub fn single_color_flat_wired(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self {
+            shader_type: ShaderType::Color,
+            flat_shade: true,
+            wire_overlay: true,
+            color: Some([r, g, b, a]),
+            vertex_colors: None,
+            tex_coords: None,
+        }
+    }
     pub fn single_color_flat(r: f32, g: f32, b: f32, a: f32) -> Self {
         Self {
             shader_type: ShaderType::Color,

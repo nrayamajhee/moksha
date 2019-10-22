@@ -1,5 +1,6 @@
-use crate::{Mesh, ObjectInfo, RcRcell, Storage, Transform};
-use nalgebra::{Point3, UnitQuaternion, Vector3};
+use crate::{Mesh, ObjectInfo, RcRcell, Storage, Transform, mesh::multiply, Material};
+use nalgebra::{Point3, UnitQuaternion, Vector3, Isometry3};
+use ncollide3d::{query::Ray, shape::ConvexHull, query::RayCast};
 use std::rc::Rc;
 
 /// An entity in the scene that holds reference to its props in Storage, keeps tracks of
@@ -160,5 +161,51 @@ impl Node {
     }
     pub fn owned_children(&self) -> &Vec<Node> {
         &self.owned_children
+    }
+    fn collides_w_children_recursive(ray: &Ray<f32>, node: Rc<Node>) -> Option<(Rc<Node>, Isometry3<f32>)> {
+        if let Some(t) = node.collides_w_ray(ray) {
+            return Some((node.clone(), t));
+        }
+        for child in node.children() {
+            if let Some(result) = Self::collides_w_children_recursive(ray, child.clone()) {
+                return Some(result);
+            }
+        }
+        None
+    }
+    pub fn collides_w_children(&self, ray: &Ray<f32>) -> Option<(Rc<Node>, Isometry3<f32>)> {
+        for each in self.children() {
+            if let Some(result) =
+                Self::collides_w_children_recursive(&ray, each.clone())
+            {
+                return Some(result);
+            }
+        }
+        None
+    }
+    pub fn collides_w_ray(&self, ray: &Ray<f32>) -> Option<Isometry3<f32>>{
+        let t = self.transform();
+        let p_t = self.parent_transform();
+        let s = multiply(t.scale, p_t.scale);
+        if let Some(mesh) = self.mesh() {
+            let verts: Vec<Point3<f32>> = mesh
+                .geometry
+                .vertices
+                .chunks(3)
+                .map(|c| Point3::new(c[0] * s.x, c[1] * s.y, c[2] * s.z))
+                .collect();
+            if let Some(target) = ConvexHull::try_from_points(&verts) {
+                let transform = (p_t * t).isometry;
+                if target.intersects_ray(&transform, &ray) {
+                    return Some(transform);
+                }
+            }
+        }
+        return None;
+    }
+    pub fn change_color(&self, color: [f32; 3]) {
+        let mut mesh = self.mesh().unwrap();
+        mesh.material = Material::single_color_no_shade(color[0], color[1], color[2], 1.);
+        self.set_mesh(mesh);
     }
 }

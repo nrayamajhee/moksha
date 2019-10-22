@@ -5,7 +5,7 @@ mod storage;
 pub mod primitives;
 
 #[doc(inline)]
-pub use primitives::{Gizmo, Primitive};
+pub use primitives::Primitive;
 
 #[doc(inline)]
 pub use node::Node;

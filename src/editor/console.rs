@@ -69,9 +69,12 @@ fn add_events(config: ConsoleConfig) {
         }
     });
     if config.change_history {
-        let path = document().location().unwrap().pathname().unwrap();
-        if path.as_str() == "/console" {
-            toggle_console(true, true);
+        let storage = window.session_storage().unwrap().unwrap();
+        if let Some(redirect) = storage.get_item("redirect").unwrap() {
+            if redirect.as_str() == "/console" {
+                toggle_console(true, true);
+                storage.remove_item("redirect").unwrap();
+            }
         }
         add_event(&window, "popstate", |_| {
             if document().location().unwrap().pathname().unwrap().as_str() == "/console" {

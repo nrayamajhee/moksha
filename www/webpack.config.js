@@ -9,7 +9,9 @@ module.exports = {
     },
     mode: "development",
     devServer: {
-		historyApiFallback: true,
+		historyApiFallback: {
+			  index: '404.html'
+		}
 	},
     plugins: [
         new CopyWebpackPlugin(['index.html', '404.html', {

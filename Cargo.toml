@@ -65,6 +65,7 @@ features = [
   'PopStateEvent',
   'Location',
   'History',
+  'Storage',
   'CssStyleDeclaration'
 ]
 
