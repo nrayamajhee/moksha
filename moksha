@@ -2,7 +2,7 @@
 
 case $1 in
 	"w" | "watch")
-		cargo watch -w src -s "wasm-pack build"
+		cargo watch -w src -w Cargo.toml -s "wasm-pack build"
 	;;
 	"b" | "build")
 		wasm-pack build

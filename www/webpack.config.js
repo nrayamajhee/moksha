@@ -9,17 +9,17 @@ module.exports = {
     },
     mode: "development",
     devServer: {
-		historyApiFallback: {
-			  index: '404.html'
-		}
-	},
+        historyApiFallback: {
+            index: '404.html'
+        }
+    },
     plugins: [
         new CopyWebpackPlugin(['index.html', '404.html', {
             from: '../src/assets',
             to: 'assets'
-        }, {
+        },{
             from: '../src/style.css',
-            to: '.'
+            to: 'style.css'
         }])
     ],
 };

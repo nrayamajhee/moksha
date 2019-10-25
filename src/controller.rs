@@ -183,6 +183,9 @@ impl Viewport {
     pub fn enable_rotation(&mut self) {
         self.rotate = true;
     }
+    pub fn zooming(&self) -> bool {
+        self.zoom
+    }
     pub fn disable_zoom(&mut self) {
         self.zoom = false;
     }

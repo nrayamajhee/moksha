@@ -140,12 +140,6 @@ impl Node {
         self.index
     }
     pub fn add(&mut self, node: Rc<Node>) {
-        //log!(
-        //"Parent",
-        //self.info().name,
-        //self.transform().isometry.translation.vector,
-        //self.transform().scale
-        //);
         self.children.push(node);
         self.apply_parent_transform(self.parent_transform() * self.transform());
     }
@@ -162,6 +156,14 @@ impl Node {
     pub fn owned_children(&self) -> &Vec<Node> {
         &self.owned_children
     }
+    pub fn owned_childre_collide_w_ray(&self, ray: &Ray<f32>) -> Option<Isometry3<f32>> {
+        for child in self.owned_children() {
+            if let Some(t) = child.collides_w_ray(ray) {
+                return Some(t);
+            }
+        }
+        return None;
+    }
     fn collides_w_children_recursive(ray: &Ray<f32>, node: Rc<Node>) -> Option<(Rc<Node>, Isometry3<f32>)> {
         if let Some(t) = node.collides_w_ray(ray) {
             return Some((node.clone(), t));
@@ -170,6 +172,9 @@ impl Node {
             if let Some(result) = Self::collides_w_children_recursive(ray, child.clone()) {
                 return Some(result);
             }
+        }
+        if let Some(t) = node.owned_childre_collide_w_ray(ray) {
+            return Some((node,t));
         }
         None
     }

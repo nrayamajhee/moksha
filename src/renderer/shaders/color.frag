@@ -34,7 +34,7 @@ vec3 calc_amb_light(Light light) {
 
 vec3 calc_light(Light light, vec3 normal, int type) {
 	// light
-	vec3 light_dir = (type == DIR) ? normalize(-light.position): normalize(light.position - object_pos); 
+	vec3 light_dir = (type == DIR) ? normalize(light.direction): normalize(light.position - object_pos); 
 	
 	// diffuse
 	float diff = max(dot(normal, light_dir), 0.0);

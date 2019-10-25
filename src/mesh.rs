@@ -3,7 +3,7 @@ use genmesh::{
     generators::{IndexedPolygon, SharedVertex},
     EmitTriangles, Triangulate, Vertex,
 };
-use nalgebra::{one, Isometry3, Matrix4, Translation3, Vector3};
+use nalgebra::{one, Isometry3, Matrix4, Translation3, Vector3, Point3};
 use wasm_bindgen::JsValue;
 use web_sys::WebGl2RenderingContext as GL;
 
@@ -23,6 +23,14 @@ impl Transform {
             isometry: self.isometry.inverse(),
             scale: divide([1., 1., 1.].into(), self.scale),
         }
+    }
+    pub fn transform_vector(&self,vec: &Vector3<f32>) -> Vector3<f32> {
+        multiply(self.scale, self.isometry.transform_vector(vec))
+    }
+    pub fn transform_point(&self, point: &Point3<f32>) -> Point3<f32> {
+        let p = self.isometry.transform_point(point); 
+        let v = multiply(self.scale, Vector3::new(p.x,p.y,p.z));
+        Point3::new(v.x,v.y,v.z)
     }
 }
 

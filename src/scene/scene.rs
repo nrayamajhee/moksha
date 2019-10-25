@@ -5,23 +5,18 @@ use crate::{
     scene::primitives::create_light_node,
     Geometry, Material, Mesh, MouseButton, Node, RcRcell, Storage, Transform, Viewport,
 };
-use std::fmt;
+use strum_macros::{Display, EnumIter, EnumString};
 use std::rc::Rc;
 use wasm_bindgen::JsCast;
 use web_sys::{KeyboardEvent, MouseEvent, WheelEvent};
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Display, EnumIter, EnumString)]
 pub enum LightType {
     Ambient,
     Point,
     Directional,
     Spot,
-}
-
-impl fmt::Display for LightType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(self, f)
-    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -82,7 +77,7 @@ impl Scene {
             None,
             Default::default(),
             ObjectInfo {
-                name: "Scene".into(),
+                name: "root".into(),
                 ..Default::default()
             },
         );
@@ -116,6 +111,28 @@ impl Scene {
         }
         for child in node.owned_children() {
             self.show(child);
+        }
+    }
+    pub fn show_only(&self, node: &Node) {
+        {
+            let s = self.storage();
+            let mut storage = s.borrow_mut();
+            let mut info = storage.mut_info(node.index());
+            info.render = true;
+        }
+        for child in node.owned_children() {
+            self.show_only(child);
+        }
+    }
+    pub fn hide_only(&self, node: &Node) {
+        {
+            let s = self.storage();
+            let mut storage = s.borrow_mut();
+            let mut info = storage.mut_info(node.index());
+            info.render = false;
+        }
+        for child in node.owned_children() {
+            self.hide_only(child);
         }
     }
     pub fn add(&mut self, node: Rc<Node>) {
@@ -220,6 +237,25 @@ impl Scene {
     }
     pub fn storage(&self) -> RcRcell<Storage> {
         self.root.storage()
+    }
+    pub fn find_node_recursive(node: Rc<Node>, name: &str) -> Option<Rc<Node>> {
+        if node.info().name == name {
+            return Some(node);
+        }
+        for each in node.children() {
+            if let Some(node) = Self::find_node_recursive(each.clone(), name) {
+                return Some(node);
+            }
+        }
+        return None;
+    }
+    pub fn find_node_w_name(&self, name: &str) -> Option<Rc<Node>> {
+        for each in self.root.children() {
+            if let Some(node) = Self::find_node_recursive(each.clone(), name) {
+                return Some(node);
+            }
+        }
+        None
     }
     pub fn duplicate_node(&self, node: &Node) -> Node {
         let transform = node.transform();

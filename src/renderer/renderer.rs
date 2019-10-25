@@ -5,20 +5,22 @@ use super::shader::{
 };
 use crate::{
     controller::Viewport,
-    dom_factory::{get_canvas, resize_canvas},
+    dom_factory::{get_canvas, resize_canvas,body},
     log,
     mesh::Mesh,
     scene::Scene,
     LightType, Storage,
 };
+use std::f32::consts::PI;
 use std::collections::HashMap;
+use maud::html;
 use strum::IntoEnumIterator;
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{
     HtmlCanvasElement, HtmlElement, WebGl2RenderingContext as GL, WebGlProgram,
     WebGlVertexArrayObject,
 };
-use nalgebra::Vector3;
+use nalgebra::{Vector3, UnitQuaternion};
 
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -32,7 +34,7 @@ pub enum DrawMode {
 
 #[derive(Debug)]
 pub struct RenderConfig {
-    pub selector: &'static str,
+    pub id: &'static str,
     pub pixel_ratio: f64,
 }
 
@@ -49,7 +51,13 @@ pub struct Renderer {
 
 impl Renderer {
     pub fn new(config: RenderConfig) -> Self {
-        let mut canvas = get_canvas(config.selector);
+        let dom = html! {
+            canvas id=(config.id) oncontextmenu="return false;" {}
+        };
+        body()
+        .insert_adjacent_html("beforeend", dom.into_string().as_str())
+        .expect("Couldn't insert markup into the DOM!");
+        let mut canvas = get_canvas(config.id);
         let aspect_ratio = resize_canvas(&mut canvas, config.pixel_ratio);
         let ctx = canvas
             .get_context("webgl2")
@@ -272,23 +280,26 @@ impl Renderer {
                         &format!("{}[{}].position", attrib, index),
                         &position,
                     );
-                    if light.light_type == LightType::Spot {
-                        let direction = (storage.parent_tranform(light.node_id)
+                    if light.light_type == LightType::Directional || light.light_type == LightType::Spot {
+                        let vector = (storage.parent_tranform(light.node_id)
                             * storage.transform(light.node_id))
                         .isometry
-                        .rotation.transform_vector(&Vector3::identity())
-                        .data;
+                        .rotation.transform_vector(&Vector3::identity());
+                        // The cone and arrows mesh is intrinsically oriented 90 deg
+                        let direction = UnitQuaternion::from_euler_angles(0.,PI/2.,0.).transform_vector(&vector).data;
                         set_vec3(
                             gl,
                             program,
                             &format!("{}[{}].direction", attrib, index),
                             &direction,
                         );
+                    }
+                    if light.light_type == LightType::Spot {
                         set_f32(
                             gl,
                             program,
                             &format!("{}[{}].cutoff", attrib, index),
-                            f32::cos(std::f32::consts::PI / 30.),
+                            f32::cos(PI / 30.),
                         );
                         set_f32(
                             gl,

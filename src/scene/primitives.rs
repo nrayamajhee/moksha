@@ -6,6 +6,7 @@ use crate::{
 use genmesh::generators::{Circle, Cone, Cube, Cylinder, IcoSphere, Plane, SphereUv, Torus};
 use nalgebra::{UnitQuaternion};
 use std::f32::consts::PI;
+use strum_macros::{Display, EnumIter, EnumString};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ArrowType {
@@ -15,7 +16,8 @@ pub enum ArrowType {
 }
 
 /// Various primitive types (eg. Plane, Cube, Torus, IcoSphere, etc).
-#[derive(Copy, Clone, Debug, PartialEq)]
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Display, EnumIter, EnumString)]
 pub enum Primitive {
     Plane,
     Cube,
@@ -26,30 +28,6 @@ pub enum Primitive {
     UVSphere,
     Torus,
     Empty,
-}
-
-impl From<&str> for Primitive {
-    fn from(t: &str) -> Primitive {
-        match t {
-            "Plane" => Primitive::Plane,
-            "Cube" => Primitive::Cube,
-            "Circle" => Primitive::Circle,
-            "IcoSphere" => Primitive::IcoSphere,
-            "Cylinder" => Primitive::Cylinder,
-            "Cone" => Primitive::Cone,
-            "UVSphere" => Primitive::UVSphere,
-            "Torus" => Primitive::Torus,
-            _ => Primitive::Empty,
-        }
-    }
-}
-
-use std::fmt;
-
-impl fmt::Display for Primitive {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(self, f)
-    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -139,17 +117,11 @@ pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) 
             p.set_scale(0.5);
             p
         }
-        LightType::Spot => {
-            let mut e = scene.empty_w_name(&light_type.to_string());
-            let s = scene.object_from_mesh_and_mode(
+        LightType::Spot => scene.object_from_mesh_and_mode(
                 Geometry::from_genmesh_no_normals(&Cone::new(8)),
                 Material::wireframe(color[0], color[1], color[2], 1.),
                 DrawMode::Wireframe,
-            );
-            s.rotate_by(UnitQuaternion::from_euler_angles(0., -PI / 2., 0.));
-            e.own(s);
-            e
-        }
+        ),
         LightType::Directional => {
             let mut n = scene.empty_w_name("Directional");
             let cube = scene.object_from_mesh_name_and_mode(

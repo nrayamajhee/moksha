@@ -1,5 +1,5 @@
 @import url('https://fonts.googleapis.com/css?family=Fira+Sans:400,400i,700&display=swap');
-@import url('https://fonts.googleapis.com/icon?family=Material+Icons+Outlined');
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons+Outlined|Material+Icons');
 :root {
     --bg: rgba(255,255,255,0.5);
     --border: rgba(255,255,255, 0.6);
@@ -21,6 +21,12 @@
 }
 *:-moz-focus-inner {
 	border: 0;
+}
+.shown {
+	display: block !important;
+}
+.material-icons-outlined, .material-icons {
+	user-select: none;
 }
 body {
     margin: 0;
@@ -64,69 +70,105 @@ canvas.grab {
 #toolbar button {
     margin-bottom: 0;
 }
-#scene-tree {
-	position: absolute;
+hr {
+	height: 0;
+	margin: calc(var(--pad) / 2) 0;
+	border: 0px solid transparent;
+	border-top-width: 1px;
+	border-top-color: var(--fg-near);
+}
+.panel {
 	background-color: var(--fg-near);
-	top: 0;
-	right: 0;
-	min-width: 8em;
-	margin: var(--pad);
 	border-radius: var(--radius);
+	line-height: 1;
+	overflow: auto;
+	padding: var(--pad);
 }
-#scene-tree ul {
-	padding: 0;
-	padding-left: var(--gap);
-	margin: 0;
-}
-#scene-tree > ul {
-	list-style: none;
-	padding: 0;
-}
-#scene-tree p {
-	margin: 0;
-}
-#scene-tree > ul > li > p {
-	background-color: var(--fg-nearest);
-	padding: calc(var(--pad) / 2);
-	border-radius: var(--radius) var(--radius) 0 0;
+.panel h3 {
 	text-align: center;
 	text-transform: uppercase;
+	margin: 0;
+	font-size: 1em;
+	padding: calc(var(--pad) / 2);
+	background-color: var(--fg-nearest);
+	margin: var(--pad) 0;
 }
-#scene-tree > ul > li > ul {
-	padding: var(--pad);
-	padding-left: calc(var(--pad) + var(--gap));
+.panel h3:first-of-type {
+	margin-top: 0;
+}
+.panel li, .panel h3 {
+	border-radius: calc(var(--pad) / 2);
+}
+#mesh-list li {
+	padding: calc(var(--pad) /2 ) var(--pad);
 }
 #mesh-list {
 	display: none;
 	position: absolute;
-	background-color: var(--fg-near);
 	top: 50%;
 	min-width: 8em;
-		left: calc(24px + 4 * var(--pad));
+	left: calc(24px + 4 * var(--pad));
 	transform: translate(0%, -50%);
-}
-#mesh-list h3 {
-	padding: var(--pad);
-	margin: 0;
-	background-color: var(--fg-nearest);
-}
-#mesh-list.shown {
-	display: block;
 }
 #mesh-list ul {
 	padding: 0;
 	margin: 0;
 	list-style: none;
 }
-#mesh-list li {
-	padding: var(--pad);
-	cursor: pointer;
-}
+
 #mesh-list li:hover {
 	background: var(--fg-nearest);
 }
-#console.shown {
-    display: block;
+#mesh-list li, #scene-tree p, #scene-tree i {
+	cursor: pointer;
+}
+#scene-tree {
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 12em;
+	margin: var(--pad);
+}
+#scene-tree li p {
+	padding: calc(var(--pad) /2 );
+	border-radius: calc(var(--pad) / 2);
+	margin: 0;
+	margin-left: calc(var(--gap) + var(--pad));
+	display: inline-block;
+}
+#scene-tree li i+p {
+	margin-left: 0;
+}
+#scene-tree p:hover, #scene-tree i:hover {
+	border-radius: calc(var(--pad) / 2);
+	background: var(--fg-nearest);
+}
+#scene-tree > div {
+	width: 12em;
+	max-height: 20em;
+	overflow: auto;
+}
+#scene-tree .disabled {
+	color: var(--bg);
+}
+#scene-tree .disabled p {
+	cursor: default;
+}
+#scene-tree ul {
+	display: none;
+	padding: 0;
+	margin: 0;
+	padding-left: var(--pad);
+	list-style: none;
+}
+#scene-tree > ul  {
+	padding: 0;
+}
+#scene-tree ul li > .material-icons-outlined {
+	float: left;
+}
+#scene-tree ul li > .material-icons {
+	float: right;
 }
 #console.shown ~ section, #console.shown ~ canvas {
     filter: blur(10px);

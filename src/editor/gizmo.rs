@@ -1,4 +1,4 @@
-use crate::{mesh::divide, Node, Viewport};
+use crate::{Node, Viewport};
 use nalgebra::{Isometry3, Vector3};
 use ncollide3d::{
     query::Ray,
@@ -63,12 +63,13 @@ impl Gizmo {
             let g_c = child.owned_children();
             if g_c.len() > 0 {
                 let (tip, stem) = (&g_c[1], &g_c[0]);
-                let mut collided = false;
-                if let Some(_) = tip.collides_w_ray(&ray) {
-                    collided = true
-                } else if let Some(_) = stem.collides_w_ray(&ray) {
-                    collided = true
-                }
+                let (collided, transform) = if let Some(t) = tip.collides_w_ray(&ray) {
+                    (true, t)
+                } else if let Some(t) = stem.collides_w_ray(&ray) {
+                    (true, t)
+                } else {
+                    (false, Isometry3::identity())
+                };
                 let (color, constraint) = match child.info().name.as_str() {
                     "x-axis" => ([1., 0., 0.], CollisionConstraint::XAxis),
                     "y-axis" => ([0., 1., 0.], CollisionConstraint::YAxis),
@@ -76,9 +77,10 @@ impl Gizmo {
                     _ => ([0., 0., 0.], CollisionConstraint::None),
                 };
                 if collided {
-                log!("collided with arrow");
                     self.transform = Isometry3::identity();
                     self.collision_constraint = constraint;
+                    self.offset =
+                        transform.translation.vector - Vector3::from(self.node.global_position());
                     stem.change_color(color);
                     tip.change_color(color);
                     return true;
@@ -116,21 +118,14 @@ impl Gizmo {
             if let Some(node) = active_node.as_ref() {
                 let pos = node.position();
                 // do calculation relative to parent element
-                let poi = ray.point_at(i.toi);
-                let p_t = node.parent_transform();
-                let p_v = p_t.isometry.translation.vector;
-                let p_r = p_t.isometry.rotation;
-                let p_diff = Vector3::new(poi.x, poi.y, poi.z) - p_v;
-                let p = divide(p_diff, p_t.scale);
-                let poi = p_r.inverse().transform_vector(&p);
+                let poi = node.parent_transform().inverse().transform_point(&ray.point_at(i.toi));
+                let o = node.parent_transform().inverse().transform_vector(&self.offset);
                 let p = match self.collision_constraint {
                     CollisionConstraint::XAxis => [poi.x, pos[1], pos[2]],
                     CollisionConstraint::YAxis => [pos[0], poi.y, pos[2]],
                     CollisionConstraint::ZAxis => [pos[0], pos[1], poi.z],
                     _ => [poi.x, poi.y, poi.z],
                 };
-                //let o = multiply(p_t.scale, offset.clone());
-                let o = self.offset;
                 self.copy_location(&node);
                 node.set_position(p[0] - o.x, p[1] - o.y, p[2] - o.z);
             }

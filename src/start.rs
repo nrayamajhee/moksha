@@ -1,6 +1,6 @@
 use crate::{
     controller::ProjectionConfig,
-    dom_factory::{body, document, request_animation_frame},
+    dom_factory::{document, loop_animation_frame},
     editor::{console_setup, ConsoleConfig},
     rc_rcell,
     renderer::{RenderConfig, Renderer},
@@ -8,9 +8,7 @@ use crate::{
     Editor, Geometry, Material, Scene, Viewport,
 };
 use genmesh::generators::{Cube, IcoSphere};
-use maud::html;
 use std::f32::consts::PI;
-use nalgebra::UnitQuaternion;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
@@ -19,19 +17,13 @@ use wasm_bindgen::JsValue;
 #[wasm_bindgen(start)]
 #[allow(dead_code)]
 pub fn start() -> Result<(), JsValue> {
+    document().set_title("Editor | Moksha");
     console_setup(ConsoleConfig {
         ui_button: true,
         change_history: true,
     });
-    let dom = html! {
-        canvas #gl-canvas oncontextmenu="return false;" {}
-    };
-    document().set_title("Editor | Moksha");
-    body()
-        .insert_adjacent_html("beforeend", dom.into_string().as_str())
-        .expect("Couldn't insert markup into the DOM!");
     let renderer = Renderer::new(RenderConfig {
-        selector: "#gl-canvas",
+        id: "gl-canvas",
         pixel_ratio: 1.0,
     });
     let viewport = Viewport::new(
@@ -136,16 +128,15 @@ pub fn start() -> Result<(), JsValue> {
     let amb_node = ambient.node();
     amb_node.set_position(10., 0., 10.);
 
-    let spot = scene.light(LightType::Spot, [1., 0.5, 0.5], 1.0);
+    let spot = scene.light(LightType::Spot, [1., 1., 1.], 1.0);
     let spot_node = spot.node();
     spot_node.set_position(25., 0., 10.);
-    spot_node.rotate_by(UnitQuaternion::from_euler_angles(0., PI / 2., 0.));
 
-    let point = scene.light(LightType::Point, [1., 0.5, 0.5], 1.0);
+    let point = scene.light(LightType::Point, [1., 1., 1.], 1.0);
     let point_node = point.node();
     point_node.set_position(15., 0., 10.);
 
-    let point2 = scene.light(LightType::Point, [0.5, 1., 0.5], 1.0);
+    let point2 = scene.light(LightType::Point, [1., 1., 1.], 1.0);
     let point2_node = point2.node();
     point2_node.set_position(15., 0., -10.);
 
@@ -158,18 +149,14 @@ pub fn start() -> Result<(), JsValue> {
     scene.add_light(ambient);
     //scene.add_light(point2);
     //scene.add_light(point);
-    //scene.add_light(directional);
-    scene.add_light(spot);
+    scene.add_light(directional);
+    //scene.add_light(spot);
 
     let a_scene = rc_rcell(scene);
     let mut editor = Editor::new(a_view.clone(), a_scene.clone(), a_rndr.clone());
     editor.set_active_node(_moon.clone());
     //let a_editor = rc_rcell(editor);
-
-    let f = rc_rcell(None);
-    let g = f.clone();
-
-    *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
+    loop_animation_frame(move || {
         {
             //a_earth.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.02, 0.));
             //a_sun.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.01, 0.));
@@ -179,8 +166,6 @@ pub fn start() -> Result<(), JsValue> {
             //a_editor.borrow_mut().update(&mut view);
             a_rndr.borrow_mut().render(&a_scene.borrow(), &view);
         }
-        request_animation_frame(f.borrow().as_ref().unwrap());
-    }) as Box<dyn FnMut()>));
-    request_animation_frame(g.borrow().as_ref().unwrap());
+    });
     Ok(())
 }

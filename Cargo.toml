@@ -48,6 +48,8 @@ features = [
   'DomTokenList',
   'KeyboardEvent',
   'HtmlElement',
+  'HtmlHeadElement',
+  'HtmlCollection',
   'HtmlCanvasElement',
   'HtmlImageElement',
   'WebGlBuffer',
