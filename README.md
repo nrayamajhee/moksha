@@ -89,10 +89,12 @@ Due to wasm-bingen's lack of support for rust lifetime annotations, I make heavy
     - Albedo  Map
     - Barycentric Wireframe
     - Lights (Ambient, Point, Directional, Spot)
+	- Add menu to add mesh and lights
     
  - Editor
     - Custom logging screen
     - Node tree viewer
+	- Implment open/collapse and render toggle to Node tree view
     - Zoom and Switch Perspective controls
     - Menu for adding objects
 
@@ -107,9 +109,10 @@ Due to wasm-bingen's lack of support for rust lifetime annotations, I make heavy
   - load obj (geometry + albedo texure)
 
 - Editor
-  - Fix translation gizmo's offset (currently buggy).
-  - Add lights to "Add Menu"
-  - Make node tree viewer clickable to allow selection, disable rendering, etc.
+  - Implement drag and drop for node parent/child relations.
+
+- Renderer
+  - Fix rendering order for depth
 
 # ToDo
 - System
