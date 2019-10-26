@@ -11,10 +11,10 @@
     --fg-near: var(--dark-near);
     --fg-nearest: var(--dark-nearest);
     --pad: 10px;
+    --small-pad: 5px;
     --gap: 20px;
     --radius: 16px;
     --small-radius: 8px;
-    --small-pad: 8px;
 }
 *:focus {
 	outline: none;
@@ -72,7 +72,7 @@ canvas.grab {
 }
 hr {
 	height: 0;
-	margin: calc(var(--pad) / 2) 0;
+	margin: var(--small-pad) 0;
 	border: 0px solid transparent;
 	border-top-width: 1px;
 	border-top-color: var(--fg-near);
@@ -89,7 +89,7 @@ hr {
 	text-transform: uppercase;
 	margin: 0;
 	font-size: 1em;
-	padding: calc(var(--pad) / 2);
+	padding: var(--small-pad);
 	background-color: var(--fg-nearest);
 	margin: var(--pad) 0;
 }
@@ -97,10 +97,10 @@ hr {
 	margin-top: 0;
 }
 .panel li, .panel h3 {
-	border-radius: calc(var(--pad) / 2);
+	border-radius: var(--small-pad);
 }
 #mesh-list li {
-	padding: calc(var(--pad) /2 ) var(--pad);
+	padding: var(--small-pad) var(--pad);
 }
 #mesh-list {
 	display: none;
@@ -130,17 +130,17 @@ hr {
 	margin: var(--pad);
 }
 #scene-tree li p {
-	padding: calc(var(--pad) /2 );
-	border-radius: calc(var(--pad) / 2);
+	border-radius: var(--small-pad);
 	margin: 0;
-	margin-left: calc(var(--gap) + var(--pad));
+	padding: var(--small-pad);
+	margin-left: 24px;
 	display: inline-block;
 }
 #scene-tree li i+p {
 	margin-left: 0;
 }
 #scene-tree p:hover, #scene-tree i:hover {
-	border-radius: calc(var(--pad) / 2);
+	border-radius: var(--small-pad);
 	background: var(--fg-nearest);
 }
 #scene-tree > div {
@@ -169,6 +169,31 @@ hr {
 }
 #scene-tree ul li > .material-icons {
 	float: right;
+}
+#scene-tree li p.dragenter {
+	position: relative;
+	background: var(--fg-nearest);
+	border-radius: 0;
+}
+.dragenter::before,
+.dragenter::after {
+	content:'';
+	position: absolute;
+	top: 0;
+	width: 0;
+	padding: 0;
+	margin: 0;
+	border: calc(8px + var(--small-pad)) solid transparent;
+}
+.dragenter::after {
+	left: 100%;
+	border-left-color: var(--fg-nearest);
+}
+.dragenter::before {
+	border-right-width: 0;
+	right: 100%;
+	border-color: var(--fg-nearest); 
+	border-left-color: transparent;
 }
 #console.shown ~ section, #console.shown ~ canvas {
     filter: blur(10px);

@@ -92,7 +92,7 @@ impl Viewport {
         Self {
             proj_config,
             proj,
-            initial_view: view.clone(),
+            initial_view: view,
             view,
             aspect_ratio,
             target,

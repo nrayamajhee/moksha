@@ -2,14 +2,13 @@ use crate::{
     controller::ProjectionConfig,
     dom_factory::{document, loop_animation_frame},
     editor::{console_setup, ConsoleConfig},
-    rc_rcell,
     renderer::{RenderConfig, Renderer},
+    rc_rcell,
     scene::LightType,
     Editor, Geometry, Material, Scene, Viewport,
 };
 use genmesh::generators::{Cube, IcoSphere};
 use std::f32::consts::PI;
-use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 
@@ -50,10 +49,10 @@ pub fn start() -> Result<(), JsValue> {
             [1.0, 1.0, 0.0, 1.0], // Right face: yellow
             [1.0, 0.0, 1.0, 1.0], // Left face: purple
         ];
-        for each in face_colors {
-            for _ in 0..4 {
-                for i in 0..4 {
-                    colors.push(each[i]);
+        for face in face_colors {
+            for each in face.iter() {
+                for _ in 0..4 {
+                    colors.push(*each);
                 }
             }
         }
@@ -74,16 +73,16 @@ pub fn start() -> Result<(), JsValue> {
         let mut cube =
             scene.object_from_mesh_and_name(cube_geometry.clone(), cube_tex, "Wooden Cube");
         let cube2 = scene.object_from_mesh_and_name(
-            cube_geometry.clone(),
+            cube_geometry,
             Material::vertex_colors(colors),
             "Colored Cube",
         );
         cube.set_position(5., 0., 5.);
         cube.set_scale(0.2);
         cube2.set_position(4., 0., 0.);
-        let a_cube2 = Rc::new(cube2);
+        let a_cube2 = rc_rcell(cube2);
         cube.add(a_cube2);
-        Rc::new(cube)
+        rc_rcell(cube)
     };
 
     let (sun, _earth, _moon) = {
@@ -115,46 +114,46 @@ pub fn start() -> Result<(), JsValue> {
         moon.set_scale(0.5);
         sun.set_scale(2.0);
 
-        let moon = Rc::new(moon);
+        let moon = rc_rcell(moon);
         earth.add(moon.clone());
-        let earth = Rc::new(earth);
+        let earth = rc_rcell(earth);
         sun.add(earth.clone());
-        let sun = Rc::new(sun);
+        let sun = rc_rcell(sun);
         renderer.setup_renderer();
         (sun, earth, moon)
     };
 
     let ambient = scene.light(LightType::Ambient, [1.0, 1.0, 1.0], 0.12);
     let amb_node = ambient.node();
-    amb_node.set_position(10., 0., 10.);
+    amb_node.borrow().set_position(10., 0., 10.);
 
     let spot = scene.light(LightType::Spot, [1., 1., 1.], 1.0);
     let spot_node = spot.node();
-    spot_node.set_position(25., 0., 10.);
+    spot_node.borrow().set_position(25., 0., 10.);
 
     let point = scene.light(LightType::Point, [1., 1., 1.], 1.0);
     let point_node = point.node();
-    point_node.set_position(15., 0., 10.);
+    point_node.borrow().set_position(15., 0., 10.);
 
     let point2 = scene.light(LightType::Point, [1., 1., 1.], 1.0);
     let point2_node = point2.node();
-    point2_node.set_position(15., 0., -10.);
+    point2_node.borrow().set_position(15., 0., -10.);
 
     let directional = scene.light(LightType::Directional, [1., 1., 1.], 2.0);
     let dir_node = directional.node();
-    dir_node.set_position(30., 0., -10.);
+    dir_node.borrow().set_position(30., 0., -10.);
 
-    scene.add(cube.clone());
-    scene.add(sun.clone());
-    scene.add_light(ambient);
+    scene.add(cube);
+    scene.add(sun);
+    scene.add_light(&ambient);
     //scene.add_light(point2);
     //scene.add_light(point);
-    scene.add_light(directional);
+    scene.add_light(&directional);
     //scene.add_light(spot);
 
     let a_scene = rc_rcell(scene);
     let mut editor = Editor::new(a_view.clone(), a_scene.clone(), a_rndr.clone());
-    editor.set_active_node(_moon.clone());
+    editor.set_active_node(_moon);
     //let a_editor = rc_rcell(editor);
     loop_animation_frame(move || {
         {

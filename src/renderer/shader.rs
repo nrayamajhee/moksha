@@ -168,7 +168,7 @@ pub fn link_program(
 }
 
 fn is_power_of_2(val: u32) -> bool {
-    return (val & (val - 1)) == 0;
+    (val & (val - 1)) == 0
 }
 
 pub fn bind_texture(gl: &GL, url: &str) -> Result<(), JsValue> {
@@ -251,31 +251,31 @@ pub fn set_bool(gl: &GL, program: &WebGlProgram, name: &str, value: bool) {
 pub fn set_u32(gl: &GL, program: &WebGlProgram, name: &str, value: u32) {
     let attrib = gl
         .get_uniform_location(program, name)
-        .expect(format!("Can't bind uniform: {}", name).as_str());
+        .unwrap_or_else(|| panic!("Can't bind uniform: {}", name));
     gl.uniform1ui(Some(&attrib), value);
 }
 pub fn set_i32(gl: &GL, program: &WebGlProgram, name: &str, value: i32) {
     let attrib = gl
         .get_uniform_location(program, name)
-        .expect(format!("Can't bind uniform: {}", name).as_str());
+        .unwrap_or_else(|| panic!("Can't bind uniform: {}", name));
     gl.uniform1i(Some(&attrib), value);
 }
 pub fn set_f32(gl: &GL, program: &WebGlProgram, name: &str, value: f32) {
     let attrib = gl
         .get_uniform_location(program, name)
-        .expect(format!("Can't bind uniform: {}", name).as_str());
+        .unwrap_or_else(|| panic!("Can't bind uniform: {}", name));
     gl.uniform1f(Some(&attrib), value);
 }
 pub fn set_vec3(gl: &GL, program: &WebGlProgram, attribute: &str, vector: &[f32]) {
     let mat_attrib = gl
         .get_uniform_location(program, attribute)
-        .expect(format!("Can't bind uniform: {}", attribute).as_str());
+        .unwrap_or_else(|| panic!("Can't bind uniform: {}", attribute));
     gl.uniform3f(Some(&mat_attrib), vector[0], vector[1], vector[2]);
 }
 pub fn set_vec4(gl: &GL, program: &WebGlProgram, attribute: &str, vector: &[f32]) {
     let mat_attrib = gl
         .get_uniform_location(program, attribute)
-        .expect(format!("Can't bind uniform: {}", attribute).as_str());
+        .unwrap_or_else(|| panic!("Can't bind uniform: {}", attribute));
     gl.uniform4f(
         Some(&mat_attrib),
         vector[0],
@@ -288,6 +288,6 @@ pub fn set_mat4(gl: &GL, program: &WebGlProgram, attribute: &str, matrix: &Matri
     let mat = matrix.as_slice();
     let mat_attrib = gl
         .get_uniform_location(program, attribute)
-        .expect(format!("Can't bind uniform: {}", attribute).as_str());
+        .unwrap_or_else(|| panic!("Can't bind uniform: {}", attribute));
     gl.uniform_matrix4fv_with_f32_array(Some(&mat_attrib), false, &mat);
 }

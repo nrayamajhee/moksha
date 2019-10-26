@@ -7,6 +7,9 @@ case $1 in
 	"b" | "build")
 		wasm-pack build
 	;;
+	"c" | "clippy")
+		cargo clippy --all-features -- -D warnings
+	;;
 	"d" | "doc")
 		cargo doc --document-private-items
 	;;
@@ -15,6 +18,6 @@ case $1 in
 		npm run start
 	;;
 	*)
-		echo "moksha [(w)atch | (b)uild | (d)oc | (s)erve]"
+		echo "moksha [(w)atch | (b)uild | (c)lippy | (d)oc | (s)erve]"
 	;;
 esac

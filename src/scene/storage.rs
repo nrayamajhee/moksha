@@ -14,8 +14,8 @@ pub struct Storage {
     lights: Vec<LightInfo>,
 }
 
-impl Storage {
-    pub fn new() -> Self {
+impl Default for Storage {
+    fn default() -> Self {
         Self {
             info: Vec::new(),
             meshes: Vec::new(),
@@ -25,6 +25,9 @@ impl Storage {
             lights: Vec::new(),
         }
     }
+}
+
+impl Storage {
     pub fn add_light(&mut self, light: LightInfo) -> usize {
         let index = self.lights.len();
         self.lights.push(light);

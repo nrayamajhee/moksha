@@ -66,7 +66,8 @@ impl std::ops::Mul<Transform> for Transform {
                 .transform_vector(&rhs.isometry.translation.vector),
         );
         let isometry = Isometry3::from_parts(
-            Translation3::from(&self.isometry.translation.vector + shift),
+            #[allow(clippy::suspicious_arithmetic_impl)]
+            Translation3::from(self.isometry.translation.vector + shift),
             self.isometry.rotation * rhs.isometry.rotation,
         );
         Self { isometry, scale }

@@ -4,6 +4,7 @@ use wasm_bindgen::JsCast;
 use web_sys::{
     Document, Element, Event, EventTarget, HtmlCanvasElement, HtmlElement, Node, NodeList, Window,
 };
+use crate::rc_rcell;
 
 pub fn window() -> Window {
     web_sys::window().expect("No global window found!")
@@ -16,8 +17,6 @@ pub fn document() -> Document {
 pub fn body() -> HtmlElement {
     document().body().expect("Document has no body!")
 }
-
-use crate::rc_rcell;
 
 pub fn loop_animation_frame<F>(closure: F)
 where
@@ -77,7 +76,7 @@ where
 }
 
 pub fn get_el(id: &str) -> Element {
-    document().get_element_by_id(id).unwrap()
+    document().get_element_by_id(id).expect(&format!("Cant find element with id {}", id))
 }
 
 pub fn get_html_el(id: &str) -> HtmlElement {
@@ -91,11 +90,8 @@ pub fn get_html_el(id: &str) -> HtmlElement {
 pub fn query_html_el(selector: &str) -> HtmlElement {
     document()
         .query_selector(selector)
+        .unwrap_or_else(|_| panic!("Can't find any element with query: `{}`", selector))
         .unwrap()
-        .expect(&format!(
-            "Can't find any element with query: `{}`",
-            selector
-        ))
         .dyn_into::<HtmlElement>()
         .expect("Can't cast the element as HtmlElement")
 }
@@ -200,4 +196,17 @@ pub fn get_target_parent_el(e: &Event, level: usize) -> HtmlElement {
         .expect("Could't get the element")
         .dyn_into::<HtmlElement>()
         .unwrap()
+}
+pub fn create_el_w_class_n_inner(tag_name: &str, class: &str, inner_html: &str) -> Element {
+    let el = document().create_element(tag_name).unwrap_or_else(|_|panic!("Can't create element with tage name: {}", tag_name));
+    el.class_list().add_1(class).expect("Can't add class name");
+    el.set_inner_html(inner_html);
+    el
+}
+
+pub fn add_class(el: &Element, class_name: &str) {
+    el.class_list().add_1(class_name).unwrap_or_else(|_|panic!("Can't add class name: {} to element: {:?}", class_name, el));
+}
+pub fn remove_class(el: &Element, class_name: &str) {
+    el.class_list().remove_1(class_name).unwrap_or_else(|_|panic!("Can't add class name: {} to element: {:?}", class_name, el));
 }

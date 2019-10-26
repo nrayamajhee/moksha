@@ -9,10 +9,11 @@ use std::f32::consts::PI;
 use strum_macros::{Display, EnumIter, EnumString};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum ArrowType {
+pub enum ArrowTip {
     Cone,
     Cube,
     Sphere,
+    None,
 }
 
 /// Various primitive types (eg. Plane, Cube, Torus, IcoSphere, etc).
@@ -45,9 +46,10 @@ pub enum GizmoGrab {
 pub fn create_arrow(
     scene: &Scene,
     color: [f32; 4],
-    arrow_type: ArrowType,
+    arrow_type: ArrowTip,
     name: &str,
     has_stem: bool,
+    draw_mode: DrawMode,
 ) -> Node {
     let mut node = scene.empty_w_name(name);
     if has_stem {
@@ -55,47 +57,50 @@ pub fn create_arrow(
             Geometry::from_genmesh_no_normals(&Cylinder::subdivide(8, 1)),
             Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
             "Arrow Stem",
-            DrawMode::TriangleNoDepth,
+            draw_mode
         );
         stem.set_scale_vec(0.2, 0.2, 3.);
         node.own(stem);
     }
     let head = match arrow_type {
-        ArrowType::Cone => {
+        ArrowTip::Cone => {
             let head = scene.object_from_mesh_name_and_mode(
                 Geometry::from_genmesh(&Cone::new(8)),
                 Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
                 "Arrow Head",
-                DrawMode::TriangleNoDepth,
+                draw_mode
             );
             head.set_scale(0.5);
-            head
+            Some(head)
         }
-        ArrowType::Cube => {
+        ArrowTip::Cube => {
             let head = scene.object_from_mesh_name_and_mode(
                 Geometry::from_genmesh_no_normals(&Cube::new()),
                 Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
                 "Arrow Head",
-                DrawMode::TriangleNoDepth,
+                draw_mode
             );
             head.set_scale(0.4);
-            head
+            Some(head)
         }
-        ArrowType::Sphere => {
+        ArrowTip::Sphere => {
             let head = scene.object_from_mesh_name_and_mode(
                 Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(1)),
                 Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
                 "Arrow Head",
-                DrawMode::TriangleNoDepth,
+                draw_mode
             );
             head.set_scale(0.8);
-            head
+            Some(head)
         }
+        ArrowTip::None => None
     };
-    if has_stem {
-        head.set_position(0., 0., 3.);
+    if let Some(head) = head {
+        if has_stem {
+            head.set_position(0., 0., 3.);
+        }
+        node.own(head);
     }
-    node.own(head);
     node
 }
 
@@ -123,11 +128,11 @@ pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) 
                 DrawMode::Wireframe,
         ),
         LightType::Directional => {
-            let mut n = scene.empty_w_name("Directional");
+            let mut n = scene.empty_w_name(&light_type.to_string());
             let cube = scene.object_from_mesh_name_and_mode(
                 Geometry::from_genmesh_no_normals(&Cube::new()),
                 Material::single_color_no_shade(color[0], color[1], color[2], 1.),
-                &light_type.to_string(),
+                "plane",
                 DrawMode::Triangle,
             );
             cube.set_scale_vec(0.5, 0.5, 0.05);
@@ -135,7 +140,7 @@ pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) 
             cube.set_position(0., 0., -1.);
             n.own(cube);
             for i in 0..5 {
-                let ray = create_arrow(scene, [1., 1., 0., 1.], ArrowType::Cone, "sun_ray", true);
+                let ray = create_arrow(scene, [1., 1., 0., 1.], ArrowTip::Cone, "ray", true, DrawMode::Triangle);
                 ray.set_scale(0.25);
                 match i % 5 {
                     0 => {
@@ -159,15 +164,16 @@ pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) 
     }
 }
 
-pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowType) -> Node {
+pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowTip) -> Node {
     let name = match arrow_type {
-        ArrowType::Cone => "translation",
-        ArrowType::Sphere => "look",
-        ArrowType::Cube => "scale",
+        ArrowTip::Cone => "translation",
+        ArrowTip::Sphere => "look",
+        ArrowTip::Cube => "scale",
+        ArrowTip::None=>"",
     };
-    let x = create_arrow(scene, [0.8, 0., 0., 1.], arrow_type, "x-axis", true);
-    let y = create_arrow(scene, [0., 0.8, 0., 1.], arrow_type, "y-axis", true);
-    let z = create_arrow(scene, [0., 0., 0.8, 1.], arrow_type, "z-axis", true);
+    let x = create_arrow(scene, [0.8, 0., 0., 1.], arrow_type, "XAxis", true, DrawMode::TriangleNoDepth);
+    let y = create_arrow(scene, [0., 0.8, 0., 1.], arrow_type, "YAxis", true, DrawMode::TriangleNoDepth);
+    let z = create_arrow(scene, [0., 0., 0.8, 1.], arrow_type, "ZAxis", true, DrawMode::TriangleNoDepth);
     let mut node = scene.object_from_mesh_name_and_mode(
         Geometry::from_genmesh(&IcoSphere::subdivide(2)),
         Material::single_color_no_shade(0.8, 0.8, 0.8, 0.8),
@@ -177,19 +183,19 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowType) -> Node {
     let x_p = scene.object_from_mesh_name_and_mode(
         Geometry::from_genmesh(&Cube::new()),
         Material::single_color_no_shade(0.8, 0., 0., 1.),
-        "pan_x",
+        "XPlane",
         DrawMode::TriangleNoDepth,
     );
     let y_p = scene.object_from_mesh_name_and_mode(
         Geometry::from_genmesh(&Cube::new()),
         Material::single_color_no_shade(0., 0.8, 0., 1.),
-        "pan_y",
+        "YPlane",
         DrawMode::TriangleNoDepth,
     );
     let z_p = scene.object_from_mesh_name_and_mode(
         Geometry::from_genmesh(&Cube::new()),
         Material::single_color_no_shade(0., 0., 0.8, 1.),
-        "pan_z",
+        "ZPlane",
         DrawMode::TriangleNoDepth,
     );
     x.set_position(3., 0., 0.);
@@ -210,10 +216,10 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowType) -> Node {
     node.own(x_p);
     node.own(y_p);
     node.own(z_p);
-    if arrow_type == ArrowType::Sphere {
-        let n_x = create_arrow(scene, [1.0, 0.0, 0.0, 1.0], arrow_type, "snap-x", false);
-        let n_y = create_arrow(scene, [0.0, 1.0, 0.0, 1.0], arrow_type, "snap-y", false);
-        let n_z = create_arrow(scene, [0.0, 0.0, 1.0, 1.0], arrow_type, "snap-z", false);
+    if arrow_type == ArrowTip::Sphere {
+        let n_x = create_arrow(scene, [1.0, 0.0, 0.0, 1.0], arrow_type, "snap-x", false, DrawMode::TriangleNoDepth);
+        let n_y = create_arrow(scene, [0.0, 1.0, 0.0, 1.0], arrow_type, "snap-y", false, DrawMode::TriangleNoDepth);
+        let n_z = create_arrow(scene, [0.0, 0.0, 1.0, 1.0], arrow_type, "snap-z", false, DrawMode::TriangleNoDepth);
         n_x.set_position(6., 0., 0.);
         n_y.set_position(0., -6., 0.);
         n_z.set_position(0., 0., -6.);
@@ -222,6 +228,25 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowType) -> Node {
         node.own(n_z);
     }
     node
+}
+
+pub fn create_origin(scene: &Scene) -> Node {
+    let x = create_arrow(scene, [1., 0., 0., 1.], ArrowTip::None, "XAxis", true, DrawMode::TriangleNoDepth);
+    let y = create_arrow(scene, [0., 1., 0., 1.], ArrowTip::None, "YAxis", true, DrawMode::TriangleNoDepth);
+    let z = create_arrow(scene, [0., 0., 1., 1.], ArrowTip::None, "ZAxis", true, DrawMode::TriangleNoDepth);
+    x.rotate_by(UnitQuaternion::from_euler_angles(0.0, PI / 2., 0.0));
+    y.rotate_by(UnitQuaternion::from_euler_angles(-PI / 2., 0.0, 0.0));
+    z.rotate_by(UnitQuaternion::from_euler_angles(0.0, 0.0, PI / 2.));
+    let mut center = scene.object_from_mesh_name_and_mode(
+        Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(2)),
+        Material::single_color_no_shade(1., 1., 1., 1.0),
+        "Spawn Origin",
+        DrawMode::TriangleNoDepth,
+    );
+    center.own(x);
+    center.own(y);
+    center.own(z);
+    center
 }
 
 pub fn create_primitive_node(scene: &Scene, primitive: Primitive) -> Node {
