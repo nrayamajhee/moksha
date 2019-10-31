@@ -136,7 +136,21 @@ impl Node {
     }
     pub fn add(&mut self, node: RcRcell<Node>) {
         self.children.push(node);
+        self.children.sort_by_cached_key(|e|e.borrow().info().name);
         self.apply_parent_transform(self.parent_transform() * self.transform());
+    }
+    pub fn find_child(&self, name: &str) -> Option<usize> {
+        if let Ok(i) = self.children.binary_search_by_key(&String::from(name), |a|a.borrow().info().name) {
+            Some(i)
+        } else {
+            None
+        }
+    }
+    pub fn remove(&mut self, name: &str) {
+        if let Some(i) = self.find_child(name) {
+            self.children.remove(i);
+        }
+        self.apply_parent_transform(Transform::identity());
     }
     pub fn own(&mut self, node: Node) {
         self.owned_children.push(node);
@@ -205,7 +219,7 @@ impl Node {
     }
     pub fn change_color(&self, color: [f32; 3]) {
         let mut mesh = self.mesh().unwrap();
-        mesh.material = Material::single_color_no_shade(color[0], color[1], color[2], 1.);
+        mesh.material = mesh.material.color(color[0], color[1], color[2], 1.);
         self.set_mesh(mesh);
     }
 }

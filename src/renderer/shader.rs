@@ -12,7 +12,6 @@ pub enum ShaderType {
     Color,
     Wireframe,
     VertexColor,
-    Texture,
 }
 
 pub fn create_program(gl: &GL, vertex: &str, fragment: &str) -> Result<WebGlProgram, String> {
@@ -167,10 +166,6 @@ pub fn link_program(
     }
 }
 
-fn is_power_of_2(val: u32) -> bool {
-    (val & (val - 1)) == 0
-}
-
 pub fn bind_texture(gl: &GL, url: &str) -> Result<(), JsValue> {
     let texture = gl.create_texture().expect("Can't create texture!");
     gl.bind_texture(GL::TEXTURE_2D, Some(&texture));
@@ -203,14 +198,7 @@ pub fn bind_texture(gl: &GL, url: &str) -> Result<(), JsValue> {
             &image,
         )
         .expect("Couldn't bind image as texture!");
-        if is_power_of_2(image.width()) && is_power_of_2(image.height()) {
-            gl.generate_mipmap(GL::TEXTURE_2D);
-        } else {
-            gl.tex_parameteri(GL::TEXTURE_2D, GL::TEXTURE_WRAP_S, GL::CLAMP_TO_EDGE as i32);
-            gl.tex_parameteri(GL::TEXTURE_2D, GL::TEXTURE_WRAP_T, GL::CLAMP_TO_EDGE as i32);
-            gl.tex_parameteri(GL::TEXTURE_2D, GL::TEXTURE_MIN_FILTER, GL::LINEAR as i32);
-            gl.tex_parameteri(GL::TEXTURE_2D, GL::TEXTURE_MAG_FILTER, GL::LINEAR as i32);
-        }
+        gl.generate_mipmap(GL::TEXTURE_2D);
     });
     img.borrow_mut().set_src(url);
     Ok(())

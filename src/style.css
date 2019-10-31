@@ -15,6 +15,10 @@
     --gap: 20px;
     --radius: 16px;
     --small-radius: 8px;
+
+	--cursor-auto:  auto;
+	--cursor-pointer: pointer;
+	--cursor-grab: grab;
 }
 *:focus {
 	outline: none;
@@ -29,6 +33,7 @@
 	user-select: none;
 }
 body {
+	cursor: var(--cursor-auto);
     margin: 0;
     width: 100vw;
     height: 100vh;
@@ -42,9 +47,6 @@ canvas {
     width: 100%;
     height: 100%;
     z-index: 0;
-}
-canvas.grab {
-    cursor: grab;
 }
 #console {
 	padding-top: calc(1.5rem + 2* var(--pad));
@@ -119,40 +121,39 @@ hr {
 #mesh-list li:hover {
 	background: var(--fg-nearest);
 }
-#mesh-list li, #scene-tree p, #scene-tree i {
-	cursor: pointer;
+#mesh-list li, #scene-tree p, #scene-tree i.foldable, #scene-tree i.eye, button {
+	cursor: var(--cursor-pointer);
 }
-#scene-tree {
+#right-panel {
 	position: absolute;
 	top: 0;
 	right: 0;
-	width: 12em;
-	margin: var(--pad);
+	margin: 0 var(--pad);
+}
+#right-panel > section {
+	width: 15em;
+	margin: var(--pad) 0;
+	box-sizing: border-box;
+	max-height: calc((100vh - 3 * var(--pad)) / 2);
 }
 #scene-tree li p {
 	border-radius: var(--small-pad);
+	position: relative;
 	margin: 0;
 	padding: var(--small-pad);
-	margin-left: 24px;
 	display: inline-block;
+	transition: margin 0.4s;
 }
-#scene-tree li i+p {
-	margin-left: 0;
-}
-#scene-tree p:hover, #scene-tree i:hover {
+#scene-tree p:hover, #scene-tree i.foldable:hover, #scene-tree i.eye:hover {
 	border-radius: var(--small-pad);
 	background: var(--fg-nearest);
-}
-#scene-tree > div {
-	width: 12em;
-	max-height: 20em;
-	overflow: auto;
 }
 #scene-tree .disabled {
 	color: var(--bg);
 }
 #scene-tree .disabled p {
-	cursor: default;
+	cursor: var(--cursor-auto);
+	background-color: var(--fg);
 }
 #scene-tree ul {
 	display: none;
@@ -164,27 +165,40 @@ hr {
 #scene-tree > ul  {
 	padding: 0;
 }
-#scene-tree ul li > .material-icons-outlined {
+#scene-tree li > i.fold {
 	float: left;
 }
-#scene-tree ul li > .material-icons {
+#scene-tree li > i.fold {
+	float: left;
+}
+#scene-tree li > i.eye {
 	float: right;
 }
-#scene-tree li p.dragenter {
-	position: relative;
-	background: var(--fg-nearest);
-	margin-top: var(--small-pad);
-	margin-bottom: calc(var(--pad) + 8px);
-}
-#scene-tree li p.dragenter::after {
+#scene-tree li p::after {
 	content:'';
 	position: absolute;
 	top: calc(100% + var(--small-pad));
 	left: 0;
 	width: 100%;
-	height: 8px;
+	height: 0px;
 	background-color: var(--fg-nearest);
 	border-radius: var(--small-pad);
+	transition: height 0.4s;
+}
+#scene-tree li p.dragenter {
+	background: var(--fg-nearest);
+	margin-top: var(--small-pad);
+	margin-bottom: calc(var(--pad) + 1em);
+}
+
+#scene-tree li p.dragged-el {
+	margin: 0;
+}
+#scene-tree li p.dragged-el::after {
+	display: none;
+}
+#scene-tree li p.dragenter::after {
+	height: 1em;
 }
 #console.shown ~ section, #console.shown ~ canvas {
     filter: blur(10px);
@@ -206,7 +220,7 @@ hr {
 button {
     position: relative;
     padding: 0;
-    margin: 0.5em;
+    margin: var(--pad); 
     color: white;
     border: 0;
     font: 1em/1 'Fira Sans', sans-serif;
@@ -226,7 +240,7 @@ button span {
     line-height: 24px; /* size of material icon */
     vertical-align: top;
 }
-button .hint {
+.hint {
     display: none;
     position: absolute;
     white-space:nowrap;
@@ -238,7 +252,7 @@ button .hint {
     min-width: 1em;
     border-radius: 0 var(--small-radius) var(--small-radius) 0;
 }
-#console button .hint, #open-console .hint {
+#close-console .hint {
     margin-left: 0;
     margin-right: 1.2em;
     left: 0;
@@ -248,9 +262,9 @@ button .hint {
 #open-console {
     position: absolute;
     bottom: 0;
-    right: 0;
+    left: 0;
 }
-button .hint::before {
+.hint::before {
     width: 0;
     height: 0;
     border: 0px solid transparent;
@@ -262,8 +276,7 @@ button .hint::before {
     top: 0;
     right: 100%; 
 }
-#console button .hint::before,
-#open-console .hint::before {
+#close-console .hint::before {
     top: 0;
     left: 100%; 
     border-right-color: transparent;

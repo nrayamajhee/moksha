@@ -11,7 +11,7 @@ case $1 in
 		cargo clippy --all-features -- -D warnings
 	;;
 	"d" | "doc")
-		cargo doc --document-private-items
+		cargo doc --document-private-items --open
 	;;
 	"s" | "serve")
 		cd www

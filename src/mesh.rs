@@ -32,6 +32,10 @@ impl Transform {
         let v = multiply(self.scale, Vector3::new(p.x,p.y,p.z));
         Point3::new(v.x,v.y,v.z)
     }
+    pub fn identity() -> Self {
+        Self::from(Isometry3::identity())
+
+    }
 }
 
 impl From<Isometry3<f32>> for Transform {
@@ -155,78 +159,46 @@ pub struct Material {
     pub tex_coords: Option<Vec<f32>>,
 }
 
-impl Material {
-    pub fn from_image_texture(gl: &GL, url: &str, tex_coords: Vec<f32>) -> Result<Self, JsValue> {
-        bind_texture(gl, url)?;
-        let tex_coords = Some(tex_coords);
-        Ok(Self {
-            shader_type: ShaderType::Texture,
-            flat_shade: false,
-            wire_overlay: false,
-            color: None,
-            vertex_colors: None,
-            tex_coords,
-        })
-    }
-    pub fn single_color(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Self {
-            shader_type: ShaderType::Color,
-            flat_shade: false,
-            wire_overlay: false,
-            color: Some([r, g, b, a]),
-            vertex_colors: None,
-            tex_coords: None,
-        }
-    }
-    pub fn single_color_no_shade(r: f32, g: f32, b: f32, a: f32) -> Self {
+impl Default for Material {
+    fn default() -> Self {
         Self {
             shader_type: ShaderType::Simple,
             flat_shade: false,
             wire_overlay: false,
-            color: Some([r, g, b, a]),
+            color: None,
             vertex_colors: None,
             tex_coords: None,
         }
     }
-    pub fn single_color_wired(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Self {
-            shader_type: ShaderType::Color,
-            flat_shade: false,
-            wire_overlay: true,
-            color: Some([r, g, b, a]),
-            vertex_colors: None,
-            tex_coords: None,
-        }
+}
+
+impl Material {
+    pub fn new_color_no_shade(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self::default().color(r,g,b,a)
     }
-    pub fn single_color_flat_wired(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Self {
-            shader_type: ShaderType::Color,
-            flat_shade: true,
-            wire_overlay: true,
-            color: Some([r, g, b, a]),
-            vertex_colors: None,
-            tex_coords: None,
-        }
+    pub fn new_color(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self::default().color(r,g,b,a).shader_type(ShaderType::Color)
     }
-    pub fn single_color_flat(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Self {
-            shader_type: ShaderType::Color,
-            flat_shade: true,
-            wire_overlay: false,
-            color: Some([r, g, b, a]),
-            vertex_colors: None,
-            tex_coords: None,
-        }
+    pub fn new_wire(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self::default().color(r,g,b,a).wire_overlay().shader_type(ShaderType::Wireframe)
     }
-    pub fn wireframe(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Self {
-            shader_type: ShaderType::Wireframe,
-            flat_shade: false,
-            wire_overlay: false,
-            color: Some([r, g, b, a]),
-            vertex_colors: None,
-            tex_coords: None,
-        }
+    pub fn new_texture(gl: &GL, url: &str, tex_coords: Vec<f32>) -> Result<Self, JsValue> {
+        bind_texture(gl, url)?;
+        let mut mat = Self::new_color(1.,1.,1.,1.);
+        mat.tex_coords = Some(tex_coords);
+        Ok(mat)
+    }
+    pub fn color(mut self, r: f32, g: f32, b: f32, a: f32) -> Self {
+        self.color = Some([r,g,b,a]);
+        self
+    }
+    pub fn shader_type(mut self, shader: ShaderType) -> Self {
+        self.shader_type = shader;
+        self
+    }
+    pub fn wire_overlay(mut self) -> Self {
+        self.wire_overlay = true;
+        self
     }
     pub fn vertex_colors(vertex_color: Vec<f32>) -> Self {
         Self {

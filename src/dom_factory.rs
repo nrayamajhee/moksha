@@ -1,10 +1,11 @@
+use crate::rc_rcell;
 use maud::{html, Markup};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{
-    Document, Element, Event, EventTarget, HtmlCanvasElement, HtmlElement, Node, NodeList, Window,
+    Document, Element, Event, EventTarget, HtmlCanvasElement, HtmlCollection, HtmlElement, Node,
+    NodeList, Window,
 };
-use crate::rc_rcell;
 
 pub fn window() -> Window {
     web_sys::window().expect("No global window found!")
@@ -43,7 +44,7 @@ pub fn get_canvas(id: &str) -> HtmlCanvasElement {
         .expect("Can't convert the dom element to HtmlCanvasElement!")
 }
 
-pub fn resize_canvas(canvas: &mut HtmlCanvasElement, pixel_ratio: f64) -> f32 {
+pub fn resize_canvas(canvas: &HtmlCanvasElement, pixel_ratio: f64) -> f32 {
     let window = window();
     let pixel_ratio = window.device_pixel_ratio() / pixel_ratio;
     let width: u32 = (window.inner_width().unwrap().as_f64().unwrap() * pixel_ratio) as u32;
@@ -76,7 +77,20 @@ where
 }
 
 pub fn get_el(id: &str) -> Element {
-    document().get_element_by_id(id).expect(&format!("Cant find element with id {}", id))
+    document()
+        .get_element_by_id(id)
+        .unwrap_or_else(|| panic!("Cant find element with id {}", id))
+}
+
+pub fn get_el_by_class(class: &str) -> Element {
+    document()
+        .get_elements_by_class_name(class)
+        .item(0)
+        .unwrap_or_else(|| panic!("Cant find element with class {}", class))
+}
+
+pub fn get_els_by_class(class: &str) -> HtmlCollection {
+    document().get_elements_by_class_name(class)
 }
 
 pub fn get_html_el(id: &str) -> HtmlElement {
@@ -97,7 +111,16 @@ pub fn query_html_el(selector: &str) -> HtmlElement {
 }
 
 pub fn query_els(selector: &str) -> NodeList {
-    document().query_selector_all(selector).unwrap()
+    document()
+        .query_selector_all(selector)
+        .unwrap_or_else(|_| panic!("No element matches selector: {}", selector))
+}
+
+pub fn query_el(selector: &str) -> Element {
+    document()
+        .query_selector(selector)
+        .unwrap()
+        .unwrap_or_else(|| panic!("No element matches selector: {}", selector))
 }
 
 pub fn icon_btn_w_id(id: &str, hint: &str, icon_name: &str, hotkey: &str) -> Markup {
@@ -145,6 +168,12 @@ pub fn replace_history(title: &str) -> Result<(), JsValue> {
     )
 }
 
+pub fn create_el(name: &str) -> Element {
+    document()
+        .create_element(name)
+        .unwrap_or_else(|_| panic!("Can't create element with name {}", name))
+}
+
 pub fn add_style(styles: &str) {
     let document = document();
     let style_el = document
@@ -168,12 +197,16 @@ pub fn get_target_innerh(e: &Event) -> String {
         .inner_html()
 }
 
-pub fn get_parent(node: Element, level: usize) -> Option<Element> {
+pub fn el_innerh(e: Element) -> String {
+    e.dyn_into::<HtmlElement>().unwrap().inner_html()
+}
+
+pub fn get_parent(node: &Element, level: usize) -> Option<Element> {
     if level == 0 {
-        return Some(node);
+        return Some(node.clone());
     }
     if let Some(parent) = node.parent_element() {
-        get_parent(parent, level - 1)
+        get_parent(&parent, level - 1)
     } else {
         None
     }
@@ -186,27 +219,44 @@ pub fn get_target_el(e: &Event) -> Element {
         .unwrap()
 }
 
-pub fn get_target_parent_hel(e: &Event, level: usize) -> Element {
-    get_parent(e.target().unwrap().dyn_into::<Element>().unwrap(), level)
+pub fn get_target_parent_el(e: &Event, level: usize) -> Element {
+    get_parent(&e.target().unwrap().dyn_into::<Element>().unwrap(), level)
         .expect("Could't get the element")
 }
 
-pub fn get_target_parent_el(e: &Event, level: usize) -> HtmlElement {
-    get_parent(get_target_el(e), level)
+pub fn get_target_parent_hel(e: &Event, level: usize) -> HtmlElement {
+    get_parent(&get_target_el(e), level)
         .expect("Could't get the element")
         .dyn_into::<HtmlElement>()
         .unwrap()
 }
+
 pub fn create_el_w_class_n_inner(tag_name: &str, class: &str, inner_html: &str) -> Element {
-    let el = document().create_element(tag_name).unwrap_or_else(|_|panic!("Can't create element with tage name: {}", tag_name));
-    el.class_list().add_1(class).expect("Can't add class name");
+    let el = document()
+        .create_element(tag_name)
+        .unwrap_or_else(|_| panic!("Can't create element with tage name: {}", tag_name));
+    for each in class.split(' ') {
+        el.class_list().add_1(each).expect("Can't add class name");
+    }
     el.set_inner_html(inner_html);
     el
 }
 
 pub fn add_class(el: &Element, class_name: &str) {
-    el.class_list().add_1(class_name).unwrap_or_else(|_|panic!("Can't add class name: {} to element: {:?}", class_name, el));
+    el.class_list()
+        .add_1(class_name)
+        .unwrap_or_else(|_| panic!("Can't add class name: {} to element: {:?}", class_name, el));
 }
 pub fn remove_class(el: &Element, class_name: &str) {
-    el.class_list().remove_1(class_name).unwrap_or_else(|_|panic!("Can't add class name: {} to element: {:?}", class_name, el));
+    el.class_list()
+        .remove_1(class_name)
+        .unwrap_or_else(|_| panic!("Can't add class name: {} to element: {:?}", class_name, el));
+}
+pub fn insert_el(parent: &Element, child: &Element) {
+    insert_el_at(parent, child, "beforeend");
+}
+pub fn insert_el_at(parent: &Element, child: &Element, option: &str) {
+    parent
+        .insert_adjacent_element(option, &child)
+        .expect("Couldn't insert adjacent element before end!");
 }

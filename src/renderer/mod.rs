@@ -22,7 +22,6 @@ use web_sys::{
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum DrawMode {
     Points,
-    Wireframe,
     Lines,
     Triangle,
     TriangleNoDepth,
@@ -93,10 +92,6 @@ impl Renderer {
         shaders.insert(
             ShaderType::VertexColor,
             create_vertex_color_program(&ctx).expect("Can't create vertex color shader!"),
-        );
-        shaders.insert(
-            ShaderType::Texture,
-            create_texture_program(&ctx).expect("can't create texture shader!"),
         );
         log!("Renderer created");
         Self {
@@ -176,11 +171,11 @@ impl Renderer {
                 .expect("Couldn't bind vertex colors.");
             }
             // bind texture
-            if shader_type == ShaderType::Texture {
+            if let Some(tex_coords) = mesh.material.tex_coords.as_ref() {
                 bind_buffer_and_attribute(
                     &self.ctx,
                     &program,
-                    "texCoord",
+                    "tex_coords",
                     mesh.material
                         .tex_coords
                         .as_ref()
@@ -368,10 +363,13 @@ impl Renderer {
             if shader_type == ShaderType::Color {
                 set_bool(gl, program, "flat_shade", mesh.material.flat_shade);
                 set_bool(gl, program, "wire_overlay", mesh.material.wire_overlay);
-            }
-            if shader_type == ShaderType::Texture {
-                gl.active_texture(GL::TEXTURE0);
-                set_i32(gl, program, "sampler", 0);
+                if let Some(_) = mesh.material.tex_coords {
+                    gl.active_texture(GL::TEXTURE0);
+                    set_i32(gl, program, "sampler", 0);
+                    set_bool(gl, program, "has_albedo", true);
+                } else {
+                    set_bool(gl, program, "has_albedo", false);
+                }
             }
             let model = storage.parent_tranform(i) * storage.transform(i);
             set_mat4(gl, program, "model", &model.to_homogeneous());
@@ -454,7 +452,7 @@ impl Renderer {
     }
     pub fn resize(&mut self) {
         log!("Renderer resized");
-        self.aspect_ratio = resize_canvas(&mut self.canvas, self.config.pixel_ratio);
+        self.aspect_ratio = resize_canvas(&self.canvas, self.config.pixel_ratio);
         // log!("New aspect ratio: {:?}", self.aspect_ratio());
         self.ctx.viewport(
             0,
@@ -487,16 +485,10 @@ impl Renderer {
             .style();
         match cursory_type {
             CursorType::Pointer => {
-                canvas_style.set_property("cursor", "default").unwrap();
+                canvas_style.set_property("cursor", "var(--cursor-auto)").unwrap();
             }
             CursorType::Grab => {
-                canvas_style.set_property("cursor", "grabbing").unwrap();
-            }
-            CursorType::ZoomIn => {
-                canvas_style.set_property("cursor", "zoom-in").unwrap();
-            }
-            CursorType::ZoomOut => {
-                canvas_style.set_property("cursor", "zoom-out").unwrap();
+                canvas_style.set_property("cursor", "var(--cursor-grab)").unwrap();
             }
         }
     }
@@ -505,6 +497,4 @@ impl Renderer {
 pub enum CursorType {
     Pointer,
     Grab,
-    ZoomIn,
-    ZoomOut,
 }

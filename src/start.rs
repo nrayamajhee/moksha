@@ -4,13 +4,71 @@ use crate::{
     editor::{console_setup, ConsoleConfig},
     renderer::{RenderConfig, Renderer},
     rc_rcell,
-    scene::LightType,
+    scene::LightType,Node,
     Editor, Geometry, Material, Scene, Viewport,
 };
-use genmesh::generators::{Cube, IcoSphere};
+use genmesh::generators::{Cube, IcoSphere, SphereUv};
 use std::f32::consts::PI;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
+use nalgebra::UnitQuaternion;
+use std::rc::Rc;
+
+fn cube(scene: &Scene, renderer: &Renderer) -> Node {
+    let cube_geometry = Geometry::from_genmesh(&Cube::new());
+    let mut colors = Vec::new();
+    let face_colors = vec![
+        [1.0, 1.0, 1.0, 1.0], // Front face: white
+        [1.0, 0.0, 0.0, 1.0], // Back face: red
+        [0.0, 1.0, 0.0, 1.0], // Top face: green
+        [0.0, 0.0, 1.0, 1.0], // Bottom face: blue
+        [1.0, 1.0, 0.0, 1.0], // Right face: yellow
+        [1.0, 0.0, 1.0, 1.0], // Left face: purple
+    ];
+    for face in face_colors {
+        for each in face.iter() {
+            for _ in 0..4 {
+                colors.push(*each);
+            }
+        }
+    }
+    let tex_coords = vec![
+        // Front
+        0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Back
+        0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Top
+        0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Bottom
+        0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Right
+        0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Left
+        0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+    ];
+    let cube_tex = Material::new_texture(
+        renderer.context(),
+        "/assets/img/box_tex.png",
+        tex_coords,
+    ).expect("Couldn't load texture");
+    let mut cube =
+        scene.object_from_mesh_and_name(cube_geometry.clone(), cube_tex, "Wooden Cube");
+    let cube2 = scene.object_from_mesh_and_name(
+        cube_geometry,
+        Material::vertex_colors(colors),
+        "Colored Cube",
+    );
+    cube.set_position(5., 0., 5.);
+    cube.set_scale(0.2);
+    cube2.set_position(4., 0., 0.);
+    let a_cube2 = rc_rcell(cube2);
+    //cube.add(a_cube2);
+    cube
+}
+
+fn gen_sphere_uv(geometry: &Geometry) -> Vec<f32> {
+    let mut uvs = Vec::new();
+    for each in geometry.vertices.chunks(3) {
+        uvs.push(0.5 + f32::atan2(each[1], each[0]) / (2. * PI));
+        uvs.push(0.5 - f32::asin(each[2]) / PI);
+    }
+    uvs
+}
 
 /// The main entrypoint that is automatically executed on page load.
 #[wasm_bindgen(start)]
@@ -36,54 +94,7 @@ pub fn start() -> Result<(), JsValue> {
 
     let a_rndr = rc_rcell(renderer);
     let a_view = rc_rcell(viewport);
-    let mut scene = Scene::new(a_rndr.clone(), a_view.clone());
-
-    let cube = {
-        let cube_geometry = Geometry::from_genmesh(&Cube::new());
-        let mut colors = Vec::new();
-        let face_colors = vec![
-            [1.0, 1.0, 1.0, 1.0], // Front face: white
-            [1.0, 0.0, 0.0, 1.0], // Back face: red
-            [0.0, 1.0, 0.0, 1.0], // Top face: green
-            [0.0, 0.0, 1.0, 1.0], // Bottom face: blue
-            [1.0, 1.0, 0.0, 1.0], // Right face: yellow
-            [1.0, 0.0, 1.0, 1.0], // Left face: purple
-        ];
-        for face in face_colors {
-            for each in face.iter() {
-                for _ in 0..4 {
-                    colors.push(*each);
-                }
-            }
-        }
-        let tex_coords = vec![
-            // Front
-            0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Back
-            0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Top
-            0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Bottom
-            0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Right
-            0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Left
-            0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
-        ];
-        let cube_tex = Material::from_image_texture(
-            a_rndr.borrow().context(),
-            "/assets/img/box_tex.png",
-            tex_coords,
-        )?;
-        let mut cube =
-            scene.object_from_mesh_and_name(cube_geometry.clone(), cube_tex, "Wooden Cube");
-        let cube2 = scene.object_from_mesh_and_name(
-            cube_geometry,
-            Material::vertex_colors(colors),
-            "Colored Cube",
-        );
-        cube.set_position(5., 0., 5.);
-        cube.set_scale(0.2);
-        cube2.set_position(4., 0., 0.);
-        let a_cube2 = rc_rcell(cube2);
-        cube.add(a_cube2);
-        rc_rcell(cube)
-    };
+    let scene = Scene::new(a_rndr.clone(), a_view.clone());
 
     let (sun, _earth, _moon) = {
         //let scene = a_scene.borrow();
@@ -92,22 +103,35 @@ pub fn start() -> Result<(), JsValue> {
 
         let mut sun = scene.object_from_mesh_and_name(
             Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(2)),
-            Material::single_color_no_shade(1.0, 1.0, 0.0, 1.0),
+            Material::new_color_no_shade(1.0, 1.0, 0.0, 1.0),
             "Sun",
         );
 
+        //let mut earth = scene.object_from_mesh_and_name(
+            //Geometry::from_genmesh(&SphereUv::new(16,8)),
+            //Material::new_color(0.0, 0.0, 1.0, 1.0).wire_overlay(),
+            //"Earth",
+        //);
+        let geo = Geometry::from_genmesh(&SphereUv::new(8, 4));
+        let tex = Material::new_texture(
+            renderer.context(),
+            "/assets/img/earth.jpg",
+            gen_sphere_uv(&geo),
+        ).expect("Couldn't load texture");
         let mut earth = scene.object_from_mesh_and_name(
-            Geometry::from_genmesh(&IcoSphere::subdivide(2)),
-            Material::single_color_wired(0.0, 0.0, 1.0, 1.0),
+            geo,
+            tex,
             "Earth",
         );
 
-        let moon = scene.object_from_mesh_and_name(
+        let mut moon = scene.object_from_mesh_and_name(
             Geometry::from_genmesh(&IcoSphere::subdivide(2)),
-            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            Material::new_color(1.0, 1.0, 1.0, 1.0),
             "Moon",
         );
 
+        let cube = rc_rcell(cube(&scene, &a_rndr.borrow()));
+        moon.add(cube);
         moon.set_position(6.0, 0.0, 0.0);
         earth.set_position(10.0, 0.0, 0.0);
         earth.set_scale(0.5);
@@ -123,7 +147,7 @@ pub fn start() -> Result<(), JsValue> {
         (sun, earth, moon)
     };
 
-    let ambient = scene.light(LightType::Ambient, [1.0, 1.0, 1.0], 0.12);
+    let ambient = scene.light(LightType::Ambient, [1.0, 1.0, 1.0], 1.0);
     let amb_node = ambient.node();
     amb_node.borrow().set_position(10., 0., 10.);
 
@@ -143,27 +167,28 @@ pub fn start() -> Result<(), JsValue> {
     let dir_node = directional.node();
     dir_node.borrow().set_position(30., 0., -10.);
 
-    scene.add(cube);
-    scene.add(sun);
+    scene.add(sun.clone());
     scene.add_light(&ambient);
     //scene.add_light(point2);
     //scene.add_light(point);
     scene.add_light(&directional);
     //scene.add_light(spot);
 
-    let a_scene = rc_rcell(scene);
-    let mut editor = Editor::new(a_view.clone(), a_scene.clone(), a_rndr.clone());
-    editor.set_active_node(_moon);
-    //let a_editor = rc_rcell(editor);
+    //_earth.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.02, 0.));
+
+    let a_scene = Rc::new(scene);
+    let mut editor = Editor::new(a_scene.clone());
+    editor.set_active_node(_earth);
+    let a_editor = rc_rcell(editor);
+    sun.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., PI / 3., 0.));
     loop_animation_frame(move || {
         {
             //a_earth.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.02, 0.));
-            //a_sun.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.01, 0.));
+            //sun.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.01, 0.));
         }
         {
-            let view = a_view.borrow_mut();
-            //a_editor.borrow_mut().update(&mut view);
-            a_rndr.borrow_mut().render(&a_scene.borrow(), &view);
+            a_editor.borrow().track_gizmo();
+            a_rndr.borrow_mut().render(&a_scene, &a_view.borrow());
         }
     });
     Ok(())

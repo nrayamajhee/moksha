@@ -89,14 +89,14 @@ Due to wasm-bingen's lack of support for rust lifetime annotations, I make heavy
     - Albedo  Map
     - Barycentric Wireframe
     - Lights (Ambient, Point, Directional, Spot)
-	- Add menu to add mesh and lights
     
- - Editor
+- Editor
     - Custom logging screen
     - Node tree viewer
-	- Implment open/collapse and render toggle to Node tree view
+		- Implment open/collapse and render toggle to Node tree view
+		- Implement drag and drop for node parent/child relations.
     - Zoom and Switch Perspective controls
-    - Menu for adding objects
+	- Add menu to add mesh and lights
 
 - Viewport
     - Perspective Projection
@@ -104,15 +104,16 @@ Due to wasm-bingen's lack of support for rust lifetime annotations, I make heavy
     - Third Person Controls
 
 # Doing
-
 - Scene
   - load obj (geometry + albedo texure)
 
-- Editor
-  - Implement drag and drop for node parent/child relations.
+- System
+    - Cap the framerate for performance.
 
-- Renderer
-  - Fix rendering order for depth
+- World
+    - Load milkyway skybox
+    - Displace the icosphere vertices with noise function
+    - Add plane model.
 
 # ToDo
 - System

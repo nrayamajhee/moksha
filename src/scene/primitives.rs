@@ -55,7 +55,7 @@ pub fn create_arrow(
     if has_stem {
         let stem = scene.object_from_mesh_name_and_mode(
             Geometry::from_genmesh_no_normals(&Cylinder::subdivide(8, 1)),
-            Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
+            Material::new_color_no_shade(color[0], color[1], color[2], color[3]),
             "Arrow Stem",
             draw_mode
         );
@@ -66,7 +66,7 @@ pub fn create_arrow(
         ArrowTip::Cone => {
             let head = scene.object_from_mesh_name_and_mode(
                 Geometry::from_genmesh(&Cone::new(8)),
-                Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
+                Material::new_color_no_shade(color[0], color[1], color[2], color[3]),
                 "Arrow Head",
                 draw_mode
             );
@@ -76,7 +76,7 @@ pub fn create_arrow(
         ArrowTip::Cube => {
             let head = scene.object_from_mesh_name_and_mode(
                 Geometry::from_genmesh_no_normals(&Cube::new()),
-                Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
+                Material::new_color_no_shade(color[0], color[1], color[2], color[3]),
                 "Arrow Head",
                 draw_mode
             );
@@ -86,7 +86,7 @@ pub fn create_arrow(
         ArrowTip::Sphere => {
             let head = scene.object_from_mesh_name_and_mode(
                 Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(1)),
-                Material::single_color_no_shade(color[0], color[1], color[2], color[3]),
+                Material::new_color_no_shade(color[0], color[1], color[2], color[3]),
                 "Arrow Head",
                 draw_mode
             );
@@ -106,32 +106,31 @@ pub fn create_arrow(
 
 pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) -> Node {
     match light_type {
-        LightType::Ambient => scene.object_from_mesh_name_and_mode(
+        LightType::Ambient => scene.object_from_mesh_and_name(
             Geometry::from_genmesh_no_normals(&IcoSphere::new()),
-            Material::wireframe(color[0], color[1], color[2], 1.),
+            Material::new_wire(color[0], color[1], color[2], 1.),
             &light_type.to_string(),
-            DrawMode::Wireframe,
         ),
         LightType::Point => {
             let p = scene.object_from_mesh_name_and_mode(
                 Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(2)),
-                Material::single_color_no_shade(color[0], color[1], color[2], 1.),
+                Material::new_color_no_shade(color[0], color[1], color[2], 1.),
                 &light_type.to_string(),
                 DrawMode::Triangle,
             );
             p.set_scale(0.5);
             p
         }
-        LightType::Spot => scene.object_from_mesh_and_mode(
+        LightType::Spot => scene.object_from_mesh_and_name(
                 Geometry::from_genmesh_no_normals(&Cone::new(8)),
-                Material::wireframe(color[0], color[1], color[2], 1.),
-                DrawMode::Wireframe,
+                Material::new_wire(color[0], color[1], color[2], 1.),
+                &light_type.to_string(),
         ),
         LightType::Directional => {
             let mut n = scene.empty_w_name(&light_type.to_string());
             let cube = scene.object_from_mesh_name_and_mode(
                 Geometry::from_genmesh_no_normals(&Cube::new()),
-                Material::single_color_no_shade(color[0], color[1], color[2], 1.),
+                Material::new_color_no_shade(color[0], color[1], color[2], 1.),
                 "plane",
                 DrawMode::Triangle,
             );
@@ -176,25 +175,25 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowTip) -> Node {
     let z = create_arrow(scene, [0., 0., 0.8, 1.], arrow_type, "ZAxis", true, DrawMode::TriangleNoDepth);
     let mut node = scene.object_from_mesh_name_and_mode(
         Geometry::from_genmesh(&IcoSphere::subdivide(2)),
-        Material::single_color_no_shade(0.8, 0.8, 0.8, 0.8),
+        Material::new_color_no_shade(0.8, 0.8, 0.8, 0.8),
         name,
         DrawMode::TriangleNoDepth,
     );
     let x_p = scene.object_from_mesh_name_and_mode(
         Geometry::from_genmesh(&Cube::new()),
-        Material::single_color_no_shade(0.8, 0., 0., 1.),
+        Material::new_color_no_shade(0.8, 0., 0., 1.),
         "XPlane",
         DrawMode::TriangleNoDepth,
     );
     let y_p = scene.object_from_mesh_name_and_mode(
         Geometry::from_genmesh(&Cube::new()),
-        Material::single_color_no_shade(0., 0.8, 0., 1.),
+        Material::new_color_no_shade(0., 0.8, 0., 1.),
         "YPlane",
         DrawMode::TriangleNoDepth,
     );
     let z_p = scene.object_from_mesh_name_and_mode(
         Geometry::from_genmesh(&Cube::new()),
-        Material::single_color_no_shade(0., 0., 0.8, 1.),
+        Material::new_color_no_shade(0., 0., 0.8, 1.),
         "ZPlane",
         DrawMode::TriangleNoDepth,
     );
@@ -239,7 +238,7 @@ pub fn create_origin(scene: &Scene) -> Node {
     z.rotate_by(UnitQuaternion::from_euler_angles(0.0, 0.0, PI / 2.));
     let mut center = scene.object_from_mesh_name_and_mode(
         Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(2)),
-        Material::single_color_no_shade(1., 1., 1., 1.0),
+        Material::new_color_no_shade(1., 1., 1., 1.0),
         "Spawn Origin",
         DrawMode::TriangleNoDepth,
     );
@@ -253,42 +252,42 @@ pub fn create_primitive_node(scene: &Scene, primitive: Primitive) -> Node {
     match primitive {
         Primitive::Plane => scene.object_from_mesh_and_name(
             Geometry::from_genmesh(&Plane::new()),
-            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            Material::new_color(1.0, 1.0, 1.0, 1.0),
             &primitive.to_string(),
         ),
         Primitive::IcoSphere => scene.object_from_mesh_and_name(
             Geometry::from_genmesh(&IcoSphere::new()),
-            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            Material::new_color(1.0, 1.0, 1.0, 1.0),
             &primitive.to_string(),
         ),
         Primitive::Cube => scene.object_from_mesh_and_name(
             Geometry::from_genmesh(&Cube::new()),
-            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            Material::new_color(1.0, 1.0, 1.0, 1.0),
             &primitive.to_string(),
         ),
         Primitive::Circle => scene.object_from_mesh_and_name(
             Geometry::from_genmesh(&Circle::new(8)),
-            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            Material::new_color(1.0, 1.0, 1.0, 1.0),
             &primitive.to_string(),
         ),
         Primitive::Cylinder => scene.object_from_mesh_and_name(
             Geometry::from_genmesh(&Cylinder::new(8)),
-            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            Material::new_color(1.0, 1.0, 1.0, 1.0),
             &primitive.to_string(),
         ),
         Primitive::Cone => scene.object_from_mesh_and_name(
             Geometry::from_genmesh(&Cone::new(8)),
-            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            Material::new_color(1.0, 1.0, 1.0, 1.0),
             &primitive.to_string(),
         ),
         Primitive::UVSphere => scene.object_from_mesh_and_name(
             Geometry::from_genmesh(&SphereUv::new(8, 16)),
-            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            Material::new_color(1.0, 1.0, 1.0, 1.0),
             &primitive.to_string(),
         ),
         Primitive::Torus => scene.object_from_mesh_and_name(
             Geometry::from_genmesh(&Torus::new(1., 0.2, 16, 8)),
-            Material::single_color(1.0, 1.0, 1.0, 1.0),
+            Material::new_color(1.0, 1.0, 1.0, 1.0),
             &primitive.to_string(),
         ),
         Primitive::Empty => scene.empty(),

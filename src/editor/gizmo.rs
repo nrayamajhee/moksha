@@ -38,6 +38,11 @@ impl Gizmo {
     pub fn node(&self) -> &Node {
         &self.node
     }
+    pub fn apply_target_transform(&self, target: &Node) {
+        // don't apply target's scale
+        self.node.set_parent_transform((target.parent_transform() * target.transform()).isometry.into());
+        self.node.apply_parent_transform(self.node.parent_transform() * self.node.transform());
+    }
     pub fn rescale(&self, transform: &Isometry3<f32>) {
         self.node.set_scale(transform.translation.vector.magnitude() / 30.);
     }
@@ -128,8 +133,8 @@ impl Gizmo {
                     CollisionConstraint::ZAxis => [pos[0], pos[1], poi.z],
                     _ => [poi.x, poi.y, poi.z],
                 };
-                self.node.copy_location(&node);
                 node.set_position(p[0] - o.x, p[1] - o.y, p[2] - o.z);
+                self.apply_target_transform(&node);
             }
         }
     }

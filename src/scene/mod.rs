@@ -74,7 +74,7 @@ impl Default for ObjectInfo {
 /// A Scene tree that facilitates creation of varieties of Nodes. Scene creates Storage that is
 /// then shared by all nodes.
 pub struct Scene {
-    root: Node,
+    root: RcRcell<Node>,
     renderer: RcRcell<Renderer>,
     viewport: RcRcell<Viewport>,
 }
@@ -82,7 +82,7 @@ pub struct Scene {
 impl Scene {
     pub fn new(renderer: RcRcell<Renderer>, viewport: RcRcell<Viewport>) -> Self {
         let storage = rc_rcell(Default::default());
-        let root = Self::object(
+        let root = rc_rcell(Self::object(
             storage,
             &renderer.borrow(),
             None,
@@ -91,7 +91,7 @@ impl Scene {
                 name: "root".into(),
                 ..Default::default()
             },
-        );
+        ));
         let scene = Self {
             root,
             renderer,
@@ -100,8 +100,14 @@ impl Scene {
         scene.add_viewport_events();
         scene
     }
-    pub fn root(&self) -> &Node {
-        &self.root
+    pub fn root(&self) -> RcRcell<Node> {
+        self.root.clone()
+    }
+    pub fn view(&self) -> RcRcell<Viewport> {
+        self.viewport.clone()
+    }
+    pub fn renderer(&self) -> RcRcell<Renderer> {
+        self.renderer.clone()
     }
     pub fn turn_lights_visiblity(&self, node: &Node, visible: bool) {
         let s = self.storage();
@@ -150,11 +156,11 @@ impl Scene {
     pub fn hide_only(&self, node: &Node) {
         self.set_visibility_only(node, false);
     }
-    pub fn add(&mut self, node: RcRcell<Node>) {
+    pub fn add(&self, node: RcRcell<Node>) {
         self.show(&node.borrow());
-        self.root.add(node);
+        self.root.borrow_mut().add(node);
     }
-    pub fn add_light(&mut self, light: &Light) {
+    pub fn add_light(&self, light: &Light) {
         self.add(light.node());
         let s = self.storage();
         let mut storage = s.borrow_mut();
@@ -256,26 +262,22 @@ impl Scene {
         self.object_from_mesh_and_name(geometry, material, "node")
     }
     pub fn storage(&self) -> RcRcell<Storage> {
-        self.root.storage()
+        self.root.borrow().storage()
     }
     pub fn find_node_recursive(node: RcRcell<Node>, name: &str) -> Option<RcRcell<Node>> {
-        if node.borrow().info().name == name {
-            return Some(node);
-        }
-        for each in node.borrow().children() {
-            if let Some(node) = Self::find_node_recursive(each.clone(), name) {
-                return Some(node);
+        if node.borrow().info().name.as_str() == name {
+            Some(node)
+        } else {
+            for each in node.borrow().children() {
+                if let Some(n) = Self::find_node_recursive(each.clone(), name) {
+                    return Some(n);
+                }   
             }
+            None
         }
-        None
     }
     pub fn find_node_w_name(&self, name: &str) -> Option<RcRcell<Node>> {
-        for each in self.root.children() {
-            if let Some(node) = Self::find_node_recursive(each.clone(), name) {
-                return Some(node);
-            }
-        }
-        None
+        Self::find_node_recursive(self.root(), name)
     }
     pub fn duplicate_node(&self, node: &Node) -> Node {
         let transform = node.transform();
