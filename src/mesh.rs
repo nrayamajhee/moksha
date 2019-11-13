@@ -3,7 +3,7 @@ use genmesh::{
     generators::{IndexedPolygon, SharedVertex},
     EmitTriangles, Triangulate, Vertex,
 };
-use nalgebra::{one, Isometry3, Matrix4, Translation3, Vector3, Point3};
+use nalgebra::{one, Isometry3, Matrix4, Point3, Translation3, Vector3};
 use wasm_bindgen::JsValue;
 use web_sys::WebGl2RenderingContext as GL;
 
@@ -24,17 +24,16 @@ impl Transform {
             scale: divide([1., 1., 1.].into(), self.scale),
         }
     }
-    pub fn transform_vector(&self,vec: &Vector3<f32>) -> Vector3<f32> {
+    pub fn transform_vector(&self, vec: &Vector3<f32>) -> Vector3<f32> {
         multiply(self.scale, self.isometry.transform_vector(vec))
     }
     pub fn transform_point(&self, point: &Point3<f32>) -> Point3<f32> {
-        let p = self.isometry.transform_point(point); 
-        let v = multiply(self.scale, Vector3::new(p.x,p.y,p.z));
-        Point3::new(v.x,v.y,v.z)
+        let p = self.isometry.transform_point(point);
+        let v = multiply(self.scale, Vector3::new(p.x, p.y, p.z));
+        Point3::new(v.x, v.y, v.z)
     }
     pub fn identity() -> Self {
         Self::from(Isometry3::identity())
-
     }
 }
 
@@ -94,12 +93,28 @@ pub struct Mesh {
     pub material: Material,
 }
 
+impl Mesh {
+    pub fn new(geometry: Geometry, material: Material) -> Self {
+        Self { geometry, material }
+    }
+}
+
 /// Geometry of a 3D object containing vertices, indices, and face normals.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Geometry {
     pub vertices: Vec<f32>,
     pub indices: Vec<u16>,
     pub normals: Vec<f32>,
+}
+
+impl Default for Geometry {
+    fn default() -> Self {
+        Self {
+            vertices: Vec::new(),
+            indices: Vec::new(),
+            normals: Vec::new(),
+        }
+    }
 }
 
 impl Geometry {
@@ -157,6 +172,8 @@ pub struct Material {
     pub color: Option<[f32; 4]>,
     pub vertex_colors: Option<Vec<f32>>,
     pub tex_coords: Option<Vec<f32>>,
+    pub texture_urls: Vec<String>,
+    pub texture_indices: Vec<usize>,
 }
 
 impl Default for Material {
@@ -168,28 +185,35 @@ impl Default for Material {
             color: None,
             vertex_colors: None,
             tex_coords: None,
+            texture_urls: Vec::new(),
+            texture_indices: Vec::new(),
         }
     }
 }
 
 impl Material {
     pub fn new_color_no_shade(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Self::default().color(r,g,b,a)
+        Self::default().color(r, g, b, a)
     }
     pub fn new_color(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Self::default().color(r,g,b,a).shader_type(ShaderType::Color)
+        Self::default()
+            .color(r, g, b, a)
+            .shader_type(ShaderType::Color)
     }
     pub fn new_wire(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Self::default().color(r,g,b,a).wire_overlay().shader_type(ShaderType::Wireframe)
+        Self::default()
+            .color(r, g, b, a)
+            .wire_overlay()
+            .shader_type(ShaderType::Wireframe)
     }
-    pub fn new_texture(gl: &GL, url: &str, tex_coords: Vec<f32>) -> Result<Self, JsValue> {
-        bind_texture(gl, url)?;
-        let mut mat = Self::new_color(1.,1.,1.,1.);
+    pub fn new_texture(url: &str, tex_coords: Vec<f32>) -> Result<Self, JsValue> {
+        let mut mat = Self::new_color(1., 1., 1., 1.);
         mat.tex_coords = Some(tex_coords);
+        mat.texture_urls.push(String::from(url));
         Ok(mat)
     }
     pub fn color(mut self, r: f32, g: f32, b: f32, a: f32) -> Self {
-        self.color = Some([r,g,b,a]);
+        self.color = Some([r, g, b, a]);
         self
     }
     pub fn shader_type(mut self, shader: ShaderType) -> Self {
@@ -201,13 +225,8 @@ impl Material {
         self
     }
     pub fn vertex_colors(vertex_color: Vec<f32>) -> Self {
-        Self {
-            shader_type: ShaderType::VertexColor,
-            flat_shade: false,
-            wire_overlay: false,
-            color: None,
-            vertex_colors: Some(vertex_color),
-            tex_coords: None,
-        }
+        let mut mat = Self::default();
+        mat.vertex_colors = Some(vertex_color);
+        mat
     }
 }

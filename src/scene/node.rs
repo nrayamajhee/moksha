@@ -1,6 +1,6 @@
-use crate::{Mesh, ObjectInfo, RcRcell, Storage, Transform, mesh::multiply, Material};
-use nalgebra::{Point3, UnitQuaternion, Vector3, Isometry3};
-use ncollide3d::{query::Ray, shape::ConvexHull, query::RayCast};
+use crate::{mesh::multiply, Material, Mesh, ObjectInfo, RcRcell, Storage, Transform};
+use nalgebra::{Isometry3, Point3, UnitQuaternion, Vector3};
+use ncollide3d::{query::Ray, query::RayCast, shape::ConvexHull};
 
 /// An entity in the scene that holds reference to its props in Storage, keeps tracks of
 /// other nodes that are its children either borrowed or owned.
@@ -122,25 +122,32 @@ impl Node {
         let storage = self.storage.borrow();
         storage.info(self.index)
     }
+    pub fn set_info(&self, info: ObjectInfo) {
+        let mut storage = self.storage.borrow_mut();
+        *storage.mut_info(self.index) = info;
+    }
     pub fn mesh(&self) -> Option<Mesh> {
         let storage = self.storage.borrow();
         storage.mesh(self.index)
     }
-    pub fn set_mesh(&self, mesh: Mesh) {
+    pub fn set_mesh(&self, mesh: Option<Mesh>) {
         let mut storage = self.storage.borrow_mut();
         let m = storage.mut_mesh(self.index);
-        *m = Some(mesh);
+        *m = mesh;
     }
     pub fn index(&self) -> usize {
         self.index
     }
     pub fn add(&mut self, node: RcRcell<Node>) {
         self.children.push(node);
-        self.children.sort_by_cached_key(|e|e.borrow().info().name);
+        self.children.sort_by_cached_key(|e| e.borrow().info().name);
         self.apply_parent_transform(self.parent_transform() * self.transform());
     }
     pub fn find_child(&self, name: &str) -> Option<usize> {
-        if let Ok(i) = self.children.binary_search_by_key(&String::from(name), |a|a.borrow().info().name) {
+        if let Ok(i) = self
+            .children
+            .binary_search_by_key(&String::from(name), |a| a.borrow().info().name)
+        {
             Some(i)
         } else {
             None
@@ -173,7 +180,10 @@ impl Node {
         }
         None
     }
-    fn collides_w_children_recursive(ray: &Ray<f32>, node: RcRcell<Node>) -> Option<(RcRcell<Node>, Isometry3<f32>)> {
+    fn collides_w_children_recursive(
+        ray: &Ray<f32>,
+        node: RcRcell<Node>,
+    ) -> Option<(RcRcell<Node>, Isometry3<f32>)> {
         if let Some(t) = node.borrow().collides_w_ray(ray) {
             return Some((node.clone(), t));
         }
@@ -183,21 +193,19 @@ impl Node {
             }
         }
         if let Some(t) = node.borrow().owned_children_collide_w_ray(ray) {
-            return Some((node.clone(),t));
+            return Some((node.clone(), t));
         }
         None
     }
     pub fn collides_w_children(&self, ray: &Ray<f32>) -> Option<(RcRcell<Node>, Isometry3<f32>)> {
         for each in self.children() {
-            if let Some(result) =
-                Self::collides_w_children_recursive(&ray, each.clone())
-            {
+            if let Some(result) = Self::collides_w_children_recursive(&ray, each.clone()) {
                 return Some(result);
             }
         }
         None
     }
-    pub fn collides_w_ray(&self, ray: &Ray<f32>) -> Option<Isometry3<f32>>{
+    pub fn collides_w_ray(&self, ray: &Ray<f32>) -> Option<Isometry3<f32>> {
         let t = self.transform();
         let p_t = self.parent_transform();
         let s = multiply(t.scale, p_t.scale);
@@ -220,6 +228,6 @@ impl Node {
     pub fn change_color(&self, color: [f32; 3]) {
         let mut mesh = self.mesh().unwrap();
         mesh.material = mesh.material.color(color[0], color[1], color[2], 1.);
-        self.set_mesh(mesh);
+        self.set_mesh(Some(mesh));
     }
 }

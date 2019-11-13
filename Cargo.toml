@@ -22,6 +22,7 @@ ncollide3d = "0.20.1"
 genmesh = "0.6.2"
 strum = "0.15.0"
 strum_macros = "0.15.0"
+wavefront_obj = "7.0.0"
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires

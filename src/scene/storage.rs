@@ -1,6 +1,6 @@
 use crate::{scene::LightInfo, Mesh, ObjectInfo, Transform};
-
-use web_sys::WebGlVertexArrayObject;
+use std::rc::Rc;
+use web_sys::{WebGlTexture, WebGlVertexArrayObject};
 
 /// The main data structure that holds almost everything: object info, meshes, transforms, vaos,
 /// etc.
@@ -11,6 +11,7 @@ pub struct Storage {
     transforms: Vec<Transform>,
     parent_transforms: Vec<Transform>,
     vaos: Vec<Option<WebGlVertexArrayObject>>,
+    textures: Vec<Rc<WebGlTexture>>,
     lights: Vec<LightInfo>,
 }
 
@@ -22,6 +23,7 @@ impl Default for Storage {
             transforms: Vec::new(),
             parent_transforms: Vec::new(),
             vaos: Vec::new(),
+            textures: Vec::new(),
             lights: Vec::new(),
         }
     }
@@ -31,6 +33,11 @@ impl Storage {
     pub fn add_light(&mut self, light: LightInfo) -> usize {
         let index = self.lights.len();
         self.lights.push(light);
+        index
+    }
+    pub fn add_texture(&mut self, texture: Rc<WebGlTexture>) -> usize {
+        let index = self.textures.len();
+        self.textures.push(texture);
         index
     }
     pub fn add(
@@ -69,6 +76,9 @@ impl Storage {
     }
     pub fn mesh(&self, indx: usize) -> Option<Mesh> {
         self.meshes.get(indx).expect("No such mesh found!").clone()
+    }
+    pub fn texture(&self, indx: usize) -> &WebGlTexture {
+        &self.textures.get(indx).expect("No such texture found!")
     }
     pub fn mut_mesh(&mut self, indx: usize) -> &mut Option<Mesh> {
         self.meshes.get_mut(indx).expect("No such mesh found!")

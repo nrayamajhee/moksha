@@ -9,7 +9,9 @@
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[macro_use]
-mod log_macros;
+mod log_macro;
+#[macro_use]
+mod node_macro;
 
 use std::cell::RefCell;
 use std::rc::Rc;

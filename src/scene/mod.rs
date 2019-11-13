@@ -13,14 +13,15 @@ pub use storage::Storage;
 use crate::{
     dom_factory::{add_event, window},
     rc_rcell,
-    renderer::{CursorType, DrawMode, Renderer},
+    renderer::{bind_texture, CursorType, DrawMode, RenderFlags, Renderer},
     scene::primitives::create_light_node,
     Geometry, Material, Mesh, MouseButton, RcRcell, Transform, Viewport,
 };
+use nalgebra::Vector3;
 use strum_macros::{Display, EnumIter, EnumString};
 use wasm_bindgen::JsCast;
+use wavefront_obj::obj;
 use web_sys::{MouseEvent, WheelEvent};
-
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Display, EnumIter, EnumString)]
 pub enum LightType {
@@ -58,7 +59,7 @@ impl Light {
 pub struct ObjectInfo {
     pub name: String,
     pub draw_mode: DrawMode,
-    pub render: bool,
+    pub render_flags: RenderFlags,
 }
 
 impl Default for ObjectInfo {
@@ -66,7 +67,7 @@ impl Default for ObjectInfo {
         Self {
             name: "node".into(),
             draw_mode: DrawMode::Triangle,
-            render: false,
+            render_flags: Default::default(),
         }
     }
 }
@@ -130,7 +131,7 @@ impl Scene {
             let s = self.storage();
             let mut storage = s.borrow_mut();
             let mut info = storage.mut_info(node.index());
-            info.render = true;
+            info.render_flags.render = true;
         }
         for child in node.children() {
             self.show(&child.borrow());
@@ -144,7 +145,7 @@ impl Scene {
             let s = self.storage();
             let mut storage = s.borrow_mut();
             let mut info = storage.mut_info(node.index());
-            info.render = visible;
+            info.render_flags.render = true;
         }
         for child in node.owned_children() {
             self.set_visibility_only(child, visible);
@@ -174,9 +175,23 @@ impl Scene {
         transform: Transform,
         info: ObjectInfo,
     ) -> Node {
-        let vao = renderer.create_vao(&mesh);
-        let index = storage.borrow_mut().add(mesh, vao, transform, info);
-        Node::new(index, storage)
+        let sto = storage.clone();
+        let mut storage = storage.borrow_mut();
+        let index = if let Some(mut mesh) = mesh {
+            let vao = renderer.create_vao(&mesh);
+            let urls = &mesh.material.texture_urls;
+            if urls.len() > 0 {
+                let tex_i = storage.add_texture(
+                    bind_texture(renderer.context(), &urls[0])
+                        .expect("Couldn't bind albedo texture"),
+                );
+                mesh.material.texture_indices.push(tex_i);
+            }
+            storage.add(Some(mesh), Some(vao), transform, info)
+        } else {
+            storage.add(None, None, transform, info)
+        };
+        Node::new(index, sto)
     }
     pub fn light(&self, light_type: LightType, color: [f32; 3], intensity: f32) -> Light {
         let node = rc_rcell(create_light_node(&self, light_type, color));
@@ -189,77 +204,81 @@ impl Scene {
         });
         Light { light_id, node }
     }
-    pub fn empty(&self) -> Node {
-        self.empty_w_name("Empty")
+    pub fn from_mesh(&self, mesh: Option<Mesh>) -> Node {
+        Self::object(
+            self.storage(),
+            &self.renderer.borrow(),
+            mesh,
+            Default::default(),
+            Default::default(),
+        )
     }
-    pub fn empty_w_name(&self, name: &str) -> Node {
+    pub fn empty(&self) -> Node {
         Self::object(
             self.storage(),
             &self.renderer.borrow(),
             None,
             Default::default(),
-            ObjectInfo {
-                name: name.into(),
-                ..Default::default()
-            },
-        )
-    }
-    pub fn object_from_mesh_and_info(&self, mesh: Mesh, info: ObjectInfo) -> Node {
-        Self::object(
-            self.storage(),
-            &self.renderer.borrow(),
-            Some(mesh),
             Default::default(),
-            info,
         )
     }
-    pub fn object_from_mesh_name_and_mode(
-        &self,
-        geometry: Geometry,
-        material: Material,
-        name: &str,
-        draw_mode: DrawMode,
-    ) -> Node {
-        self.object_from_mesh_and_info(
-            Mesh { geometry, material },
-            ObjectInfo {
-                name: name.into(),
-                draw_mode,
-                ..Default::default()
-            },
-        )
-    }
-    pub fn object_from_mesh_and_mode(
-        &self,
-        geometry: Geometry,
-        material: Material,
-        draw_mode: DrawMode,
-    ) -> Node {
-        self.object_from_mesh_and_info(
-            Mesh { geometry, material },
-            ObjectInfo {
-                name: "node".into(),
-                draw_mode,
-                ..Default::default()
-            },
-        )
-    }
-    pub fn object_from_mesh_and_name(
-        &self,
-        geometry: Geometry,
-        material: Material,
-        name: &str,
-    ) -> Node {
-        self.object_from_mesh_and_info(
-            Mesh { geometry, material },
-            ObjectInfo {
-                name: name.into(),
-                ..Default::default()
-            },
-        )
-    }
-    pub fn object_from_mesh(&self, geometry: Geometry, material: Material) -> Node {
-        self.object_from_mesh_and_name(geometry, material, "node")
+    pub fn object_from_obj(&self, src: &str, albedo_src: &str) -> Node {
+        let obj_sets = obj::parse(src).unwrap();
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
+        let mut buf_normals = Vec::new();
+        let mut tex_coords = Vec::new();
+        let object = &obj_sets.objects[0];
+        let name = object.name.clone();
+        for vertex in &object.vertices {
+            vertices.push(vertex.x as f32);
+            vertices.push(vertex.y as f32);
+            vertices.push(vertex.z as f32);
+        }
+        let mut normals: Vec<f32> = vec![0.; vertices.len()];
+        for normal in &object.normals {
+            buf_normals.push(normal.x as f32);
+            buf_normals.push(normal.x as f32);
+            buf_normals.push(normal.x as f32);
+        }
+        for shape in &object.geometry[0].shapes {
+            if let obj::Primitive::Triangle(x, y, z) = shape.primitive {
+                indices.push(x.0 as u16);
+                indices.push(y.0 as u16);
+                indices.push(z.0 as u16);
+                if x.2 != None {
+                    let current_normal = Vector3::new(
+                        buf_normals[x.2.unwrap()],
+                        buf_normals[y.2.unwrap()],
+                        buf_normals[z.2.unwrap()],
+                    );
+                    let new_normal = Vector3::new(
+                        normals[x.2.unwrap()],
+                        normals[y.2.unwrap()],
+                        normals[z.2.unwrap()],
+                    );
+                    let cross = current_normal.cross(&new_normal);
+                    normals.push(cross.x as f32);
+                    normals.push(cross.y as f32);
+                    normals.push(cross.z as f32);
+                } else {
+                    log!("obj file doesn't have normal indices");
+                }
+            }
+        }
+        for tex_coord in &object.tex_vertices {
+            tex_coords.push(tex_coord.u as f32);
+            tex_coords.push(tex_coord.v as f32);
+        }
+        let geometry = Geometry {
+            vertices,
+            indices,
+            normals,
+        };
+        //let mat = Material::new_texture(albedo_src, tex_coords).unwrap();
+        let material = Material::new_color(1., 1., 1., 1.);
+        //let mat = Material::new_wire(1.,1.,1.,1.);
+        node!(&self, Some(Mesh { geometry, material }), name)
     }
     pub fn storage(&self) -> RcRcell<Storage> {
         self.root.borrow().storage()
@@ -271,7 +290,7 @@ impl Scene {
             for each in node.borrow().children() {
                 if let Some(n) = Self::find_node_recursive(each.clone(), name) {
                     return Some(n);
-                }   
+                }
             }
             None
         }

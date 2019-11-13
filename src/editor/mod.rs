@@ -4,7 +4,7 @@ use crate::{
     dom_factory::{
         add_class, add_event, body, create_el, create_el_w_class_n_inner, document, el_innerh,
         get_el, get_parent, get_target_el, get_target_innerh, get_target_parent_el, icon_btn_w_id,
-        query_el, query_els, query_html_el, remove_class, window, insert_el,
+        insert_el, insert_el_at, query_el, query_els, query_html_el, remove_class, window,
     },
     mesh::{Geometry, Material},
     rc_rcell,
@@ -22,13 +22,14 @@ use maud::html;
 use nalgebra::UnitQuaternion;
 use ncollide3d::query::Ray;
 use std::f32::consts::PI;
+use std::rc::Rc;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
 use wasm_bindgen::JsCast;
 use web_sys::{
-    DragEvent, Element, EventTarget, HtmlCanvasElement, HtmlElement, KeyboardEvent, MouseEvent, DataTransfer
+    DataTransfer, DragEvent, Element, EventTarget, HtmlCanvasElement, HtmlElement, KeyboardEvent,
+    MouseEvent,
 };
-use std::rc::Rc;
 
 /// The main GUI editor that faciliates buttons to manipulate the scene, displays log in a separate
 /// window, and displays the scene tree.
@@ -46,15 +47,17 @@ pub enum NodeRef<'a> {
 }
 
 impl Editor {
-    pub fn new(
-        scene: Rc<Scene>,
-    ) -> Self {
-        let grid = scene.object_from_mesh_name_and_mode(
-            Geometry::from_genmesh_no_normals(&Plane::subdivide(100, 100)),
-            Material::new_color_no_shade(0.5, 0.5, 0.5, 1.0),
+    pub fn new(scene: Rc<Scene>) -> Self {
+        let grid = node!(
+            &scene,
+            Some(Mesh::new(
+                Geometry::from_genmesh_no_normals(&Plane::subdivide(100, 100)),
+                Material::new_color_no_shade(0.5, 0.5, 0.5, 1.0),
+            )),
             "Grid",
-            DrawMode::Lines,
+            DrawMode::Lines
         );
+        log!(grid.mesh().unwrap().geometry.indices);
         grid.set_scale(50.0);
         grid.set_rotation(UnitQuaternion::from_euler_angles(PI / 2., 0., 0.));
         let node = create_transform_gizmo(&scene, ArrowTip::Cone);
@@ -69,6 +72,7 @@ impl Editor {
         gizmo.rescale(&scene.view().borrow().transform());
         let gizmo = rc_rcell(gizmo);
         scene.show(&grid);
+        log!(format!("{:?}", grid.info()));
         let active_node = rc_rcell(None);
         body()
             .insert_adjacent_html("beforeend", Self::markup().as_str())
@@ -79,8 +83,7 @@ impl Editor {
             active_node,
             spawn_origin,
         };
-        Self::markup_node(
-            editor.clone(),
+        editor.markup_node(
             &get_el("scene-tree"),
             NodeRef::Mutable(scene.root()),
         );
@@ -97,7 +100,9 @@ impl Editor {
     }
     pub fn set_active_node(&self, node: RcRcell<Node>) {
         *self.active_node.borrow_mut() = Some(node);
-        self.gizmo.borrow().rescale(&self.scene.view().borrow().transform());
+        self.gizmo
+            .borrow()
+            .rescale(&self.scene.view().borrow().transform());
         self.track_gizmo();
     }
     fn markup() -> String {
@@ -189,8 +194,7 @@ impl Editor {
                         Primitive::from_str(&get_target_innerh(&e)).unwrap(),
                     ));
                     node.borrow().copy_location(&editor.spawn_origin.borrow());
-                    Self::markup_node(
-                        editor.clone(),
+                    editor.markup_node(
                         &query_el("#scene-tree > ul"),
                         NodeRef::Mutable(node.clone()),
                     );
@@ -217,8 +221,7 @@ impl Editor {
                         .borrow()
                         .copy_location(&editor.spawn_origin.borrow());
                     scene.add_light(&light);
-                    Self::markup_node(
-                        editor.clone(),
+                    editor.markup_node(
                         &query_el("#scene-tree > ul"),
                         NodeRef::Mutable(light.node().clone()),
                     );
@@ -332,7 +335,7 @@ impl Editor {
             }
         });
     }
-    pub fn markup_node(editor: Self, parent: &Element, node: NodeRef) -> Element {
+    pub fn markup_node(&self, parent: &Element, node: NodeRef) -> Element {
         let p = create_el("p");
         let li = create_el("li");
         insert_el(&li, &p);
@@ -351,16 +354,17 @@ impl Editor {
                 insert_el(&li, &i);
             }
         };
+        let editor = self.clone();
         let recurse_children = |children: &Vec<RcRcell<Node>>, owned_children: &Vec<Node>| {
             for child in children {
                 let child_el =
-                    Self::markup_node(editor.clone(), &ul, NodeRef::Mutable(child.clone()));
+                    editor.markup_node(&ul, NodeRef::Mutable(child.clone()));
                 let li = create_el("li");
                 insert_el(&li, &child_el);
                 insert_el(&ul, &li);
             }
             for child in owned_children {
-                let child_el = Self::markup_node(editor.clone(), &ul, NodeRef::Owned(child));
+                let child_el = editor.markup_node(&ul, NodeRef::Owned(child));
                 Self::handle_node_folding(&child_el);
                 let li = create_el("li");
                 insert_el(&li, &child_el);
@@ -373,12 +377,12 @@ impl Editor {
                 let node = n.borrow();
                 let (children, owned_children) = (node.children(), node.owned_children());
                 add_collapse_icon(children, owned_children);
-                if parent.id().as_str() != "scene-tree" { 
+                if parent.id().as_str() != "scene-tree" {
                     let eyei = create_el_w_class_n_inner("i", "material-icons eye", "visibility");
                     insert_el(&li, &eyei);
                     editor.add_node_events(&ul, n.clone());
                 } else {
-                    Self::handle_node_folding(&ul); 
+                    Self::handle_node_folding(&ul);
                 }
                 editor.add_drag_events(&p);
                 let name = node.info().name;
@@ -455,7 +459,15 @@ impl Editor {
             let dragged_el = query_el("#scene-tree p.dragged-el");
             let dragged_el_name = el_innerh(dragged_el.clone());
             let dragged_parent_el = get_parent(&dragged_el, 4).unwrap();
-            let dragged_parent_name = el_innerh(dragged_parent_el.children().item(0).unwrap().children().item(0).unwrap());
+            let dragged_parent_name = el_innerh(
+                dragged_parent_el
+                    .children()
+                    .item(0)
+                    .unwrap()
+                    .children()
+                    .item(0)
+                    .unwrap(),
+            );
             log!(dragged_parent_name);
             let drop_target_name = get_target_innerh(&e);
             if drop_target_name != dragged_el_name && drop_target_name != dragged_parent_name {
@@ -467,30 +479,21 @@ impl Editor {
                 let target_node = scene.find_node_w_name(&drop_target_name).unwrap();
                 parent_node.borrow_mut().remove(&dragged_el_name);
                 target_node.borrow_mut().add(dragged_node.clone());
-                if dragged_parent_name.as_str() != "root"  {
+                if dragged_parent_name.as_str() != "root" {
                     let li = create_el("li");
                     let g_p_el = get_parent(&dragged_el, 6).unwrap();
-                    Self::markup_node(
-                        a_editor.clone(),
-                        &li,
-                        NodeRef::Mutable(parent_node)
-                    );
+                    a_editor.markup_node(&li, NodeRef::Mutable(parent_node));
                     insert_el(&g_p_el, &li);
                 } else {
                     // this is direct children of root
-                    Self::markup_node(
-                        a_editor.clone(),
+                    a_editor.markup_node(
                         &get_parent(&dragged_el, 5).unwrap(),
-                        NodeRef::Mutable(parent_node)
+                        NodeRef::Mutable(parent_node),
                     );
                 }
                 let li = create_el("li");
-                Self::markup_node(
-                    a_editor.clone(),
-                    &li,
-                    NodeRef::Mutable(dragged_node)
-                );
-                insert_el(&get_target_parent_el(&e,2), &li);
+                a_editor.markup_node(&li, NodeRef::Mutable(dragged_node));
+                insert_el_at(&get_target_parent_el(&e, 1), &li, "afterend");
                 get_parent(&dragged_el, 4).unwrap().remove();
             }
         });

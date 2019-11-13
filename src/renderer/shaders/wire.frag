@@ -3,7 +3,7 @@
 // barycentric coordinates. Please refer to the following url for further details:
 // <http://codeflow.org/entries/2012/aug/02/easy-wireframe-display-with-barycentric-coordinates/>
 precision mediump float;
-in vec4 f_color;
+uniform vec4 color;
 in vec3 frag_bc;
 out vec4 outputColor;
 
@@ -15,10 +15,10 @@ float edgeFactor(){
 
 void main() {
 	if(gl_FrontFacing){
-		outputColor = vec4(f_color.xyz, (1.0-edgeFactor())*0.95);
+		outputColor = vec4(color.xyz, (1.0-edgeFactor())*0.95);
 	}
 	else{
-		outputColor = vec4(f_color.xyz, (1.0-edgeFactor())*0.2);
+		outputColor = vec4(color.xyz, (1.0-edgeFactor())*0.2);
 	}
 
 }

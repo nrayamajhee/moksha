@@ -1,8 +1,11 @@
 use crate::{dom_factory::add_event, rc_rcell};
 use js_sys::{Float32Array, Uint16Array, Uint8Array};
 use nalgebra::Matrix4;
+use std::rc::Rc;
 use wasm_bindgen::JsValue;
-use web_sys::{HtmlImageElement, WebGl2RenderingContext as GL, WebGlProgram, WebGlShader};
+use web_sys::{
+    HtmlImageElement, WebGl2RenderingContext as GL, WebGlProgram, WebGlShader, WebGlTexture,
+};
 
 use strum_macros::{Display, EnumIter};
 
@@ -165,8 +168,7 @@ pub fn link_program(
             .unwrap_or_else(|| String::from("Unknown error creating program object")))
     }
 }
-
-pub fn bind_texture(gl: &GL, url: &str) -> Result<(), JsValue> {
+pub fn bind_texture(gl: &GL, url: &str) -> Result<Rc<WebGlTexture>, JsValue> {
     let texture = gl.create_texture().expect("Can't create texture!");
     gl.bind_texture(GL::TEXTURE_2D, Some(&texture));
     let pixel = unsafe { Uint8Array::view(&[255, 0, 255, 255]) };
@@ -184,11 +186,13 @@ pub fn bind_texture(gl: &GL, url: &str) -> Result<(), JsValue> {
     let image = HtmlImageElement::new().expect("Can't create Image Element");
     let img = rc_rcell(image);
     let a_img = img.clone();
+    let texture = Rc::new(texture);
+    let tex = texture.clone();
     // couldn't avoid this
     let gl = gl.clone();
     add_event(&img.borrow(), "load", move |_| {
         let image = a_img.borrow();
-        gl.bind_texture(GL::TEXTURE_2D, Some(&texture));
+        gl.bind_texture(GL::TEXTURE_2D, Some(&tex));
         gl.tex_image_2d_with_u32_and_u32_and_html_image_element(
             GL::TEXTURE_2D,
             0,
@@ -201,7 +205,7 @@ pub fn bind_texture(gl: &GL, url: &str) -> Result<(), JsValue> {
         gl.generate_mipmap(GL::TEXTURE_2D);
     });
     img.borrow_mut().set_src(url);
-    Ok(())
+    Ok(texture)
 }
 pub fn bind_attribute(gl: &GL, program: &WebGlProgram, name: &str, size: i32) {
     let attribute = gl.get_attrib_location(program, name);

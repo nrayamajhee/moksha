@@ -1,12 +1,12 @@
-use crate::{Node, Viewport, RcRcell};
+use crate::{Node, RcRcell, Viewport};
 use nalgebra::{Isometry3, Vector3};
 use ncollide3d::{
     query::Ray,
     query::RayCast,
     shape::{Ball, Plane as CollidePlane},
 };
-use strum_macros::{Display, EnumIter, EnumString};
 use std::str::FromStr;
+use strum_macros::{Display, EnumIter, EnumString};
 #[derive(Copy, Clone, Debug, PartialEq, Display, EnumIter, EnumString)]
 pub enum CollisionConstraint {
     XAxis,
@@ -40,11 +40,17 @@ impl Gizmo {
     }
     pub fn apply_target_transform(&self, target: &Node) {
         // don't apply target's scale
-        self.node.set_parent_transform((target.parent_transform() * target.transform()).isometry.into());
-        self.node.apply_parent_transform(self.node.parent_transform() * self.node.transform());
+        self.node.set_parent_transform(
+            (target.parent_transform() * target.transform())
+                .isometry
+                .into(),
+        );
+        self.node
+            .apply_parent_transform(self.node.parent_transform() * self.node.transform());
     }
     pub fn rescale(&self, transform: &Isometry3<f32>) {
-        self.node.set_scale(transform.translation.vector.magnitude() / 30.);
+        self.node
+            .set_scale(transform.translation.vector.magnitude() / 30.);
     }
     pub fn collision_constraint(&self) -> CollisionConstraint {
         self.collision_constraint
@@ -54,9 +60,11 @@ impl Gizmo {
         let gizmo_node_t = self.node.transform().isometry;
         // if the central white ball is clicked
         if target.intersects_ray(&gizmo_node_t, ray) {
-            self.transform =
-                Isometry3::from_parts(gizmo_node_t.translation, view.transform().inverse().rotation);
-            self.offset = Vector3::new(0.,0.,0.);
+            self.transform = Isometry3::from_parts(
+                gizmo_node_t.translation,
+                view.transform().inverse().rotation,
+            );
+            self.offset = Vector3::new(0., 0., 0.);
             self.collision_constraint = CollisionConstraint::ViewPlane;
             self.node().change_color([1., 1., 1.]);
             return true;
@@ -68,7 +76,7 @@ impl Gizmo {
                 "XAxis" | "XPlane" => [1., 0., 0.],
                 "YAxis" | "YPlane" => [0., 1., 0.],
                 "ZAxis" | "ZPlane" => [0., 0., 1.],
-                _=>[0.,0.,0.],
+                _ => [0., 0., 0.],
             };
             let constraint = CollisionConstraint::from_str(&child.info().name).unwrap();
             let t = if !g_c.is_empty() {
