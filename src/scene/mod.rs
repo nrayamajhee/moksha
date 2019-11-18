@@ -20,7 +20,7 @@ use crate::{
 use nalgebra::Vector3;
 use strum_macros::{Display, EnumIter, EnumString};
 use wasm_bindgen::JsCast;
-use wavefront_obj::obj;
+use wavefront_obj::{mtl, obj};
 use web_sys::{MouseEvent, WheelEvent};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Display, EnumIter, EnumString)]
@@ -222,63 +222,124 @@ impl Scene {
             Default::default(),
         )
     }
-    pub fn object_from_obj(&self, src: &str, albedo_src: &str) -> Node {
-        let obj_sets = obj::parse(src).unwrap();
+    pub fn load_object_from_obj(
+        &self,
+        path: &str,
+        object: &obj::Object,
+        mat_set: &Option<mtl::MtlSet>,
+    ) -> Node {
         let mut vertices = Vec::new();
-        let mut indices = Vec::new();
-        let mut buf_normals = Vec::new();
-        let mut tex_coords = Vec::new();
-        let object = &obj_sets.objects[0];
-        let name = object.name.clone();
         for vertex in &object.vertices {
             vertices.push(vertex.x as f32);
             vertices.push(vertex.y as f32);
             vertices.push(vertex.z as f32);
         }
+        let mut indices = Vec::new();
         let mut normals: Vec<f32> = vec![0.; vertices.len()];
-        for normal in &object.normals {
-            buf_normals.push(normal.x as f32);
-            buf_normals.push(normal.x as f32);
-            buf_normals.push(normal.x as f32);
-        }
+        let mut tex_coords: Vec<f32> = vec![-1.; vertices.len() / 3 * 2];
+        let push_normals = |normals: &mut Vec<f32>, e: usize, ne: usize| {
+            let current_normal = Vector3::new(normals[e], normals[e + 1], normals[e + 2]);
+            let new_normal = Vector3::new(
+                object.normals[ne].x as f32,
+                object.normals[ne].y as f32,
+                object.normals[ne].z as f32,
+            )
+            .normalize();
+            let avg_normal = if current_normal.magnitude() == 1. {
+                ((new_normal + current_normal) * 0.5).normalize()
+            } else {
+                new_normal
+            };
+            normals[e] = avg_normal.x;
+            normals[e + 1] = avg_normal.y;
+            normals[e + 2] = avg_normal.z;
+        };
+        let mut flat = false;
         for shape in &object.geometry[0].shapes {
-            if let obj::Primitive::Triangle(x, y, z) = shape.primitive {
-                indices.push(x.0 as u16);
-                indices.push(y.0 as u16);
-                indices.push(z.0 as u16);
-                if x.2 != None {
-                    let current_normal = Vector3::new(
-                        buf_normals[x.2.unwrap()],
-                        buf_normals[y.2.unwrap()],
-                        buf_normals[z.2.unwrap()],
-                    );
-                    let new_normal = Vector3::new(
-                        normals[x.2.unwrap()],
-                        normals[y.2.unwrap()],
-                        normals[z.2.unwrap()],
-                    );
-                    let cross = current_normal.cross(&new_normal);
-                    normals.push(cross.x as f32);
-                    normals.push(cross.y as f32);
-                    normals.push(cross.z as f32);
+            if shape.smoothing_groups.is_empty() {
+                flat = true;
+            }
+            if let obj::Primitive::Triangle(a, b, c) = shape.primitive {
+                if a.1 != None && a.2 != None {
+                    for ((a, ua), na) in [a.0, b.0, c.0]
+                        .iter()
+                        .zip([a.1.unwrap(), b.1.unwrap(), c.1.unwrap()].iter())
+                        .zip([a.2.unwrap(), b.2.unwrap(), c.2.unwrap()].iter())
+                    {
+                        let (e, ue, ne) = (*a * 3, *ua, *na);
+                        push_normals(&mut normals, e, ne);
+                        let u = object.tex_vertices[ue].u as f32;
+                        let v = -object.tex_vertices[ue].v as f32;
+
+                        let current_tex = tex_coords[*a * 2];
+                        let duplicate_v = current_tex != -1. && current_tex != u;
+                        let current_tex = tex_coords[*a * 2 + 1];
+                        let duplicate_u = current_tex != -1. && current_tex != v;
+                        if duplicate_u || duplicate_v {
+                            indices.push((vertices.len() / 3) as u16);
+                            vertices.push(vertices[e]);
+                            vertices.push(vertices[e + 1]);
+                            vertices.push(vertices[e + 2]);
+                            normals.push(normals[e]);
+                            normals.push(normals[e + 1]);
+                            normals.push(normals[e + 2]);
+                            tex_coords.push(u);
+                            tex_coords.push(v);
+                        } else {
+                            indices.push(*a as u16);
+                            tex_coords[*a * 2] = u;
+                            tex_coords[*a * 2 + 1] = v;
+                        }
+                    }
                 } else {
-                    log!("obj file doesn't have normal indices");
+                    log!("obj file doesn't have normal or uv indices. Only vertices are loaded");
                 }
             }
-        }
-        for tex_coord in &object.tex_vertices {
-            tex_coords.push(tex_coord.u as f32);
-            tex_coords.push(tex_coord.v as f32);
         }
         let geometry = Geometry {
             vertices,
             indices,
             normals,
+        }; 
+        let mut material = Material::new_color(1., 1., 1., 1.);
+        if let Some(material_name) = &object.geometry[0].material_name  {
+            if let Some(mat_set) = mat_set {
+                for each in &mat_set.materials {
+                    if &each.name == material_name {
+                        material = if let Some(src) = &each.uv_map {
+                            Material::new_texture(&format!("{}/{}",path,src), tex_coords).unwrap()
+                        } else {
+                            let c = each.color_diffuse;
+                            log!("Color" c);
+                            Material::new_color(c.r as f32,c.g as f32,c.b as f32,1.0)
+                        };
+                        if flat {
+                            material = material.flat();
+                        }
+                        break;
+                    }
+                };
+            }
+        }
+        node!(
+            &self,
+            Some(Mesh { geometry, material }),
+            object.name.clone()
+        )
+    }
+    pub fn object_from_obj(&self, path: &str, obj_src: &str, mtl_src: Option<&str>) -> Node {
+        let obj_set = obj::parse(obj_src).unwrap();
+        assert!(!obj_set.objects.is_empty(), "No objects in the obj file");
+        let mat_set = if let Some(src) = mtl_src {
+            Some(mtl::parse(src).unwrap())
+        } else {
+            None
         };
-        //let mat = Material::new_texture(albedo_src, tex_coords).unwrap();
-        let material = Material::new_color(1., 1., 1., 1.);
-        //let mat = Material::new_wire(1.,1.,1.,1.);
-        node!(&self, Some(Mesh { geometry, material }), name)
+        let mut root = self.load_object_from_obj(path, &obj_set.objects[0], &mat_set);
+        for object in obj_set.objects {
+            root.add(rc_rcell(self.load_object_from_obj(path, &object, &mat_set)));
+        }
+        root
     }
     pub fn storage(&self) -> RcRcell<Storage> {
         self.root.borrow().storage()

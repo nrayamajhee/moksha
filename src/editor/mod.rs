@@ -57,7 +57,6 @@ impl Editor {
             "Grid",
             DrawMode::Lines
         );
-        log!(grid.mesh().unwrap().geometry.indices);
         grid.set_scale(50.0);
         grid.set_rotation(UnitQuaternion::from_euler_angles(PI / 2., 0., 0.));
         let node = create_transform_gizmo(&scene, ArrowTip::Cone);
@@ -72,7 +71,6 @@ impl Editor {
         gizmo.rescale(&scene.view().borrow().transform());
         let gizmo = rc_rcell(gizmo);
         scene.show(&grid);
-        log!(format!("{:?}", grid.info()));
         let active_node = rc_rcell(None);
         body()
             .insert_adjacent_html("beforeend", Self::markup().as_str())
@@ -83,10 +81,7 @@ impl Editor {
             active_node,
             spawn_origin,
         };
-        editor.markup_node(
-            &get_el("scene-tree"),
-            NodeRef::Mutable(scene.root()),
-        );
+        editor.markup_node(&get_el("scene-tree"), NodeRef::Mutable(scene.root()));
         editor.add_events();
         editor
     }
@@ -357,8 +352,7 @@ impl Editor {
         let editor = self.clone();
         let recurse_children = |children: &Vec<RcRcell<Node>>, owned_children: &Vec<Node>| {
             for child in children {
-                let child_el =
-                    editor.markup_node(&ul, NodeRef::Mutable(child.clone()));
+                let child_el = editor.markup_node(&ul, NodeRef::Mutable(child.clone()));
                 let li = create_el("li");
                 insert_el(&li, &child_el);
                 insert_el(&ul, &li);
@@ -473,7 +467,7 @@ impl Editor {
             if drop_target_name != dragged_el_name && drop_target_name != dragged_parent_name {
                 log!("Dropping");
                 let scene = &a_editor.scene;
-                log!(dragged_el_name, dragged_parent_name, drop_target_name);
+                log!(dragged_el_name dragged_parent_name drop_target_name);
                 let dragged_node = scene.find_node_w_name(&dragged_el_name).unwrap();
                 let parent_node = scene.find_node_w_name(&dragged_parent_name).unwrap();
                 let target_node = scene.find_node_w_name(&drop_target_name).unwrap();

@@ -216,6 +216,10 @@ impl Material {
         self.color = Some([r, g, b, a]);
         self
     }
+    pub fn flat(mut self) -> Self {
+        self.flat_shade = true;
+        self
+    }
     pub fn shader_type(mut self, shader: ShaderType) -> Self {
         self.shader_type = shader;
         self

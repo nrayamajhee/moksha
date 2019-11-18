@@ -203,6 +203,7 @@ pub fn bind_texture(gl: &GL, url: &str) -> Result<Rc<WebGlTexture>, JsValue> {
         )
         .expect("Couldn't bind image as texture!");
         gl.generate_mipmap(GL::TEXTURE_2D);
+        //gl.tex_parameteri(GL::TEXTURE_2D, GL::TEXTURE_MAG_FILTER as u32, GL::NEARESR as i32);
     });
     img.borrow_mut().set_src(url);
     Ok(texture)

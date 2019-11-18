@@ -5,7 +5,7 @@
 
 #[macro_export]
 macro_rules! log {
-    ($($x:expr),*) => {
+    ($($x:expr) *) => {
         {
             let document = crate::dom_factory::document();
             let console_el = document.get_element_by_id("console");

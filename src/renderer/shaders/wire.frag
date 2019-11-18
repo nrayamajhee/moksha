@@ -18,7 +18,7 @@ void main() {
 		outputColor = vec4(color.xyz, (1.0-edgeFactor())*0.95);
 	}
 	else{
-		outputColor = vec4(color.xyz, (1.0-edgeFactor())*0.2);
+		outputColor = vec4(color.xyz, (1.0-edgeFactor())*0.5);
 	}
 
 }

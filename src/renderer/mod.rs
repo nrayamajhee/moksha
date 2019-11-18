@@ -73,7 +73,7 @@ impl RenderFlags {
     pub fn wire() -> Self {
         Self {
             blend: true,
-            depth: false,
+            depth: true,
             cull_face: false,
             ..Default::default()
         }
@@ -451,20 +451,40 @@ impl Renderer {
             let indices = &mesh.geometry.indices;
             bind_index_buffer(gl, &indices).expect("Can't bind index buffer!");
 
-            Self::set_flags(&gl, info.render_flags);
             if shader_type == ShaderType::Wireframe {
-                gl.draw_arrays(GL::TRIANGLES, 0, indices.len() as i32);
-            } else if mesh.material.wire_overlay {
-                gl.draw_arrays(GL::TRIANGLES, 0, indices.len() as i32);
-            } else if info.draw_mode == DrawMode::Lines {
-                gl.draw_elements_with_i32(GL::LINES, indices.len() as i32, GL::UNSIGNED_SHORT, 0);
+                gl.enable(GL::SAMPLE_ALPHA_TO_COVERAGE);
             } else {
-                gl.draw_elements_with_i32(
-                    GL::TRIANGLES,
-                    indices.len() as i32,
-                    GL::UNSIGNED_SHORT,
-                    0,
-                );
+                gl.disable(GL::SAMPLE_ALPHA_TO_COVERAGE);
+            }
+            Self::set_flags(&gl, info.render_flags);
+            match info.draw_mode {
+                DrawMode::Arrays => {
+                    gl.draw_arrays(GL::TRIANGLES, 0, indices.len() as i32);
+                }
+                DrawMode::Lines => {
+                    gl.draw_elements_with_i32(
+                        GL::LINES,
+                        indices.len() as i32,
+                        GL::UNSIGNED_SHORT,
+                        0,
+                    );
+                }
+                DrawMode::Points => {
+                    gl.draw_elements_with_i32(
+                        GL::POINTS,
+                        indices.len() as i32,
+                        GL::UNSIGNED_SHORT,
+                        0,
+                    );
+                }
+                DrawMode::Triangle => {
+                    gl.draw_elements_with_i32(
+                        GL::TRIANGLES,
+                        indices.len() as i32,
+                        GL::UNSIGNED_SHORT,
+                        0,
+                    );
+                }
             }
         }
     }

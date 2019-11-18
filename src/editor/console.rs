@@ -92,14 +92,14 @@ pub fn toggle_console(show: bool, history: bool) {
             if show {
                 if history {
                     push_history("console").unwrap_or_else(|err| {
-                        log!("Couldn't modify history: ", err);
+                        log!("Couldn't modify history: " err);
                     });
                 }
                 el.class_list().add_1("shown").unwrap();
             } else {
                 if history {
                     replace_history("").unwrap_or_else(|err| {
-                        log!("Couldn't modify history: ", err);
+                        log!("Couldn't modify history: " err);
                     });
                 }
                 el.class_list().remove_1("shown").unwrap();

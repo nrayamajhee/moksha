@@ -55,15 +55,6 @@ fn cube(scene: &Scene, renderer: &Renderer) -> Node {
     cube
 }
 
-fn gen_sphere_uv(geometry: &Geometry) -> Vec<f32> {
-    let mut uvs = Vec::new();
-    for each in geometry.vertices.chunks(3) {
-        uvs.push(0.5 + f32::atan2(each[1], each[0]) / (2. * PI));
-        uvs.push(0.5 - f32::asin(each[2]) / PI);
-    }
-    uvs
-}
-
 /// The main entrypoint that is automatically executed on page load.
 #[wasm_bindgen(start)]
 #[allow(dead_code)]
@@ -89,8 +80,7 @@ pub fn start() -> Result<(), JsValue> {
     let a_rndr = rc_rcell(renderer);
     let a_view = rc_rcell(viewport);
     let scene = Scene::new(a_rndr.clone(), a_view.clone());
-
-    let (sun, _earth, _moon) = {
+    let (sun, _earth) = {
         //let scene = a_scene.borrow();
         let renderer = a_rndr.borrow();
         //let viewport = a_view.borrow();
@@ -110,40 +100,29 @@ pub fn start() -> Result<(), JsValue> {
                 Geometry::from_genmesh(&SphereUv::new(16, 8)),
                 Material::new_color(0.0, 0.0, 1.0, 1.0).wire_overlay(),
             )),
+            DrawMode::Arrays,
             "Earth"
         );
-        //let geo = Geometry::from_genmesh(&SphereUv::new(8, 4));
-        //let tex = Material::new_texture("/assets/img/earth.jpg", gen_sphere_uv(&geo))
-        //.expect("Couldn't load texture");
-        //let mesh = Mesh::new(geo, tex);
-        //let mut earth = node!(scene, mesh, "Earth");
-        //let mut earth = scene.object_from_obj(
-        //include_str!("assets/obj/earth.obj"),
-        //"/assets/img/earth.jpg",
-        //);
-        let mut moon = node!(
-            scene,
-            Some(Mesh::new(
-                Geometry::from_genmesh(&IcoSphere::subdivide(2)),
-                Material::new_color(1.0, 1.0, 1.0, 1.0),
-            )),
-            "Moon"
-        );
+        //let mut geometry = Geometry::from_genmesh(&SphereUv::new(64, 32));
+        //let material =
+            //Material::new_texture("assets/img/moon.jpg", gen_sphere_uv(&mut geometry)).unwrap();
+        //let mut moon = node!(scene, Some(Mesh { geometry, material }), "Moon");
+        //moon.rotate_by(UnitQuaternion::from_euler_angles(PI / 2., 0., 0.));
 
         let cube = rc_rcell(cube(&scene, &a_rndr.borrow()));
-        moon.add(cube);
-        moon.set_position(6.0, 0.0, 0.0);
+        //moon.add(cube);
+        //moon.set_position(6.0, 0.0, 0.0);
         earth.set_position(10.0, 0.0, 0.0);
         earth.set_scale(0.5);
-        moon.set_scale(0.5);
+        //moon.set_scale(0.5);
         sun.set_scale(2.0);
 
-        let moon = rc_rcell(moon);
-        earth.add(moon.clone());
+        //let moon = rc_rcell(moon);
+        //earth.add(moon.clone());
         let earth = rc_rcell(earth);
         sun.add(earth.clone());
         let sun = rc_rcell(sun);
-        (sun, earth, moon)
+        (sun, earth)
     };
 
     let ambient = scene.light(LightType::Ambient, [1.0, 1.0, 1.0], 0.1);
@@ -162,7 +141,7 @@ pub fn start() -> Result<(), JsValue> {
     //let point2_node = point2.node();
     //point2_node.borrow().set_position(15., 0., -10.);
 
-    let directional = scene.light(LightType::Directional, [1., 1., 1.], 2.0);
+    let directional = scene.light(LightType::Directional, [1., 1., 1.], 1.0);
     let dir_node = directional.node();
     dir_node.borrow().set_position(30., 0., -10.);
 
@@ -171,16 +150,24 @@ pub fn start() -> Result<(), JsValue> {
     ////scene.add_light(point2);
     ////scene.add_light(point);
     scene.add_light(&directional);
-    //scene.add_light(spot);
 
     //_earth.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.02, 0.));
 
+    let path = "assets/obj/earth/earth.obj";
+    let obj = rc_rcell(scene.object_from_obj(
+        "assets/obj/earth",
+        include_str!("assets/obj/earth/earth.obj"),
+        Some(include_str!("assets/obj/earth/earth.mtl")),
+    ));
+    scene.add(obj.clone());
     let a_scene = Rc::new(scene);
     let mut editor = Editor::new(a_scene.clone());
-    editor.set_active_node(_earth);
+    obj.borrow().set_position(28., 0., 0.);
+
+    editor.set_active_node(obj);
     let a_editor = rc_rcell(editor);
-    sun.borrow()
-        .rotate_by(UnitQuaternion::from_euler_angles(0., PI / 3., 0.));
+    //sun.borrow()
+    //.rotate_by(UnitQuaternion::from_euler_angles(0., PI / 3., 0.));
     loop_animation_frame(move || {
         {
             //a_earth.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.02, 0.));
