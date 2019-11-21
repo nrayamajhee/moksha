@@ -1,8 +1,9 @@
 use crate::{
     mesh::{Geometry, Material},
-    renderer::DrawMode,
+    node,
+    renderer::RenderFlags,
     scene::{LightType, Node, Scene},
-    Mesh,
+    Mesh, ObjectInfo,
 };
 use genmesh::generators::{Circle, Cone, Cube, Cylinder, IcoSphere, Plane, SphereUv, Torus};
 use nalgebra::UnitQuaternion;
@@ -50,6 +51,7 @@ pub fn create_arrow(
     arrow_type: ArrowTip,
     name: &str,
     has_stem: bool,
+    depthless: bool,
 ) -> Node {
     let mut node = node!(scene, None, String::from(name));
     if has_stem {
@@ -59,57 +61,37 @@ pub fn create_arrow(
                 Geometry::from_genmesh_no_normals(&Cylinder::subdivide(8, 1)),
                 Material::new_color_no_shade(color[0], color[1], color[2], color[3]),
             )),
-            "Arrow Stem",
-            RenderFlags::no_depth()
+            "Arrow Stem"
         );
-        stem.set_scale_vec(0.2, 0.2, 3.);
+        if depthless {
+            let mut info = stem.info();
+            info.render_flags = RenderFlags::no_depth();
+            stem.set_info(info);
+        }
+        stem.set_scale_vec(0.2, 0.2, 5.);
         node.own(stem);
     }
-    let head = match arrow_type {
-        ArrowTip::Cone => {
-            let head = node!(
-                scene,
-                Some(Mesh::new(
-                    Geometry::from_genmesh(&Cone::new(8)),
-                    Material::new_color_no_shade(color[0], color[1], color[2], color[3]),
-                )),
-                "Arrow Head",
-                RenderFlags::no_depth()
-            );
-            head.set_scale(0.5);
-            Some(head)
-        }
-        ArrowTip::Cube => {
-            let head = node!(
-                scene,
-                Some(Mesh::new(
-                    Geometry::from_genmesh_no_normals(&Cube::new()),
-                    Material::new_color_no_shade(color[0], color[1], color[2], color[3]),
-                )),
-                "Arrow Head",
-                RenderFlags::no_depth()
-            );
-            head.set_scale(0.4);
-            Some(head)
-        }
-        ArrowTip::Sphere => {
-            let head = node!(
-                scene,
-                Some(Mesh::new(
-                    Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(1)),
-                    Material::new_color_no_shade(color[0], color[1], color[2], color[3]),
-                )),
-                "Arrow Head",
-                RenderFlags::no_depth()
-            );
-            head.set_scale(0.8);
-            Some(head)
-        }
+    let head_geo = match arrow_type {
+        ArrowTip::Cone => Some(Geometry::from_genmesh(&Cone::new(8))),
+        ArrowTip::Cube => Some(Geometry::from_genmesh_no_normals(&Cube::new())),
+        ArrowTip::Sphere => Some(Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(1))),
         ArrowTip::None => None,
     };
-    if let Some(head) = head {
-        if has_stem {
-            head.set_position(0., 0., 3.);
+    if let Some(head_geo) = head_geo {
+        let head = node!(
+            scene,
+            Some(Mesh::new(
+                head_geo,
+                Material::new_color_no_shade(color[0], color[1], color[2], color[3]),
+            )),
+            "Arrow Head"
+        );
+        head.set_scale(0.8);
+        head.set_position(0., 0., 5.);
+        if depthless {
+            let mut info = head.info();
+            info.render_flags = RenderFlags::no_depth();
+            head.set_info(info);
         }
         node.own(head);
     }
@@ -125,7 +107,7 @@ pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) 
                 Material::new_wire(color[0], color[1], color[2], 1.),
             )),
             light_type.to_string(),
-            RenderFlags::wire(),
+            RenderFlags::blend_cull(),
             DrawMode::Arrays
         ),
         LightType::Point => {
@@ -165,8 +147,8 @@ pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) 
             cube.set_position(0., 0., -1.);
             n.own(cube);
             for i in 0..5 {
-                let ray = create_arrow(scene, [1., 1., 0., 1.], ArrowTip::Cone, "ray", true);
-                ray.set_scale(0.25);
+                let ray = create_arrow(scene, [1., 1., 0., 1.], ArrowTip::Cone, "ray", true, false);
+                ray.set_scale(0.1);
                 match i % 5 {
                     0 => {
                         ray.set_position(0.5, 0., 0.);
@@ -196,9 +178,9 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowTip) -> Node {
         ArrowTip::Cube => "scale",
         ArrowTip::None => "",
     };
-    let x = create_arrow(scene, [0.8, 0., 0., 1.], arrow_type, "XAxis", true);
-    let y = create_arrow(scene, [0., 0.8, 0., 1.], arrow_type, "YAxis", true);
-    let z = create_arrow(scene, [0., 0., 0.8, 1.], arrow_type, "ZAxis", true);
+    let x = create_arrow(scene, [0.8, 0., 0., 1.], arrow_type, "XAxis", true, true);
+    let y = create_arrow(scene, [0., 0.8, 0., 1.], arrow_type, "YAxis", true, true);
+    let z = create_arrow(scene, [0., 0., 0.8, 1.], arrow_type, "ZAxis", true, true);
     let mut node = node!(
         scene,
         Some(Mesh::new(
@@ -235,15 +217,15 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowTip) -> Node {
         "ZPlane",
         RenderFlags::no_depth()
     );
-    x.set_position(3., 0., 0.);
-    y.set_position(0., 3., 0.);
-    z.set_position(0., 0., 3.);
+    x.set_position(5., 0., 0.);
+    y.set_position(0., 5., 0.);
+    z.set_position(0., 0., 5.);
     x.rotate_by(UnitQuaternion::from_euler_angles(0.0, PI / 2., 0.0));
     y.rotate_by(UnitQuaternion::from_euler_angles(-PI / 2., 0.0, 0.0));
     z.rotate_by(UnitQuaternion::from_euler_angles(0.0, 0.0, PI / 2.));
-    x_p.set_position(0., 3., 3.);
-    y_p.set_position(3., 0., 3.);
-    z_p.set_position(3., 3., 0.);
+    x_p.set_position(0., 5., 5.);
+    y_p.set_position(5., 0., 5.);
+    z_p.set_position(5., 5., 0.);
     x_p.set_scale_vec(0.2, 1., 1.);
     y_p.set_scale_vec(1., 0.2, 1.);
     z_p.set_scale_vec(1., 1., 0.2);
@@ -254,9 +236,9 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowTip) -> Node {
     node.own(y_p);
     node.own(z_p);
     if arrow_type == ArrowTip::Sphere {
-        let n_x = create_arrow(scene, [1.0, 0.0, 0.0, 1.0], arrow_type, "snap-x", false);
-        let n_y = create_arrow(scene, [0.0, 1.0, 0.0, 1.0], arrow_type, "snap-y", false);
-        let n_z = create_arrow(scene, [0.0, 0.0, 1.0, 1.0], arrow_type, "snap-z", false);
+        let n_x = create_arrow(scene, [1.0, 0.0, 0.0, 1.0], arrow_type, "snap-x", false, true);
+        let n_y = create_arrow(scene, [0.0, 1.0, 0.0, 1.0], arrow_type, "snap-y", false, true);
+        let n_z = create_arrow(scene, [0.0, 0.0, 1.0, 1.0], arrow_type, "snap-z", false, true);
         n_x.set_position(6., 0., 0.);
         n_y.set_position(0., -6., 0.);
         n_z.set_position(0., 0., -6.);
@@ -268,12 +250,15 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowTip) -> Node {
 }
 
 pub fn create_origin(scene: &Scene) -> Node {
-    let x = create_arrow(scene, [1., 0., 0., 1.], ArrowTip::None, "XAxis", true);
-    let y = create_arrow(scene, [0., 1., 0., 1.], ArrowTip::None, "YAxis", true);
-    let z = create_arrow(scene, [0., 0., 1., 1.], ArrowTip::None, "ZAxis", true);
+    let x = create_arrow(scene, [1., 0., 0., 1.], ArrowTip::None, "XAxis", true, true);
+    let y = create_arrow(scene, [0., 1., 0., 1.], ArrowTip::None, "YAxis", true, true);
+    let z = create_arrow(scene, [0., 0., 1., 1.], ArrowTip::None, "ZAxis", true, true);
     x.rotate_by(UnitQuaternion::from_euler_angles(0.0, PI / 2., 0.0));
     y.rotate_by(UnitQuaternion::from_euler_angles(-PI / 2., 0.0, 0.0));
     z.rotate_by(UnitQuaternion::from_euler_angles(0.0, 0.0, PI / 2.));
+    x.set_scale(0.5);
+    y.set_scale(0.5);
+    z.set_scale(0.5);
     let mut center = node!(
         scene,
         Some(Mesh::new(
@@ -302,7 +287,7 @@ pub fn create_primitive_node(scene: &Scene, primitive: Primitive) -> Node {
         Primitive::Empty => Geometry::default(),
     };
     match primitive {
-        Primitive::Empty => scene.empty(),
+        Primitive::Empty => scene.empty("Empty"),
         _ => node!(
             scene,
             Some(Mesh::new(geo, Material::new_color(1.0, 1.0, 1.0, 1.0),)),

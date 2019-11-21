@@ -65,50 +65,6 @@ pub fn create_vertex_color_program(gl: &GL) -> Result<WebGlProgram, String> {
     Ok(shader)
 }
 
-pub fn create_texture_program(gl: &GL) -> Result<WebGlProgram, String> {
-    let shader = create_program(
-        gl,
-        r#" #version 300 es
-            in vec4 position;
-            in vec3 normal;
-            in vec2 texCoord;
-
-            uniform mat4 model, view, proj, inv_transpose;
-
-            out vec2 f_texCoord;
-			out vec3 lighting;
-
-            void main() {
-                gl_Position = proj * view * model * position;
-                f_texCoord = texCoord;
-
-				vec3 ambientLight = vec3(0.1, 0.1, 0.1);
-				vec3 directionalLightColor = vec3(1, 1, 1);
-				vec3 directionalVector = normalize(vec3(0., 0., 5.0));
-
-				vec4 transformedNormal = inv_transpose * vec4(normal, 1.0);
-
-				float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
-				lighting = ambientLight + directionalLightColor * directional;
-            }
-        "#,
-        r#" #version 300 es
-            precision mediump float;
-            in vec2 f_texCoord;
-			in vec3 lighting;
-
-			uniform sampler2D sampler;
-            out vec4 outputColor;
-
-            void main() {
-				vec4 texelColor = texture(sampler, f_texCoord);
-				outputColor = vec4(texelColor.rgb * lighting, texelColor.a);
-            }
-        "#,
-    )?;
-    Ok(shader)
-}
-
 pub fn compile_shader(gl: &GL, shader_type: u32, source: &str) -> Result<WebGlShader, String> {
     let shader = gl
         .create_shader(shader_type)

@@ -2,7 +2,7 @@ use crate::{
     controller::ProjectionConfig,
     dom_factory::{document, loop_animation_frame},
     editor::{console_setup, ConsoleConfig},
-    rc_rcell,
+    node, rc_rcell, node_from_obj,
     renderer::{Renderer, RendererConfig},
     scene::LightType,
     Editor, Geometry, Material, Mesh, Node, Scene, Viewport,
@@ -41,8 +41,7 @@ fn cube(scene: &Scene, renderer: &Renderer) -> Node {
         0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Left
         0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
     ];
-    let cube_tex = Material::new_texture("/assets/img/box_tex.png", tex_coords)
-        .expect("Couldn't load texture");
+    let cube_tex = Material::new_texture("/assets/img/box_tex.png", tex_coords);
     let cube_mesh = Mesh::new(cube_geometry.clone(), cube_tex);
     let mut cube = node!(scene, Some(cube_mesh), "Wooden Cube");
     let mesh = Mesh::new(cube_geometry, Material::vertex_colors(colors));
@@ -57,7 +56,6 @@ fn cube(scene: &Scene, renderer: &Renderer) -> Node {
 
 /// The main entrypoint that is automatically executed on page load.
 #[wasm_bindgen(start)]
-#[allow(dead_code)]
 pub fn start() -> Result<(), JsValue> {
     document().set_title("Editor | Moksha");
     console_setup(ConsoleConfig {
@@ -105,7 +103,7 @@ pub fn start() -> Result<(), JsValue> {
         );
         //let mut geometry = Geometry::from_genmesh(&SphereUv::new(64, 32));
         //let material =
-            //Material::new_texture("assets/img/moon.jpg", gen_sphere_uv(&mut geometry)).unwrap();
+        //Material::new_texture("assets/img/moon.jpg", gen_sphere_uv(&mut geometry)).unwrap();
         //let mut moon = node!(scene, Some(Mesh { geometry, material }), "Moon");
         //moon.rotate_by(UnitQuaternion::from_euler_angles(PI / 2., 0., 0.));
 
@@ -153,18 +151,15 @@ pub fn start() -> Result<(), JsValue> {
 
     //_earth.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.02, 0.));
 
-    let path = "assets/obj/earth/earth.obj";
-    let obj = rc_rcell(scene.object_from_obj(
-        "assets/obj/earth",
-        include_str!("assets/obj/earth/earth.obj"),
-        Some(include_str!("assets/obj/earth/earth.mtl")),
-    ));
+    let obj = rc_rcell(
+        node_from_obj!(scene, "assets/obj/earth", "earth")
+    );
+    obj.borrow().set_position(28., 0., 0.);
     scene.add(obj.clone());
     let a_scene = Rc::new(scene);
     let mut editor = Editor::new(a_scene.clone());
-    obj.borrow().set_position(28., 0., 0.);
 
-    editor.set_active_node(obj);
+    editor.set_active_node(obj.clone());
     let a_editor = rc_rcell(editor);
     //sun.borrow()
     //.rotate_by(UnitQuaternion::from_euler_angles(0., PI / 3., 0.));
@@ -174,7 +169,7 @@ pub fn start() -> Result<(), JsValue> {
             //sun.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.01, 0.));
         }
         {
-            a_editor.borrow().track_gizmo();
+            //a_editor.borrow().track_gizmo();
             a_rndr.borrow_mut().render(&a_scene, &a_view.borrow());
         }
     });

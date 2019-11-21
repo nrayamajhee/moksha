@@ -1,4 +1,4 @@
-use crate::{mesh::multiply, Material, Mesh, ObjectInfo, RcRcell, Storage, Transform};
+use crate::{RcRcell, Storage, Transform, ObjectInfo, Mesh, mesh::multiply};
 use nalgebra::{Isometry3, Point3, UnitQuaternion, Vector3};
 use ncollide3d::{query::Ray, query::RayCast, shape::ConvexHull};
 

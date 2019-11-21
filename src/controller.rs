@@ -157,15 +157,15 @@ impl Viewport {
     }
     pub fn switch_projection(&mut self) {
         self.proj = match self.proj {
-            Projection::Perspective(_) => self.create_proj(ProjectionType::Orthographic),
-            Projection::Orthographic(_) => self.create_proj(ProjectionType::Perspective),
+            Projection::Perspective(_) => self.get_proj(ProjectionType::Orthographic),
+            Projection::Orthographic(_) => self.get_proj(ProjectionType::Perspective),
         };
     }
     pub fn resize(&mut self, aspect_ratio: f32) {
         self.aspect_ratio = aspect_ratio;
         self.proj = match self.proj {
-            Projection::Orthographic(_) => self.create_proj(ProjectionType::Orthographic),
-            Projection::Perspective(_) => self.create_proj(ProjectionType::Perspective),
+            Projection::Orthographic(_) => self.get_proj(ProjectionType::Orthographic),
+            Projection::Perspective(_) => self.get_proj(ProjectionType::Perspective),
         };
     }
     pub fn button(&self) -> Option<MouseButton> {
@@ -176,6 +176,9 @@ impl Viewport {
             Projection::Orthographic(_) => ProjectionType::Orthographic,
             Projection::Perspective(_) => ProjectionType::Perspective,
         }
+    }
+    pub fn rotating(&self) -> bool {
+        self.rotate
     }
     pub fn disable_rotation(&mut self) {
         self.rotate = false;
@@ -202,7 +205,7 @@ impl Viewport {
     pub fn focus(&mut self, node: &Node) {
         self.target = (node.parent_transform() * node.transform()).isometry;
     }
-    fn create_proj(&self, proj_type: ProjectionType) -> Projection {
+    pub fn get_proj(&self, proj_type: ProjectionType) -> Projection {
         if proj_type == ProjectionType::Perspective {
             Projection::Perspective(Perspective3::new(
                 self.aspect_ratio,
@@ -221,7 +224,7 @@ impl Viewport {
     }
     fn update_ortho(&mut self) {
         if let Projection::Orthographic(_) = self.proj {
-            self.proj = self.create_proj(ProjectionType::Orthographic);
+            self.proj = self.get_proj(ProjectionType::Orthographic);
         }
     }
 }

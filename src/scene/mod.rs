@@ -1,7 +1,6 @@
 mod node;
-mod storage;
-
 pub mod primitives;
+mod storage;
 
 #[doc(inline)]
 pub use primitives::Primitive;
@@ -12,7 +11,7 @@ pub use storage::Storage;
 
 use crate::{
     dom_factory::{add_event, window},
-    rc_rcell,
+    log, node, rc_rcell,
     renderer::{bind_texture, CursorType, DrawMode, RenderFlags, Renderer},
     scene::primitives::create_light_node,
     Geometry, Material, Mesh, MouseButton, RcRcell, Transform, Viewport,
@@ -145,7 +144,7 @@ impl Scene {
             let s = self.storage();
             let mut storage = s.borrow_mut();
             let mut info = storage.mut_info(node.index());
-            info.render_flags.render = true;
+            info.render_flags.render = visible;
         }
         for child in node.owned_children() {
             self.set_visibility_only(child, visible);
@@ -193,6 +192,27 @@ impl Scene {
         };
         Node::new(index, sto)
     }
+    pub fn from_mesh(&self, mesh: Option<Mesh>) -> Node {
+        Self::object(
+            self.storage(),
+            &self.renderer.borrow(),
+            mesh,
+            Default::default(),
+            Default::default(),
+        )
+    }
+    pub fn empty(&self, name: &str) -> Node {
+        Self::object(
+            self.storage(),
+            &self.renderer.borrow(),
+            None,
+            Default::default(),
+            ObjectInfo {
+                name: name.to_string(),
+                ..Default::default()
+            }
+        )
+    }
     pub fn light(&self, light_type: LightType, color: [f32; 3], intensity: f32) -> Light {
         let node = rc_rcell(create_light_node(&self, light_type, color));
         let light_id = self.storage().borrow_mut().add_light(LightInfo {
@@ -204,27 +224,9 @@ impl Scene {
         });
         Light { light_id, node }
     }
-    pub fn from_mesh(&self, mesh: Option<Mesh>) -> Node {
-        Self::object(
-            self.storage(),
-            &self.renderer.borrow(),
-            mesh,
-            Default::default(),
-            Default::default(),
-        )
-    }
-    pub fn empty(&self) -> Node {
-        Self::object(
-            self.storage(),
-            &self.renderer.borrow(),
-            None,
-            Default::default(),
-            Default::default(),
-        )
-    }
     pub fn load_object_from_obj(
         &self,
-        path: &str,
+        dir: Option<&str>,
         object: &obj::Object,
         mat_set: &Option<mtl::MtlSet>,
     ) -> Node {
@@ -300,25 +302,29 @@ impl Scene {
             vertices,
             indices,
             normals,
-        }; 
+        };
         let mut material = Material::new_color(1., 1., 1., 1.);
-        if let Some(material_name) = &object.geometry[0].material_name  {
+        if let Some(material_name) = &object.geometry[0].material_name {
             if let Some(mat_set) = mat_set {
                 for each in &mat_set.materials {
                     if &each.name == material_name {
                         material = if let Some(src) = &each.uv_map {
-                            Material::new_texture(&format!("{}/{}",path,src), tex_coords).unwrap()
+                            Material::new_texture(&format!("{}/{}", dir.unwrap(), src), tex_coords)
                         } else {
                             let c = each.color_diffuse;
-                            log!("Color" c);
-                            Material::new_color(c.r as f32,c.g as f32,c.b as f32,1.0)
+                            Material::new_color(
+                                c.r as f32,
+                                c.g as f32,
+                                c.b as f32,
+                                each.alpha as f32,
+                            )
                         };
                         if flat {
                             material = material.flat();
                         }
                         break;
                     }
-                };
+                }
             }
         }
         node!(
@@ -327,7 +333,7 @@ impl Scene {
             object.name.clone()
         )
     }
-    pub fn object_from_obj(&self, path: &str, obj_src: &str, mtl_src: Option<&str>) -> Node {
+    pub fn object_from_obj(&self, dir: Option<&str>, obj_src: &str, mtl_src: Option<&str>) -> Node {
         let obj_set = obj::parse(obj_src).unwrap();
         assert!(!obj_set.objects.is_empty(), "No objects in the obj file");
         let mat_set = if let Some(src) = mtl_src {
@@ -335,9 +341,9 @@ impl Scene {
         } else {
             None
         };
-        let mut root = self.load_object_from_obj(path, &obj_set.objects[0], &mat_set);
-        for object in obj_set.objects {
-            root.add(rc_rcell(self.load_object_from_obj(path, &object, &mat_set)));
+        let mut root = self.load_object_from_obj(dir, &obj_set.objects[0], &mat_set);
+        for object in obj_set.objects.iter().skip(1) {
+            root.add(rc_rcell(self.load_object_from_obj(dir, &object, &mat_set)));
         }
         root
     }

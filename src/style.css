@@ -26,6 +26,12 @@
 *:-moz-focus-inner {
 	border: 0;
 }
+input[type="file"]{
+	display: none;
+}
+label {
+	cursor: pointer;
+}
 .shown {
 	display: block !important;
 }
@@ -104,6 +110,23 @@ hr {
 #mesh-list li {
 	padding: var(--small-pad) var(--pad);
 }
+#mesh-list #file li {
+	position: relative;
+	overflow: hidden;
+}
+#mesh-list #file li .progress {
+	content: '';
+	width: 0;
+	height: 100%;
+	background: red;
+	position: absolute;
+	top: 0;
+	left: 0;
+	transition: width 0.5s;
+}
+#mesh-list #file li .progress.loaded {
+	transition:none; 
+}
 #mesh-list {
 	display: none;
 	position: absolute;
@@ -117,7 +140,6 @@ hr {
 	margin: 0;
 	list-style: none;
 }
-
 #mesh-list li:hover {
 	background: var(--fg-nearest);
 }

@@ -1,10 +1,27 @@
 #[macro_export]
+macro_rules! node_from_obj {
+    ($scene: expr, $dir: expr, $file: expr) => {{
+        $scene.object_from_obj(
+            Some($dir),
+            include_str!(concat!($dir, "/", $file, ".obj")),
+            Some(include_str!(concat!($dir, "/", $file, ".mtl"))),
+        )
+    }};
+    ($scene: expr, $dir: expr, $file: expr, $has_mat: expr) => {{
+        if $has_mat {
+            node_from_obj!($scene, $dir, $file)
+        } else {
+            $scene.object_from_obj(Some($dir), include_str!(concat!($dir, "/", $file, ".obj")), None)
+        }
+    }};
+}
+#[macro_export]
 macro_rules! node {
     ($scene: expr, $mesh: expr, $($x:expr),*) => {
         {
             let node = $scene.from_mesh($mesh);
             use std::any::Any;
-            use crate::{Mesh, ObjectInfo, renderer::{DrawMode, RenderFlags}};
+            use crate::{ ObjectInfo, renderer::{DrawMode, RenderFlags}};
             $(
                 if let Some(name) = (&$x as &dyn Any).downcast_ref::<&str>() {
                     let mut info = node.info();

@@ -70,10 +70,17 @@ impl RenderFlags {
             ..Default::default()
         }
     }
-    pub fn wire() -> Self {
+    pub fn no_depth_blend_cull() -> Self {
         Self {
             blend: true,
-            depth: true,
+            depth: false,
+            cull_face: false,
+            ..Default::default()
+        }
+    }
+    pub fn blend_cull() -> Self {
+        Self {
+            blend: true,
             cull_face: false,
             ..Default::default()
         }
@@ -226,10 +233,7 @@ impl Renderer {
                 &self.ctx,
                 &program,
                 "tex_coords",
-                mesh.material
-                    .tex_coords
-                    .as_ref()
-                    .expect("Expected texture coordinates, found nothing!"),
+                tex_coords,
                 2,
             )
             .expect("Couldn't bind tex coordinates");
@@ -496,7 +500,7 @@ impl Renderer {
         self.setup_lights(&storage);
         self.update_viewport(viewport);
         let len = storage.meshes().len();
-        let render_stage = |condition: Box<Fn(bool, Option<ShaderType>) -> bool>| {
+        let render_stage = |condition: Box<dyn Fn(bool, Option<ShaderType>) -> bool>| {
             for i in 0..len {
                 let info = storage.info(i);
                 let shader_type = if let Some(mesh) = storage.mesh(i) {

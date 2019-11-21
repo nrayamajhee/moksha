@@ -1,11 +1,10 @@
-use crate::renderer::{bind_texture, ShaderType};
+use crate::renderer::{ShaderType};
 use genmesh::{
     generators::{IndexedPolygon, SharedVertex},
     EmitTriangles, Triangulate, Vertex,
 };
 use nalgebra::{one, Isometry3, Matrix4, Point3, Translation3, Vector3};
 use wasm_bindgen::JsValue;
-use web_sys::WebGl2RenderingContext as GL;
 
 /// A 3D transform that can handle translation, rotation, and non-uniform scaling.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -201,16 +200,13 @@ impl Material {
             .shader_type(ShaderType::Color)
     }
     pub fn new_wire(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Self::default()
-            .color(r, g, b, a)
+        Self::new_color(r, g, b, a)
             .wire_overlay()
             .shader_type(ShaderType::Wireframe)
     }
-    pub fn new_texture(url: &str, tex_coords: Vec<f32>) -> Result<Self, JsValue> {
-        let mut mat = Self::new_color(1., 1., 1., 1.);
-        mat.tex_coords = Some(tex_coords);
-        mat.texture_urls.push(String::from(url));
-        Ok(mat)
+    pub fn new_texture(url: &str, tex_coords: Vec<f32>) -> Self  {
+        Self::new_color(1.,1.,1.,1.)
+            .texture(url, tex_coords)
     }
     pub fn color(mut self, r: f32, g: f32, b: f32, a: f32) -> Self {
         self.color = Some([r, g, b, a]);
@@ -226,6 +222,11 @@ impl Material {
     }
     pub fn wire_overlay(mut self) -> Self {
         self.wire_overlay = true;
+        self
+    }
+    pub fn texture(mut self, url: &str, tex_coords: Vec<f32>) -> Self {
+        self.tex_coords = Some(tex_coords);
+        self.texture_urls.push(String::from(url));
         self
     }
     pub fn vertex_colors(vertex_color: Vec<f32>) -> Self {

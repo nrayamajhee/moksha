@@ -3,8 +3,8 @@ use maud::{html, Markup};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{
-    Document, Element, Event, EventTarget, HtmlCanvasElement, HtmlCollection, HtmlElement, Node,
-    NodeList, Window,
+    Document, Element, Event, EventTarget, FileList, FileReader, HtmlCanvasElement, HtmlCollection,
+    HtmlElement, HtmlInputElement, Node, NodeList, Window, ProgressEvent
 };
 
 pub fn window() -> Window {
@@ -63,6 +63,10 @@ where
         .add_event_listener_with_callback(event_type, cl.as_ref().unchecked_ref())
         .unwrap();
     cl.forget();
+}
+
+pub fn now() -> f64 {
+    window().performance().expect("Performance should be available").now()
 }
 
 pub fn set_timeout<H>(callback: H, timeout: i32)
@@ -189,14 +193,6 @@ pub fn add_style(styles: &str) {
         .expect("Can't attach style element into head");
 }
 
-pub fn get_target_innerh(e: &Event) -> String {
-    e.target()
-        .unwrap()
-        .dyn_into::<HtmlElement>()
-        .unwrap()
-        .inner_html()
-}
-
 pub fn el_innerh(e: Element) -> String {
     e.dyn_into::<HtmlElement>().unwrap().inner_html()
 }
@@ -212,20 +208,51 @@ pub fn get_parent(node: &Element, level: usize) -> Option<Element> {
     }
 }
 
-pub fn get_target_el(e: &Event) -> Element {
-    e.target()
-        .expect("No target element for the event")
-        .dyn_into::<Element>()
+pub fn get_target(e: &Event) -> EventTarget {
+    e.target().expect("No target element for the event!")
+}
+
+pub fn get_target_innerh(e: &Event) -> String {
+    get_target(&e)
+        .dyn_into::<HtmlElement>()
         .unwrap()
+        .inner_html()
+}
+
+pub fn get_target_el(e: &Event) -> Element {
+    get_target(&e)
+        .dyn_into::<Element>()
+        .expect("Can't cast as Element!")
+}
+
+pub fn get_target_files(e: &Event) -> FileList {
+    get_target(&e)
+        .dyn_into::<HtmlInputElement>()
+        .expect("Can't cast as HtmlInputElement! This might not be an input element.")
+        .files()
+        .expect("No files in the input element")
+}
+
+pub fn get_target_file_result(e: &Event) -> String {
+    get_target(&e)
+        .dyn_into::<FileReader>()
+        .expect("Can't cast as File Reader!")
+        .result()
+        .expect("File reader has no result content!")
+        .as_string()
+        .expect("Can't parse reader result as string!")
+}
+
+pub fn get_progress(e: Event) -> ProgressEvent {
+    e.dyn_into::<ProgressEvent>().expect("Can't cast event as ProgrssEvent")
 }
 
 pub fn get_target_parent_el(e: &Event, level: usize) -> Element {
-    get_parent(&e.target().unwrap().dyn_into::<Element>().unwrap(), level)
-        .expect("Could't get the element")
+    get_parent(&get_target_el(&e), level).expect("Could't get the element!")
 }
 
-pub fn get_target_parent_hel(e: &Event, level: usize) -> HtmlElement {
-    get_parent(&get_target_el(e), level)
+pub fn get_target_parent_html_el(e: &Event, level: usize) -> HtmlElement {
+    get_parent(&get_target_el(&e), level)
         .expect("Could't get the element")
         .dyn_into::<HtmlElement>()
         .unwrap()

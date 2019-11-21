@@ -39,7 +39,6 @@ impl Gizmo {
         &self.node
     }
     pub fn apply_target_transform(&self, target: &Node) {
-        // don't apply target's scale
         self.node.set_parent_transform(
             (target.parent_transform() * target.transform())
                 .isometry
@@ -48,16 +47,14 @@ impl Gizmo {
         self.node
             .apply_parent_transform(self.node.parent_transform() * self.node.transform());
     }
-    pub fn rescale(&self, transform: &Isometry3<f32>) {
-        self.node
-            .set_scale(transform.translation.vector.magnitude() / 30.);
-    }
     pub fn collision_constraint(&self) -> CollisionConstraint {
         self.collision_constraint
     }
     pub fn handle_mousedown(&mut self, ray: &Ray<f32>, view: &Viewport) -> bool {
-        let target = Ball::new(self.node.scale().x);
-        let gizmo_node_t = self.node.transform().isometry;
+        let p_t = self.node.parent_transform();
+        let t = self.node.transform();
+        let gizmo_node_t = (p_t * t).isometry;
+        let target = Ball::new(t.scale.x);
         // if the central white ball is clicked
         if target.intersects_ray(&gizmo_node_t, ray) {
             self.transform = Isometry3::from_parts(
