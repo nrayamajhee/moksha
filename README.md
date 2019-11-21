@@ -134,6 +134,7 @@ Due to wasm-bingen's lack of support for rust lifetime annotations, I make heavy
     - Fancy Wireframe (Points + Line + Depth Fade)
   
 - Editor
+	- Implement a nofitication panel and notify macro with progress bars
     - Fancy mesh outline while selecting
     - Configuration Editor
     - Create a fps meter
@@ -141,7 +142,6 @@ Due to wasm-bingen's lack of support for rust lifetime annotations, I make heavy
     - Implement rotational gizmo.
     - IMplement scaling gizmo.
     - Implement a pan guide gizmo. (This might need rendering on a separate framebuffer)
-  
   
 - Viewport
     - First Person Constrol
