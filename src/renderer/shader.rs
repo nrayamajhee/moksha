@@ -4,7 +4,7 @@ use nalgebra::Matrix4;
 use std::rc::Rc;
 use wasm_bindgen::JsValue;
 use web_sys::{
-    HtmlImageElement, WebGl2RenderingContext as GL, WebGlProgram, WebGlShader, WebGlTexture,
+    HtmlImageElement, WebGl2RenderingContext as GL, WebGlProgram, WebGlShader, WebGlTexture, Url,
 };
 
 use strum_macros::{Display, EnumIter};
@@ -124,7 +124,7 @@ pub fn link_program(
             .unwrap_or_else(|| String::from("Unknown error creating program object")))
     }
 }
-pub fn bind_texture(gl: &GL, url: &str) -> Result<Rc<WebGlTexture>, JsValue> {
+pub fn bind_texture(gl: &GL, url: &str, is_img_obj: bool) -> Result<Rc<WebGlTexture>, JsValue> {
     let texture = gl.create_texture().expect("Can't create texture!");
     gl.bind_texture(GL::TEXTURE_2D, Some(&texture));
     let pixel = unsafe { Uint8Array::view(&[255, 0, 255, 255]) };
@@ -139,15 +139,16 @@ pub fn bind_texture(gl: &GL, url: &str) -> Result<Rc<WebGlTexture>, JsValue> {
         GL::UNSIGNED_BYTE,
         Some(&pixel),
     )?;
-    let image = HtmlImageElement::new().expect("Can't create Image Element");
-    let img = rc_rcell(image);
-    let a_img = img.clone();
+    let image = Rc::new(HtmlImageElement::new().expect("Can't create Image Element"));
+    let img = image.clone();
     let texture = Rc::new(texture);
     let tex = texture.clone();
     // couldn't avoid this
     let gl = gl.clone();
-    add_event(&img.borrow(), "load", move |_| {
-        let image = a_img.borrow();
+    add_event(&image, "load", move |_| {
+        if is_img_obj {
+            Url::revoke_object_url(&img.src());
+        }
         gl.bind_texture(GL::TEXTURE_2D, Some(&tex));
         gl.tex_image_2d_with_u32_and_u32_and_html_image_element(
             GL::TEXTURE_2D,
@@ -155,13 +156,13 @@ pub fn bind_texture(gl: &GL, url: &str) -> Result<Rc<WebGlTexture>, JsValue> {
             GL::RGBA as i32,
             GL::RGBA,
             GL::UNSIGNED_BYTE,
-            &image,
+            &img,
         )
         .expect("Couldn't bind image as texture!");
         gl.generate_mipmap(GL::TEXTURE_2D);
         //gl.tex_parameteri(GL::TEXTURE_2D, GL::TEXTURE_MAG_FILTER as u32, GL::NEARESR as i32);
     });
-    img.borrow_mut().set_src(url);
+    image.set_src(url);
     Ok(texture)
 }
 pub fn bind_attribute(gl: &GL, program: &WebGlProgram, name: &str, size: i32) {

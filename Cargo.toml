@@ -61,6 +61,7 @@ features = [
   'WebGlShader',
   'File',
   'Blob',
+  'Url',
   'FileList',
   'FileReader',
   'WebGlTexture',

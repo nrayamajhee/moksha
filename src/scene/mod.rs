@@ -2,6 +2,8 @@ mod node;
 pub mod primitives;
 mod storage;
 
+use std::collections::HashMap;
+
 #[doc(inline)]
 pub use primitives::Primitive;
 
@@ -91,6 +93,7 @@ impl Scene {
                 name: "root".into(),
                 ..Default::default()
             },
+            false,
         ));
         let scene = Self {
             root,
@@ -173,6 +176,7 @@ impl Scene {
         mesh: Option<Mesh>,
         transform: Transform,
         info: ObjectInfo,
+        is_img_obj: bool,
     ) -> Node {
         let sto = storage.clone();
         let mut storage = storage.borrow_mut();
@@ -181,7 +185,7 @@ impl Scene {
             let urls = &mesh.material.texture_urls;
             if urls.len() > 0 {
                 let tex_i = storage.add_texture(
-                    bind_texture(renderer.context(), &urls[0])
+                    bind_texture(renderer.context(), &urls[0], is_img_obj)
                         .expect("Couldn't bind albedo texture"),
                 );
                 mesh.material.texture_indices.push(tex_i);
@@ -199,6 +203,7 @@ impl Scene {
             mesh,
             Default::default(),
             Default::default(),
+            false,
         )
     }
     pub fn empty(&self, name: &str) -> Node {
@@ -210,7 +215,8 @@ impl Scene {
             ObjectInfo {
                 name: name.to_string(),
                 ..Default::default()
-            }
+            },
+            false
         )
     }
     pub fn light(&self, light_type: LightType, color: [f32; 3], intensity: f32) -> Light {
@@ -226,9 +232,10 @@ impl Scene {
     }
     pub fn load_object_from_obj(
         &self,
-        dir: Option<&str>,
+        dir: &str,
         object: &obj::Object,
         mat_set: &Option<mtl::MtlSet>,
+        img_obj_url: Option<&HashMap<String, String>>,
     ) -> Node {
         let mut vertices = Vec::new();
         for vertex in &object.vertices {
@@ -308,17 +315,25 @@ impl Scene {
             if let Some(mat_set) = mat_set {
                 for each in &mat_set.materials {
                     if &each.name == material_name {
-                        material = if let Some(src) = &each.uv_map {
-                            Material::new_texture(&format!("{}/{}", dir.unwrap(), src), tex_coords)
-                        } else {
-                            let c = each.color_diffuse;
-                            Material::new_color(
-                                c.r as f32,
-                                c.g as f32,
-                                c.b as f32,
-                                each.alpha as f32,
-                            )
-                        };
+                        let c = each.color_diffuse;
+                        material = Material::new_color(
+                            c.r as f32,
+                            c.g as f32,
+                            c.b as f32,
+                            each.alpha as f32,
+                        );
+                        if let Some(name) = &each.uv_map {
+                            if let Some(urls) = img_obj_url {
+                                if let Some(url) = urls.get(name) {
+                                    material = material.texture(url, tex_coords)
+                                } else {
+                                    log!("The file with name " name.to_string() " was not uploaded. Resorting to color")
+                                }
+                            } else {
+                                log!(dir.to_string() "/" name.to_string());
+                                material = material.texture(&format!("{}/{}", dir, name), tex_coords)
+                            }
+                        }
                         if flat {
                             material = material.flat();
                         }
@@ -333,7 +348,7 @@ impl Scene {
             object.name.clone()
         )
     }
-    pub fn object_from_obj(&self, dir: Option<&str>, obj_src: &str, mtl_src: Option<&str>) -> Node {
+    pub fn object_from_obj(&self, dir: &str, obj_src: &str, mtl_src: Option<&str>, img_obj_url: Option<&HashMap<String, String>>) -> Node {
         let obj_set = obj::parse(obj_src).unwrap();
         assert!(!obj_set.objects.is_empty(), "No objects in the obj file");
         let mat_set = if let Some(src) = mtl_src {
@@ -341,9 +356,9 @@ impl Scene {
         } else {
             None
         };
-        let mut root = self.load_object_from_obj(dir, &obj_set.objects[0], &mat_set);
+        let mut root = self.load_object_from_obj(dir, &obj_set.objects[0], &mat_set, img_obj_url);
         for object in obj_set.objects.iter().skip(1) {
-            root.add(rc_rcell(self.load_object_from_obj(dir, &object, &mat_set)));
+            root.add(rc_rcell(self.load_object_from_obj(dir, &object, &mat_set, img_obj_url)));
         }
         root
     }
@@ -375,6 +390,7 @@ impl Scene {
             mesh,
             transform,
             info,
+            false,
         )
     }
     fn add_viewport_events(&self) {

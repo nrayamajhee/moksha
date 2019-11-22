@@ -2,16 +2,22 @@
 macro_rules! node_from_obj {
     ($scene: expr, $dir: expr, $file: expr) => {{
         $scene.object_from_obj(
-            Some($dir),
+            $dir,
             include_str!(concat!($dir, "/", $file, ".obj")),
             Some(include_str!(concat!($dir, "/", $file, ".mtl"))),
+            None,
         )
     }};
     ($scene: expr, $dir: expr, $file: expr, $has_mat: expr) => {{
         if $has_mat {
             node_from_obj!($scene, $dir, $file)
         } else {
-            $scene.object_from_obj(Some($dir), include_str!(concat!($dir, "/", $file, ".obj")), None)
+            $scene.object_from_obj(
+                $dir,
+                include_str!(concat!($dir, "/", $file, ".obj")),
+                None,
+                None,
+            )
         }
     }};
 }
