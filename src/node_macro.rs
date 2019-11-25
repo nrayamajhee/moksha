@@ -1,4 +1,16 @@
 #[macro_export]
+macro_rules! node_from_obj_wired {
+    ($scene: expr, $dir: expr, $file: expr) => {{
+        $scene.object_from_obj(
+            $dir,
+            include_str!(concat!($dir, "/", $file, ".obj")),
+            Some(include_str!(concat!($dir, "/", $file, ".mtl"))),
+            None,
+            true
+        )
+    }}
+}
+#[macro_export]
 macro_rules! node_from_obj {
     ($scene: expr, $dir: expr, $file: expr) => {{
         $scene.object_from_obj(
@@ -6,26 +18,23 @@ macro_rules! node_from_obj {
             include_str!(concat!($dir, "/", $file, ".obj")),
             Some(include_str!(concat!($dir, "/", $file, ".mtl"))),
             None,
+            false
         )
-    }};
-    ($scene: expr, $dir: expr, $file: expr, $has_mat: expr) => {{
-        if $has_mat {
-            node_from_obj!($scene, $dir, $file)
-        } else {
-            $scene.object_from_obj(
-                $dir,
-                include_str!(concat!($dir, "/", $file, ".obj")),
-                None,
-                None,
-            )
-        }
-    }};
+    }}
 }
 #[macro_export]
 macro_rules! node {
     ($scene: expr, $mesh: expr, $($x:expr),*) => {
         {
-            let node = $scene.from_mesh($mesh);
+            let mut setup_unique_vertices = false;
+            $(
+                if let Some(mode) = (&$x as &dyn Any).downcast_ref::<DrawMode>() {
+                    if *mode == DrawMode::Arrays {
+                        setup_unique_vertices = true;
+                    }
+                }
+            )*
+            let node = $scene.from_mesh($mesh, setup_unique_vertices);
             use std::any::Any;
             use crate::{ ObjectInfo, renderer::{DrawMode, RenderFlags}};
             $(

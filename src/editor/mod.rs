@@ -5,7 +5,7 @@ mod toolbar;
 use crate::{
     dom_factory::{add_event, get_el, window},
     mesh::{Geometry, Material},
-    node, rc_rcell,
+    node, rc_rcell, ProjectionType,
     scene::{
         primitives::{create_origin, create_transform_gizmo, ArrowTip},
         Node, Scene,
@@ -74,15 +74,21 @@ impl Editor {
         editor
     }
     pub fn scale_gizmos(&self) {
-        use crate::log;
-        let eye = Point3::from(self.scene().view().borrow().eye());
         let gizmo = self.gizmo.borrow();
         let gizmo = gizmo.node();
         let origin = self.spawn_origin.borrow();
-        let g_pos = Point3::from(gizmo.global_position());
-        let o_pos = Point3::from(origin.global_position());
-        let g_mag = (eye - g_pos).magnitude() / 60.;
-        let o_mag = (eye - o_pos).magnitude() / 60.; 
+        let view = self.scene().view();
+        let view = view.borrow();
+        let (g_mag, o_mag) = if self.scene().view().borrow().projection_type() == ProjectionType::Perspective {
+            let eye = Point3::from(view.eye());
+            let g_pos = Point3::from(gizmo.global_position());
+            let o_pos = Point3::from(origin.global_position());
+            ((eye - g_pos).magnitude() / 60.,
+            (eye - o_pos).magnitude() / 60.) 
+        } else {
+            let d = view.transform().translation.vector.magnitude() / 60.;
+            (d, d)
+        };
         gizmo.set_scale(g_mag);
         origin.set_scale(o_mag);
     }
@@ -129,11 +135,14 @@ impl Editor {
                 return;
             }
             let active_node = editor.active_node.borrow();
-            let mut view = view.borrow_mut();
-            view.disable_rotation();
-            let me = e.dyn_into::<MouseEvent>().unwrap();
-            let ray = Self::get_ray_from_screen(&me, &view, &renderer.borrow().canvas());
-            gizmo.handle_mousemove(&ray, &active_node);
+            {
+                let mut view = view.borrow_mut();
+                view.disable_rotation();
+                let me = e.dyn_into::<MouseEvent>().unwrap();
+                let ray = Self::get_ray_from_screen(&me, &view, &renderer.borrow().canvas());
+                gizmo.handle_mousemove(&ray, &active_node);
+            }
+            editor.scale_gizmos();
         });
 
         let editor = self.clone();

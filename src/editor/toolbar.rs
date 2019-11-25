@@ -2,9 +2,9 @@ use super::scene_tree::build_node;
 use super::NodeRef;
 use crate::{
     dom_factory::{
-        add_event, body, document, get_el, get_progress, get_target_el, get_target_file_result,
-        get_target_files, get_target_innerh, get_target_parent_el, icon_btn_w_id, now, query_els,
-        query_html_el, set_timeout, window,
+        add_event, body, document, get_el, get_progress, get_target_file_result,
+        get_target_files, get_target_innerh, icon_btn_w_id, query_els,
+        query_html_el, set_timeout, 
     },
     log, rc_rcell,
     scene::primitives::create_primitive_node,
@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
 use wasm_bindgen::JsCast;
-use web_sys::{EventTarget, FileReader, HtmlInputElement, Url, File};
+use web_sys::{EventTarget, FileReader, Url, File};
 pub fn build(editor: &Editor) {
     body()
         .insert_adjacent_html("beforeend", markup().as_str())
@@ -69,7 +69,7 @@ fn add_events(editor: &Editor) {
     add_event(
         &document().get_element_by_id("add-mesh").unwrap(),
         "click",
-        move |e| {
+        move |_| {
             get_el("mesh-list").class_list().toggle("shown").unwrap();
         },
     );
@@ -127,7 +127,7 @@ fn add_events(editor: &Editor) {
             },
         );
     }
-    let editor = editor.clone();
+    let a_editor = editor.clone();
     add_event(&get_el("obj-file"), "input", move |e| {
         let files = get_target_files(&e);
         let mut tex: HashMap<String, Rc<File>> = HashMap::new();
@@ -142,7 +142,7 @@ fn add_events(editor: &Editor) {
                 let mut n: Vec<&str> = file_name.split(".").collect();
                 n.pop().unwrap().to_string()
             };
-            if file_type == "obj" {
+            if file_type == "application" || file_type == "obj" {
                 obj = Some(file);
             } else if file_type == "mtl" {
                 mtl = Some(file);
@@ -156,21 +156,56 @@ fn add_events(editor: &Editor) {
                 total += 1;
             }
             total += tex.len();
-            let reader = FileReader::new().unwrap();
+            let update_progress = |reader: Rc<FileReader>, progress: RcRcell<f64>, total| {
+                let progress_el = query_html_el("#obj-file + label .progress");
+                //progress_el.class_list().remove_1("loaded");
+                add_event(&reader, "progress", move |e| {
+                    let mut progress = progress.borrow_mut();
+                    let pe = get_progress(e);
+                    *progress += (pe.loaded() * 100.) / (pe.total() * total as f64);
+                    log!("Progress" progress.to_string());
+                    progress_el
+                        .style()
+                        .set_property("width", &format!("{}%", *progress)).unwrap();
+                    if *progress == 100. {
+                        let p = progress_el.clone();
+                        set_timeout(
+                            move || {
+                                //p.class_list().add_1("loaded");
+                                p.style().set_property("width", "0");
+                            },
+                            1000,
+                        );
+                    }
+                });
+            };
+            let obj_reader = Rc::new(FileReader::new().unwrap());
             let tex = Rc::new(tex);
-            let editor = editor.clone();
-            add_event(&reader, "load", move |e| {
+            let editor = a_editor.clone();
+            let progress = rc_rcell(0.);
+            let a_p = progress.clone();
+            add_event(&obj_reader, "load", move |e| {
                 let obj_src = Rc::new(get_target_file_result(&e));
+                let editor = editor.clone();
                 if let Some(file) = &mtl {
-                    let reader = FileReader::new().unwrap();
-                    let editor = editor.clone();
+                    let mat_reader = Rc::new(FileReader::new().unwrap());
                     let o_src = obj_src.clone();
                     let tex = tex.clone();
-                    add_event(&reader, "load", move |e| {
-                        let reader = FileReader::new().unwrap();
+                    let p = a_p.clone();
+                    add_event(&mat_reader, "load", move |e| {
                         let mtl_src = Rc::new(get_target_file_result(&e));
                         if tex.len() == 0 {
                             log!("No texture file uploaded. Will not load textures.");
+                            let scene = editor.scene();
+                            let node = scene.object_from_obj(
+                                "",
+                                &obj_src,
+                                Some(&mtl_src),
+                                None,
+                                true
+                            );
+                            node.copy_location(&editor.spawn_origin.borrow());
+                            scene.add(rc_rcell(node));
                         } else {
                             let h_m: HashMap<String, String> = HashMap::new();
                             let mut loaded_urls = rc_rcell(h_m);
@@ -180,16 +215,13 @@ fn add_events(editor: &Editor) {
                                 let m_src = mtl_src.clone();
                                 let f = file.clone();
                                 let len = tex.len();
-                                let e_tex = tex.clone();
                                 let l_u = loaded_urls.clone();
-                                let reader = FileReader::new().unwrap();
+                                let tex_reader = Rc::new(FileReader::new().unwrap());
                                 let n = name.clone();
-                                add_event(&reader, "load", move |e| {
+                                add_event(&tex_reader, "load", move |_| {
                                     let mut loaded_urls = l_u.borrow_mut();
                                     let url = Url::create_object_url_with_blob(&f).unwrap();
-                                    log!("Loaded" url);
                                     loaded_urls.insert(n.clone(), url);
-                                    log!("Len" len loaded_urls.len());
                                     if loaded_urls.len() == len {
                                         let scene = editor.scene();
                                         let node = scene.object_from_obj(
@@ -197,41 +229,35 @@ fn add_events(editor: &Editor) {
                                             &a_o_src,
                                             Some(&m_src),
                                             Some(&loaded_urls),
+                                            false
                                         );
                                         node.copy_location(&editor.spawn_origin.borrow());
                                         scene.add(rc_rcell(node));
                                     }
                                 });
-                                reader.read_as_data_url(file.as_ref());
+                                update_progress(tex_reader.clone(), p.clone(), total);
+                                tex_reader.read_as_data_url(file.as_ref());
                             }
                         }
                     });
-                    reader.read_as_text(file.as_ref());
+                    update_progress(mat_reader.clone(), a_p.clone(), total);
+                    mat_reader.read_as_text(file.as_ref());
                 } else {
                     log!("No material file uploaded. Will load default material instead.");
-                }
-            });
-            let progress_el = Rc::new(query_html_el("#obj-file + label .progress"));
-            progress_el.class_list().remove_1("loaded");
-            add_event(&reader, "progress", move |e| {
-                let pe = get_progress(e);
-                let progress = (pe.loaded() * 100.) / (pe.total() * total as f64);
-                log!("Progress" progress);
-                progress_el
-                    .style()
-                    .set_property("width", &format!("{}%", progress));
-                if progress == 100. {
-                    let p = progress_el.clone();
-                    set_timeout(
-                        move || {
-                            p.class_list().add_1("loaded");
-                            p.style().set_property("width", "0");
-                        },
-                        500,
+                    let scene = editor.scene();
+                    let node = scene.object_from_obj(
+                        "",
+                        &obj_src,
+                        None,
+                        None,
+                        false
                     );
+                    node.copy_location(&editor.spawn_origin.borrow());
+                    scene.add(rc_rcell(node));
                 }
             });
-            reader.read_as_text(&file);
+            update_progress(obj_reader.clone(), progress.clone(), total);
+            obj_reader.read_as_text(&file);
         } else {
             log!("You didn't provide obj file! Can't upload anything.");
         }

@@ -71,9 +71,7 @@ uniform Light amb_lights[MAX_NUM_LIGHTS];
 uniform Light point_lights[MAX_NUM_LIGHTS];
 uniform Light dir_lights[MAX_NUM_LIGHTS];
 uniform Light spot_lights[MAX_NUM_LIGHTS];
-uniform bool flat_shade;
-uniform bool wire_overlay;
-uniform bool has_albedo;
+uniform bool flat_shade, wire_overlay, has_albedo;
 in vec2 frag_tex;
 uniform sampler2D sampler;
 
@@ -88,6 +86,7 @@ void main() {
 		texture(sampler, frag_tex).rgb:
 		color.rgb;
 
+
 	for (int i = 0; i < num_l_amb; i++) {
 		result += calc_amb_light(amb_lights[i], frag_color);
 	}
@@ -100,7 +99,7 @@ void main() {
 	for (int i = 0; i < num_l_spot; i++) {
 		result += calc_light(spot_lights[i], normal, SPOT, frag_color);
 	}
-	
+
 	outputColor = wire_overlay?
 		vec4(mix(color.xyz,result, edgeFactor()), 1.0):
 		vec4(result, 1.0);

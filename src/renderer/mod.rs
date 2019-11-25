@@ -4,6 +4,7 @@ use crate::{
     dom_factory::{body, get_canvas, resize_canvas},
     log,
     mesh::Mesh,
+    ProjectionType,
     scene::Scene,
     LightType, Storage,
 };
@@ -49,6 +50,7 @@ pub struct RenderFlags {
     pub render: bool,
     pub depth: bool,
     pub blend: bool,
+    pub view_transform: bool,
     pub cull_face: bool,
 }
 
@@ -58,6 +60,7 @@ impl Default for RenderFlags {
             render: false,
             depth: true,
             blend: false,
+            view_transform: true,
             cull_face: true,
         }
     }
@@ -175,43 +178,28 @@ impl Renderer {
         let vao = self.ctx.create_vertex_array().expect("Can't creat VAO");
         self.ctx.bind_vertex_array(Some(&vao));
         // bind vertices
+        bind_buffer_and_attribute(&self.ctx, &program, "position", &mesh.geometry.vertices, 3)
+            .expect("Can't bind postion");
         if mesh.material.wire_overlay || shader_type == ShaderType::Wireframe {
-            let mut vertices = Vec::new();
             let mut bary_buffer = Vec::new();
             let barycentric: [f32; 9] = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
-            for each in mesh.geometry.indices.iter() {
-                let i = (each * 3) as usize;
-                vertices.push(mesh.geometry.vertices[i]);
-                vertices.push(mesh.geometry.vertices[i + 1]);
-                vertices.push(mesh.geometry.vertices[i + 2]);
-            }
-            for _ in 0..vertices.len() / 9 {
+            for _ in 0..mesh.geometry.vertices.len() / 9 {
                 for each in &barycentric {
                     bary_buffer.push(*each);
                 }
             }
-            bind_buffer_and_attribute(&self.ctx, &program, "position", &vertices, 3)
-                .expect("Can't bind postion");
-            bind_buffer_and_attribute(&self.ctx, &program, "barycentric", &bary_buffer[..], 3)
-                .expect("Can't bind postion");
-        } else {
-            bind_buffer_and_attribute(&self.ctx, &program, "position", &mesh.geometry.vertices, 3)
+            bind_buffer_and_attribute(&self.ctx, &program, "barycentric", &bary_buffer, 3)
                 .expect("Can't bind postion");
         }
         // bind normals
-        if shader_type == ShaderType::Color && mesh.material.wire_overlay {
-            let mut normals = Vec::new();
-            for each in mesh.geometry.indices.iter() {
-                let i = (each * 3) as usize;
-                normals.push(mesh.geometry.normals[i]);
-                normals.push(mesh.geometry.normals[i + 1]);
-                normals.push(mesh.geometry.normals[i + 2]);
-            }
-            bind_buffer_and_attribute(&self.ctx, &program, "normal", &normals, 3)
-                .expect("Can't bind normals");
-        } else if shader_type != ShaderType::Simple && shader_type != ShaderType::Wireframe {
+        if shader_type == ShaderType::Color {
             bind_buffer_and_attribute(&self.ctx, &program, "normal", &mesh.geometry.normals, 3)
                 .expect("Can't bind normals");
+        }
+        // bind texture
+        if let Some(coords) = mesh.material.tex_coords.as_ref() {
+            bind_buffer_and_attribute(&self.ctx, &program, "tex_coords", coords, 2)
+                .expect("Couldn't bind tex coordinates");
         }
         // bind vertex color
         if shader_type == ShaderType::VertexColor {
@@ -226,17 +214,6 @@ impl Renderer {
                 4,
             )
             .expect("Couldn't bind vertex colors.");
-        }
-        // bind texture
-        if let Some(tex_coords) = mesh.material.tex_coords.as_ref() {
-            bind_buffer_and_attribute(
-                &self.ctx,
-                &program,
-                "tex_coords",
-                tex_coords,
-                2,
-            )
-            .expect("Couldn't bind tex coordinates");
         }
         self.ctx.bind_buffer(GL::ARRAY_BUFFER, None);
         self.ctx.bind_vertex_array(None);
@@ -463,6 +440,11 @@ impl Renderer {
             Self::set_flags(&gl, info.render_flags);
             match info.draw_mode {
                 DrawMode::Arrays => {
+                    if shader_type == ShaderType::Wireframe {
+                        //gl.draw_arrays(GL::POINTS, 0, indices.len() as i32);
+                        //set_bool(gl, program, "drawing_points", true);
+                        set_bool(gl, program, "drawing_points", false);
+                    }
                     gl.draw_arrays(GL::TRIANGLES, 0, indices.len() as i32);
                 }
                 DrawMode::Lines => {
@@ -498,8 +480,8 @@ impl Renderer {
         let storage = scene.storage();
         let storage = storage.borrow();
         self.setup_lights(&storage);
-        self.update_viewport(viewport);
         let len = storage.meshes().len();
+        self.update_viewport(viewport);
         let render_stage = |condition: Box<dyn Fn(bool, Option<ShaderType>) -> bool>| {
             for i in 0..len {
                 let info = storage.info(i);

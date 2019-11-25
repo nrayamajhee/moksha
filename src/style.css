@@ -122,11 +122,11 @@ hr {
 	position: absolute;
 	top: 0;
 	left: 0;
-	transition: width 0.5s;
+	/*transition: width 2.0s;*/
 }
-#mesh-list #file li .progress.loaded {
-	transition:none; 
-}
+/*#mesh-list #file li .progress.loaded {*/
+	/*transition:none; */
+/*}*/
 #mesh-list {
 	display: none;
 	position: absolute;

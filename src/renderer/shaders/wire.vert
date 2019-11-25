@@ -10,5 +10,6 @@ out vec3 frag_bc;
 
 void main() {
 	gl_Position = proj * view * model * vec4(position, 1.0);
+	gl_PointSize = 10.0;
 	frag_bc = barycentric;
 }

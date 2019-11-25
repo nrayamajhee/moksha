@@ -96,6 +96,35 @@ impl Mesh {
     pub fn new(geometry: Geometry, material: Material) -> Self {
         Self { geometry, material }
     }
+    pub fn setup_unique_vertices(&mut self) {
+        let mut vertices = Vec::new();
+        for each in self.geometry.indices.iter() {
+            let i = (each * 3) as usize;
+            vertices.push(self.geometry.vertices[i]);
+            vertices.push(self.geometry.vertices[i + 1]);
+            vertices.push(self.geometry.vertices[i + 2]);
+        }
+        if !self.geometry.normals.is_empty() {
+            let mut normals = Vec::new();
+            for each in self.geometry.indices.iter() {
+                let i = (each * 3) as usize;
+                normals.push(self.geometry.normals[i]);
+                normals.push(self.geometry.normals[i + 1]);
+                normals.push(self.geometry.normals[i + 2]);
+            }
+            self.geometry.normals = normals;
+        }
+        self.geometry.vertices = vertices;
+        if let Some(tex_coords) = self.material.tex_coords.as_ref() {
+            let mut coords = Vec::new();
+            for each in self.geometry.indices.iter() {
+                let i = (each * 2) as usize;
+                coords.push(tex_coords[i]);
+                coords.push(tex_coords[i + 1]);
+            }
+            self.material.tex_coords = Some(coords);
+        }
+    }
 }
 
 /// Geometry of a 3D object containing vertices, indices, and face normals.

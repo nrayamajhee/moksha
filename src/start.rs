@@ -2,7 +2,7 @@ use crate::{
     controller::ProjectionConfig,
     dom_factory::{document, loop_animation_frame},
     editor::{console_setup, ConsoleConfig},
-    node, rc_rcell, node_from_obj,
+    node, node_from_obj, rc_rcell, node_from_obj_wired,
     renderer::{Renderer, RendererConfig},
     scene::LightType,
     Editor, Geometry, Material, Mesh, Node, Scene, Viewport,
@@ -41,9 +41,9 @@ fn cube(scene: &Scene, renderer: &Renderer) -> Node {
         0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Left
         0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
     ];
-    let cube_tex = Material::new_texture("/assets/img/box_tex.png", tex_coords);
+    let cube_tex = Material::new_texture("/assets/img/box_tex.png", tex_coords).wire_overlay();
     let cube_mesh = Mesh::new(cube_geometry.clone(), cube_tex);
-    let mut cube = node!(scene, Some(cube_mesh), "Wooden Cube");
+    let mut cube = node!(scene, Some(cube_mesh), "Wooden Cube", DrawMode::Arrays);
     let mesh = Mesh::new(cube_geometry, Material::vertex_colors(colors));
     let cube2 = node!(scene, Some(mesh), "Colored Cube");
     cube.set_position(5., 0., 5.);
@@ -144,6 +144,8 @@ pub fn start() -> Result<(), JsValue> {
     dir_node.borrow().set_position(30., 0., -10.);
 
     scene.add(sun.clone());
+    let cube = rc_rcell(cube(&scene, &a_rndr.borrow()));
+    scene.add(cube);
     scene.add_light(&ambient);
     ////scene.add_light(point2);
     ////scene.add_light(point);
@@ -151,9 +153,8 @@ pub fn start() -> Result<(), JsValue> {
 
     //_earth.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.02, 0.));
 
-    let obj = rc_rcell(
-        node_from_obj!(scene, "assets/obj/earth", "earth")
-    );
+    //let obj = rc_rcell(node_from_obj!(scene, "assets/obj/earth", "earth"));
+    let obj = rc_rcell(node_from_obj_wired!(scene, "assets/obj/earth", "earth"));
     obj.borrow().set_position(28., 0., 0.);
     scene.add(obj.clone());
     let a_scene = Rc::new(scene);

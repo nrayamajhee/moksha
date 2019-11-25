@@ -94,6 +94,7 @@ impl Scene {
                 ..Default::default()
             },
             false,
+            false
         ));
         let scene = Self {
             root,
@@ -177,10 +178,14 @@ impl Scene {
         transform: Transform,
         info: ObjectInfo,
         is_img_obj: bool,
+        setup_unique_vertices: bool,
     ) -> Node {
         let sto = storage.clone();
         let mut storage = storage.borrow_mut();
         let index = if let Some(mut mesh) = mesh {
+            if setup_unique_vertices {
+                mesh.setup_unique_vertices();
+            }
             let vao = renderer.create_vao(&mesh);
             let urls = &mesh.material.texture_urls;
             if urls.len() > 0 {
@@ -196,7 +201,7 @@ impl Scene {
         };
         Node::new(index, sto)
     }
-    pub fn from_mesh(&self, mesh: Option<Mesh>) -> Node {
+    pub fn from_mesh(&self, mesh: Option<Mesh>, setup_unique_vertices: bool) -> Node {
         Self::object(
             self.storage(),
             &self.renderer.borrow(),
@@ -204,6 +209,7 @@ impl Scene {
             Default::default(),
             Default::default(),
             false,
+            setup_unique_vertices
         )
     }
     pub fn empty(&self, name: &str) -> Node {
@@ -216,7 +222,8 @@ impl Scene {
                 name: name.to_string(),
                 ..Default::default()
             },
-            false
+            false,
+            false,
         )
     }
     pub fn light(&self, light_type: LightType, color: [f32; 3], intensity: f32) -> Light {
@@ -229,6 +236,124 @@ impl Scene {
             light: false,
         });
         Light { light_id, node }
+    }
+    pub fn load_object_from_obj_wired(
+        &self,
+        dir: &str,
+        object: &obj::Object,
+        mat_set: &Option<mtl::MtlSet>,
+        img_obj_url: Option<&HashMap<String, String>>,
+    ) -> Node {
+        let mut buf_vertices = Vec::new();
+        for vertex in &object.vertices {
+            buf_vertices.push(vertex.x as f32);
+            buf_vertices.push(vertex.y as f32);
+            buf_vertices.push(vertex.z as f32);
+        }
+        let mut buf_normals = Vec::new();
+        for normal in &object.normals {
+            buf_normals.push(normal.x as f32);
+            buf_normals.push(normal.y as f32);
+            buf_normals.push(normal.z as f32);
+        }
+        let mut buf_tex_coords = Vec::new();
+        for normal in &object.normals {
+            buf_tex_coords.push(normal.x as f32);
+            buf_tex_coords.push(normal.y as f32);
+            buf_tex_coords.push(normal.z as f32);
+        }
+        let mut vertices = Vec::new();
+        let mut normals = Vec::new();
+        let mut indices = Vec::new();
+        let mut tex_coords = Vec::new();
+        for shape in &object.geometry[0].shapes {
+            if let obj::Primitive::Triangle(a, b, c) = shape.primitive {
+                if a.1 != None && a.2 != None {
+                    for ((a, ua), na) in [a.0, b.0, c.0]
+                        .iter()
+                        .zip([a.1.unwrap(), b.1.unwrap(), c.1.unwrap()].iter())
+                        .zip([a.2.unwrap(), b.2.unwrap(), c.2.unwrap()].iter())
+                    {
+                        let (e, ue, ne) = (*a * 3, *ua, *na);
+                        indices.push(e as u16);
+                        vertices.push(buf_vertices[e]);
+                        vertices.push(buf_vertices[e + 1]);
+                        vertices.push(buf_vertices[e + 2]);
+                        normals.push(buf_vertices[e]);
+                        normals.push(buf_vertices[e + 1]);
+                        normals.push(buf_vertices[e + 2]);
+                        let u = object.tex_vertices[ue].u as f32;
+                        let v = -object.tex_vertices[ue].v as f32;
+                        tex_coords.push(u);
+                        tex_coords.push(v);
+                    }
+                } else {
+                    log!("obj file doesn't have normal or uv indices. Only vertices are loaded");
+                }
+            }
+        }
+        let geometry = Geometry {
+            vertices,
+            indices,
+            normals,
+        };
+        let material = Self::load_material(
+            dir,
+            object,
+            mat_set,
+            tex_coords,
+            img_obj_url
+        );
+        let node = self.from_mesh(Some(Mesh{geometry, material}), false);
+        let mut info = node.info();
+        info.draw_mode = DrawMode::Arrays;
+        info.name = object.name.clone();
+        node.set_info(info);
+        node
+    }
+    pub fn load_material(
+        dir: &str,
+        object: &obj::Object,
+        mat_set: &Option<mtl::MtlSet>,
+        tex_coords: Vec<f32>,
+        img_obj_url: Option<&HashMap<String, String>>,
+    ) -> Material {
+        let mut material = Material::new_color(1., 1., 1., 1.);
+        if let Some(material_name) = &object.geometry[0].material_name {
+            if let Some(mat_set) = mat_set {
+                for each in &mat_set.materials {
+                    if &each.name == material_name {
+                        let c = each.color_diffuse;
+                        material = Material::new_color(
+                            c.r as f32,
+                            c.g as f32,
+                            c.b as f32,
+                            each.alpha as f32,
+                        );
+                        if let Some(name) = &each.uv_map {
+                            if let Some(urls) = img_obj_url {
+                                if let Some(url) = urls.get(name) {
+                                    material = material.texture(url, tex_coords)
+                                } else {
+                                    log!("The file with name " name.to_string() " was not uploaded. Resorting to color")
+                                }
+                            } else {
+                                if dir == "" {
+                                    log!("Invalid texture path! Won't load any texture for " name.to_string() ".");
+                                } else {
+                                    material = material.texture(&format!("{}/{}", dir, name), tex_coords)
+                                }
+                            }
+                        }
+                        if object.geometry[0].shapes[0].smoothing_groups.is_empty() {
+                            material = material.flat();
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        material
     }
     pub fn load_object_from_obj(
         &self,
@@ -263,11 +388,7 @@ impl Scene {
             normals[e + 1] = avg_normal.y;
             normals[e + 2] = avg_normal.z;
         };
-        let mut flat = false;
         for shape in &object.geometry[0].shapes {
-            if shape.smoothing_groups.is_empty() {
-                flat = true;
-            }
             if let obj::Primitive::Triangle(a, b, c) = shape.primitive {
                 if a.1 != None && a.2 != None {
                     for ((a, ua), na) in [a.0, b.0, c.0]
@@ -310,45 +431,20 @@ impl Scene {
             indices,
             normals,
         };
-        let mut material = Material::new_color(1., 1., 1., 1.);
-        if let Some(material_name) = &object.geometry[0].material_name {
-            if let Some(mat_set) = mat_set {
-                for each in &mat_set.materials {
-                    if &each.name == material_name {
-                        let c = each.color_diffuse;
-                        material = Material::new_color(
-                            c.r as f32,
-                            c.g as f32,
-                            c.b as f32,
-                            each.alpha as f32,
-                        );
-                        if let Some(name) = &each.uv_map {
-                            if let Some(urls) = img_obj_url {
-                                if let Some(url) = urls.get(name) {
-                                    material = material.texture(url, tex_coords)
-                                } else {
-                                    log!("The file with name " name.to_string() " was not uploaded. Resorting to color")
-                                }
-                            } else {
-                                log!(dir.to_string() "/" name.to_string());
-                                material = material.texture(&format!("{}/{}", dir, name), tex_coords)
-                            }
-                        }
-                        if flat {
-                            material = material.flat();
-                        }
-                        break;
-                    }
-                }
-            }
-        }
+        let material = Self::load_material(
+            dir,
+            object,
+            mat_set,
+            tex_coords,
+            img_obj_url
+        );
         node!(
             &self,
             Some(Mesh { geometry, material }),
             object.name.clone()
         )
     }
-    pub fn object_from_obj(&self, dir: &str, obj_src: &str, mtl_src: Option<&str>, img_obj_url: Option<&HashMap<String, String>>) -> Node {
+    pub fn object_from_obj(&self, dir: &str, obj_src: &str, mtl_src: Option<&str>, img_obj_url: Option<&HashMap<String, String>>, wire_overlay: bool) -> Node {
         let obj_set = obj::parse(obj_src).unwrap();
         assert!(!obj_set.objects.is_empty(), "No objects in the obj file");
         let mat_set = if let Some(src) = mtl_src {
@@ -356,11 +452,19 @@ impl Scene {
         } else {
             None
         };
-        let mut root = self.load_object_from_obj(dir, &obj_set.objects[0], &mat_set, img_obj_url);
-        for object in obj_set.objects.iter().skip(1) {
-            root.add(rc_rcell(self.load_object_from_obj(dir, &object, &mat_set, img_obj_url)));
+        if wire_overlay {
+            let mut root = self.load_object_from_obj_wired(dir, &obj_set.objects[0], &mat_set, img_obj_url);
+            for object in obj_set.objects.iter().skip(1) {
+                root.add(rc_rcell(self.load_object_from_obj_wired(dir, &object, &mat_set, img_obj_url)));
+            }
+            root
+        } else {
+            let mut root = self.load_object_from_obj(dir, &obj_set.objects[0], &mat_set, img_obj_url);
+            for object in obj_set.objects.iter().skip(1) {
+                root.add(rc_rcell(self.load_object_from_obj(dir, &object, &mat_set, img_obj_url)));
+            }
+            root
         }
-        root
     }
     pub fn storage(&self) -> RcRcell<Storage> {
         self.root.borrow().storage()
@@ -390,6 +494,7 @@ impl Scene {
             mesh,
             transform,
             info,
+            false,
             false,
         )
     }

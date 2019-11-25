@@ -25,13 +25,13 @@ pub enum Projection {
 }
 
 impl Projection {
-    fn to_matrix(self) -> Matrix4<f32> {
+    pub fn to_matrix(self) -> Matrix4<f32> {
         match self {
             Projection::Orthographic(proj) => Matrix4::from(proj),
             Projection::Perspective(proj) => Matrix4::from(proj),
         }
     }
-    fn unproject_point(&self, point: &Point3<f32>) -> Point3<f32> {
+    pub fn unproject_point(&self, point: &Point3<f32>) -> Point3<f32> {
         match self {
             Projection::Orthographic(proj) => proj.unproject_point(&point),
             Projection::Perspective(proj) => proj.unproject_point(&point),

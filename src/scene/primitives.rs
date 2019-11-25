@@ -3,7 +3,7 @@ use crate::{
     node,
     renderer::RenderFlags,
     scene::{LightType, Node, Scene},
-    Mesh, ObjectInfo,
+    Mesh, 
 };
 use genmesh::generators::{Circle, Cone, Cube, Cylinder, IcoSphere, Plane, SphereUv, Torus};
 use nalgebra::UnitQuaternion;
