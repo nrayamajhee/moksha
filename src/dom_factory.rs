@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{
     Document, Element, Event, EventTarget, FileList, FileReader, HtmlCanvasElement, HtmlCollection,
-    HtmlElement, HtmlInputElement, Node, NodeList, Window, ProgressEvent
+    HtmlElement, HtmlInputElement, Node, NodeList, ProgressEvent, Window,
 };
 
 pub fn window() -> Window {
@@ -66,7 +66,10 @@ where
 }
 
 pub fn now() -> f64 {
-    window().performance().expect("Performance should be available").now()
+    window()
+        .performance()
+        .expect("Performance should be available")
+        .now()
 }
 
 pub fn set_timeout<H>(callback: H, timeout: i32)
@@ -244,7 +247,8 @@ pub fn get_target_file_result(e: &Event) -> String {
 }
 
 pub fn get_progress(e: Event) -> ProgressEvent {
-    e.dyn_into::<ProgressEvent>().expect("Can't cast event as ProgrssEvent")
+    e.dyn_into::<ProgressEvent>()
+        .expect("Can't cast event as ProgrssEvent")
 }
 
 pub fn get_target_parent_el(e: &Event, level: usize) -> Element {

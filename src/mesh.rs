@@ -1,4 +1,4 @@
-use crate::renderer::{ShaderType};
+use crate::renderer::ShaderType;
 use genmesh::{
     generators::{IndexedPolygon, SharedVertex},
     EmitTriangles, Triangulate, Vertex,
@@ -191,6 +191,13 @@ impl Geometry {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TextureType {
+    Tex2d,
+    CubeMap,
+    None,
+}
+
 /// Material for a 3D object; can contain either color, vertex colors, or texture.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Material {
@@ -199,6 +206,7 @@ pub struct Material {
     pub wire_overlay: bool,
     pub color: Option<[f32; 4]>,
     pub vertex_colors: Option<Vec<f32>>,
+    pub tex_type: TextureType,
     pub tex_coords: Option<Vec<f32>>,
     pub texture_urls: Vec<String>,
     pub texture_indices: Vec<usize>,
@@ -212,6 +220,7 @@ impl Default for Material {
             wire_overlay: false,
             color: None,
             vertex_colors: None,
+            tex_type: TextureType::None,
             tex_coords: None,
             texture_urls: Vec::new(),
             texture_indices: Vec::new(),
@@ -233,9 +242,20 @@ impl Material {
             .wire_overlay()
             .shader_type(ShaderType::Wireframe)
     }
-    pub fn new_texture(url: &str, tex_coords: Vec<f32>) -> Self  {
-        Self::new_color(1.,1.,1.,1.)
-            .texture(url, tex_coords)
+    pub fn new_texture(url: &str, tex_coords: Vec<f32>) -> Self {
+        Self::new_color(1., 1., 1., 1.)
+            .tex_type(TextureType::Tex2d)
+            .tex_coords(tex_coords)
+            .texture(url)
+    }
+    pub fn new_cube_map(urls: [&str; 6]) -> Self {
+        let mut mat = Self::new_color(1., 1., 1., 1.)
+            .shader_type(ShaderType::CubeMap)
+            .tex_type(TextureType::CubeMap);
+        for each in urls.iter() {
+            mat = mat.texture(each);
+        }
+        mat
     }
     pub fn color(mut self, r: f32, g: f32, b: f32, a: f32) -> Self {
         self.color = Some([r, g, b, a]);
@@ -249,12 +269,19 @@ impl Material {
         self.shader_type = shader;
         self
     }
+    pub fn tex_type(mut self, tex_type: TextureType) -> Self {
+        self.tex_type = tex_type;
+        self
+    }
     pub fn wire_overlay(mut self) -> Self {
         self.wire_overlay = true;
         self
     }
-    pub fn texture(mut self, url: &str, tex_coords: Vec<f32>) -> Self {
+    pub fn tex_coords(mut self, tex_coords: Vec<f32>) -> Self {
         self.tex_coords = Some(tex_coords);
+        self
+    }
+    pub fn texture(mut self, url: &str) -> Self {
         self.texture_urls.push(String::from(url));
         self
     }

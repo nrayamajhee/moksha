@@ -6,9 +6,9 @@ macro_rules! node_from_obj_wired {
             include_str!(concat!($dir, "/", $file, ".obj")),
             Some(include_str!(concat!($dir, "/", $file, ".mtl"))),
             None,
-            true
+            true,
         )
-    }}
+    }};
 }
 #[macro_export]
 macro_rules! node_from_obj {
@@ -18,9 +18,9 @@ macro_rules! node_from_obj {
             include_str!(concat!($dir, "/", $file, ".obj")),
             Some(include_str!(concat!($dir, "/", $file, ".mtl"))),
             None,
-            false
+            false,
         )
-    }}
+    }};
 }
 #[macro_export]
 macro_rules! node {

@@ -5,17 +5,17 @@ mod toolbar;
 use crate::{
     dom_factory::{add_event, get_el, window},
     mesh::{Geometry, Material},
-    node, rc_rcell, ProjectionType,
+    node, rc_rcell,
     scene::{
         primitives::{create_origin, create_transform_gizmo, ArrowTip},
         Node, Scene,
     },
-    Mesh, RcRcell, Viewport,
+    Mesh, ProjectionType, RcRcell, Viewport,
 };
 pub use console::{console_setup, ConsoleConfig};
 use genmesh::generators::Plane;
 pub use gizmo::{CollisionConstraint, Gizmo};
-use nalgebra::{UnitQuaternion, Point3};
+use nalgebra::{Point3, UnitQuaternion};
 use ncollide3d::query::Ray;
 use std::f32::consts::PI;
 use std::rc::Rc;
@@ -52,9 +52,7 @@ impl Editor {
         grid.set_scale(50.0);
         grid.set_rotation(UnitQuaternion::from_euler_angles(PI / 2., 0., 0.));
         let gizmo = create_transform_gizmo(&scene, ArrowTip::Cone);
-        let spawn_origin = rc_rcell({
-            create_origin(&scene)
-        });
+        let spawn_origin = rc_rcell({ create_origin(&scene) });
         scene.add(spawn_origin.clone());
         scene.show(&gizmo);
         let gizmo = Gizmo::new(gizmo);
@@ -79,16 +77,19 @@ impl Editor {
         let origin = self.spawn_origin.borrow();
         let view = self.scene().view();
         let view = view.borrow();
-        let (g_mag, o_mag) = if self.scene().view().borrow().projection_type() == ProjectionType::Perspective {
-            let eye = Point3::from(view.eye());
-            let g_pos = Point3::from(gizmo.global_position());
-            let o_pos = Point3::from(origin.global_position());
-            ((eye - g_pos).magnitude() / 60.,
-            (eye - o_pos).magnitude() / 60.) 
-        } else {
-            let d = view.transform().translation.vector.magnitude() / 60.;
-            (d, d)
-        };
+        let (g_mag, o_mag) =
+            if self.scene().view().borrow().projection_type() == ProjectionType::Perspective {
+                let eye = Point3::from(view.eye());
+                let g_pos = Point3::from(gizmo.global_position());
+                let o_pos = Point3::from(origin.global_position());
+                (
+                    (eye - g_pos).magnitude() / 60.,
+                    (eye - o_pos).magnitude() / 60.,
+                )
+            } else {
+                let d = view.transform().translation.vector.magnitude() / 60.;
+                (d, d)
+            };
         gizmo.set_scale(g_mag);
         origin.set_scale(o_mag);
     }
@@ -131,7 +132,8 @@ impl Editor {
         add_event(&rndr.borrow().canvas(), "mousemove", move |e| {
             let gizmo = editor.gizmo.borrow();
             let view = editor.scene.view();
-            if gizmo.collision_constraint() == CollisionConstraint::None || view.borrow().zooming() {
+            if gizmo.collision_constraint() == CollisionConstraint::None || view.borrow().zooming()
+            {
                 return;
             }
             let active_node = editor.active_node.borrow();
@@ -171,7 +173,6 @@ impl Editor {
             }
             gizmo.handle_mouseup();
         });
-
 
         let editor = self.clone();
         add_event(&window(), "keydown", move |e| {

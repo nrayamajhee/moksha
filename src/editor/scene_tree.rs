@@ -5,7 +5,7 @@ use crate::{
         get_parent, get_target_el, get_target_innerh, get_target_parent_el, insert_el,
         insert_el_at, query_el, remove_class,
     },
-    log, Editor, Node, RcRcell 
+    log, Editor, Node, RcRcell,
 };
 use maud::html;
 use wasm_bindgen::JsCast;
@@ -25,7 +25,7 @@ fn markup() -> String {
     let markup = html! {
             section #right-panel {
                 section #scene-tree.panel {
-                    h3 {"Scene"}
+                    h3 {"Scene Tree"}
                 }
                 section #properties.panel {
                     h3 {"Properties"}
@@ -56,8 +56,7 @@ pub fn build_node(editor: &Editor, parent: &Element, node: NodeRef) -> Element {
     };
     let recurse_children = |children: &Vec<RcRcell<Node>>, owned_children: &Vec<Node>| {
         for child in children {
-            let child_el =
-                build_node(editor, &ul, NodeRef::Mutable(child.clone()));
+            let child_el = build_node(editor, &ul, NodeRef::Mutable(child.clone()));
             let li = create_el("li");
             insert_el(&li, &child_el);
             insert_el(&ul, &li);

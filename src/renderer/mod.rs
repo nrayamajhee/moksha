@@ -4,9 +4,8 @@ use crate::{
     dom_factory::{body, get_canvas, resize_canvas},
     log,
     mesh::Mesh,
-    ProjectionType,
     scene::Scene,
-    LightType, Storage,
+    LightType, ProjectionType, Storage, TextureType,
 };
 use maud::html;
 use nalgebra::{UnitQuaternion, Vector3};
@@ -81,6 +80,12 @@ impl RenderFlags {
             ..Default::default()
         }
     }
+    pub fn no_cull() -> Self {
+        Self{
+            cull_face: false,
+            ..Default::default()
+        }
+    }
     pub fn blend_cull() -> Self {
         Self {
             blend: true,
@@ -145,6 +150,15 @@ impl Renderer {
             .expect("Can't create color shader!"),
         );
         shaders.insert(
+            ShaderType::CubeMap,
+            create_program(
+                &ctx,
+                include_str!("shaders/cube.vert"),
+                include_str!("shaders/cube.frag"),
+            )
+            .expect("Can't create cubemap shader!"),
+        );
+        shaders.insert(
             ShaderType::Wireframe,
             create_program(
                 &ctx,
@@ -198,8 +212,10 @@ impl Renderer {
         }
         // bind texture
         if let Some(coords) = mesh.material.tex_coords.as_ref() {
-            bind_buffer_and_attribute(&self.ctx, &program, "tex_coords", coords, 2)
-                .expect("Couldn't bind tex coordinates");
+            if mesh.material.tex_type == TextureType::Tex2d {
+                bind_buffer_and_attribute(&self.ctx, &program, "tex_coords", coords, 2)
+                    .expect("Couldn't bind tex coordinates");
+            }
         }
         // bind vertex color
         if shader_type == ShaderType::VertexColor {
@@ -356,7 +372,12 @@ impl Renderer {
             if let Some(program) = self.shaders.get(&each) {
                 let gl = &self.ctx;
                 gl.use_program(Some(&program));
-                set_mat4(gl, &program, "view", &viewport.view());
+                if each == ShaderType::CubeMap {
+                    //set_mat4(gl, &program, "view", &viewport.view());
+                    set_mat4(gl, &program, "view", &viewport.transform().rotation.to_homogeneous());
+                } else {
+                    set_mat4(gl, &program, "view", &viewport.view());
+                }
                 set_mat4(gl, &program, "proj", &viewport.proj());
                 if each == ShaderType::Color {
                     set_vec3(gl, program, "eye", &viewport.eye());
@@ -416,19 +437,28 @@ impl Renderer {
             if shader_type == ShaderType::Color {
                 set_bool(gl, program, "flat_shade", mesh.material.flat_shade);
                 set_bool(gl, program, "wire_overlay", mesh.material.wire_overlay);
-                if let Some(_) = mesh.material.tex_coords {
+                if !mesh.material.texture_indices.is_empty() {
+                    set_bool(gl, program, "has_albedo", true);
                     let tex_i = mesh.material.texture_indices[0];
                     let texture = storage.texture(tex_i);
-                    gl.bind_texture(GL::TEXTURE_2D, Some(&texture));
                     gl.active_texture(GL::TEXTURE0);
+                    gl.bind_texture(GL::TEXTURE_2D, Some(&texture));
                     set_i32(gl, program, "sampler", 0);
-                    set_bool(gl, program, "has_albedo", true);
                 } else {
                     set_bool(gl, program, "has_albedo", false);
                 }
             }
+            if shader_type == ShaderType::CubeMap {
+                let tex_i = mesh.material.texture_indices[0];
+                let texture = storage.texture(tex_i);
+                gl.active_texture(GL::TEXTURE0);
+                gl.bind_texture(GL::TEXTURE_CUBE_MAP, Some(&texture));
+                set_i32(gl, program, "sampler", 0);
+            }
             let model = storage.parent_tranform(i) * storage.transform(i);
-            set_mat4(gl, program, "model", &model.to_homogeneous());
+            if shader_type != ShaderType::CubeMap {
+                set_mat4(gl, program, "model", &model.to_homogeneous());
+            }
             let indices = &mesh.geometry.indices;
             bind_index_buffer(gl, &indices).expect("Can't bind index buffer!");
 
@@ -495,15 +525,20 @@ impl Renderer {
                 }
             }
         };
-        // render normal meshes first
+        // render normal meshes
         render_stage(Box::new(|depth, shader_type| {
+            // has depth but isn't wireframe
             depth && shader_type != Some(ShaderType::Wireframe)
         }));
-        // render wireframe next
-        render_stage(Box::new(|depth, shader_type| {
-            depth && shader_type == Some(ShaderType::Wireframe)
+        // render wireframe
+        render_stage(Box::new(|_, shader_type| {
+            shader_type == Some(ShaderType::Wireframe)
         }));
-        // render depthless mesh last
+        // render cubemap 
+        render_stage(Box::new(|_, shader_type| {
+            shader_type == Some(ShaderType::CubeMap)
+        }));
+        // render depthless mesh
         render_stage(Box::new(|depth, _| !depth));
         gl.bind_vertex_array(None);
         gl.bind_buffer(GL::ARRAY_BUFFER, None);

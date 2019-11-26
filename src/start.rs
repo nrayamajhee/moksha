@@ -2,7 +2,7 @@ use crate::{
     controller::ProjectionConfig,
     dom_factory::{document, loop_animation_frame},
     editor::{console_setup, ConsoleConfig},
-    node, node_from_obj, rc_rcell, node_from_obj_wired,
+    node, node_from_obj, node_from_obj_wired, rc_rcell,
     renderer::{Renderer, RendererConfig},
     scene::LightType,
     Editor, Geometry, Material, Mesh, Node, Scene, Viewport,
@@ -41,16 +41,11 @@ fn cube(scene: &Scene, renderer: &Renderer) -> Node {
         0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Left
         0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
     ];
-    let cube_tex = Material::new_texture("/assets/img/box_tex.png", tex_coords).wire_overlay();
+    let cube_tex = Material::new_texture("assets/img/box_tex.png", tex_coords);
     let cube_mesh = Mesh::new(cube_geometry.clone(), cube_tex);
     let mut cube = node!(scene, Some(cube_mesh), "Wooden Cube", DrawMode::Arrays);
-    let mesh = Mesh::new(cube_geometry, Material::vertex_colors(colors));
-    let cube2 = node!(scene, Some(mesh), "Colored Cube");
     cube.set_position(5., 0., 5.);
     cube.set_scale(0.2);
-    cube2.set_position(4., 0., 0.);
-    let a_cube2 = rc_rcell(cube2);
-    //cube.add(a_cube2);
     cube
 }
 
@@ -78,52 +73,53 @@ pub fn start() -> Result<(), JsValue> {
     let a_rndr = rc_rcell(renderer);
     let a_view = rc_rcell(viewport);
     let scene = Scene::new(a_rndr.clone(), a_view.clone());
-    let (sun, _earth) = {
-        //let scene = a_scene.borrow();
-        let renderer = a_rndr.borrow();
-        //let viewport = a_view.borrow();
+    scene.set_skybox("assets/img/milkyway", "jpg");
+    //let (sun, _earth) = {
+    ////let scene = a_scene.borrow();
+    //let renderer = a_rndr.borrow();
+    ////let viewport = a_view.borrow();
 
-        let mut sun = node!(
-            scene,
-            Some(Mesh::new(
-                Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(2)),
-                Material::new_color_no_shade(1.0, 1.0, 0.0, 1.0),
-            )),
-            "Sun"
-        );
+    //let mut sun = node!(
+    //scene,
+    //Some(Mesh::new(
+    //Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(2)),
+    //Material::new_color_no_shade(1.0, 1.0, 0.0, 1.0),
+    //)),
+    //"Sun"
+    //);
 
-        let mut earth = node!(
-            scene,
-            Some(Mesh::new(
-                Geometry::from_genmesh(&SphereUv::new(16, 8)),
-                Material::new_color(0.0, 0.0, 1.0, 1.0).wire_overlay(),
-            )),
-            DrawMode::Arrays,
-            "Earth"
-        );
-        //let mut geometry = Geometry::from_genmesh(&SphereUv::new(64, 32));
-        //let material =
-        //Material::new_texture("assets/img/moon.jpg", gen_sphere_uv(&mut geometry)).unwrap();
-        //let mut moon = node!(scene, Some(Mesh { geometry, material }), "Moon");
-        //moon.rotate_by(UnitQuaternion::from_euler_angles(PI / 2., 0., 0.));
+    //let mut earth = node!(
+    //scene,
+    //Some(Mesh::new(
+    //Geometry::from_genmesh(&SphereUv::new(16, 8)),
+    //Material::new_color(0.0, 0.0, 1.0, 1.0).wire_overlay(),
+    //)),
+    //DrawMode::Arrays,
+    //"Earth"
+    //);
+    ////let mut geometry = Geometry::from_genmesh(&SphereUv::new(64, 32));
+    ////let material =
+    ////Material::new_texture("assets/img/moon.jpg", gen_sphere_uv(&mut geometry)).unwrap();
+    ////let mut moon = node!(scene, Some(Mesh { geometry, material }), "Moon");
+    ////moon.rotate_by(UnitQuaternion::from_euler_angles(PI / 2., 0., 0.));
 
-        let cube = rc_rcell(cube(&scene, &a_rndr.borrow()));
-        //moon.add(cube);
-        //moon.set_position(6.0, 0.0, 0.0);
-        earth.set_position(10.0, 0.0, 0.0);
-        earth.set_scale(0.5);
-        //moon.set_scale(0.5);
-        sun.set_scale(2.0);
+    //let cube = rc_rcell(cube(&scene, &a_rndr.borrow()));
+    ////moon.add(cube);
+    ////moon.set_position(6.0, 0.0, 0.0);
+    //earth.set_position(10.0, 0.0, 0.0);
+    //earth.set_scale(0.5);
+    ////moon.set_scale(0.5);
+    //sun.set_scale(2.0);
 
-        //let moon = rc_rcell(moon);
-        //earth.add(moon.clone());
-        let earth = rc_rcell(earth);
-        sun.add(earth.clone());
-        let sun = rc_rcell(sun);
-        (sun, earth)
-    };
+    ////let moon = rc_rcell(moon);
+    ////earth.add(moon.clone());
+    //let earth = rc_rcell(earth);
+    //sun.add(earth.clone());
+    //let sun = rc_rcell(sun);
+    //(sun, earth)
+    //};
 
-    let ambient = scene.light(LightType::Ambient, [1.0, 1.0, 1.0], 0.1);
+    let ambient = scene.light(LightType::Ambient, [1.0, 1.0, 1.0], 0.5);
     let amb_node = ambient.node();
     amb_node.borrow().set_position(10., 0., 10.);
 
@@ -143,9 +139,9 @@ pub fn start() -> Result<(), JsValue> {
     let dir_node = directional.node();
     dir_node.borrow().set_position(30., 0., -10.);
 
-    scene.add(sun.clone());
+    //scene.add(sun.clone());
     let cube = rc_rcell(cube(&scene, &a_rndr.borrow()));
-    scene.add(cube);
+    scene.add(cube.clone());
     scene.add_light(&ambient);
     ////scene.add_light(point2);
     ////scene.add_light(point);
@@ -153,14 +149,14 @@ pub fn start() -> Result<(), JsValue> {
 
     //_earth.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.02, 0.));
 
-    //let obj = rc_rcell(node_from_obj!(scene, "assets/obj/earth", "earth"));
-    let obj = rc_rcell(node_from_obj_wired!(scene, "assets/obj/earth", "earth"));
+    let obj = rc_rcell(node_from_obj!(scene, "../assets/obj/earth", "earth"));
+    //let obj = rc_rcell(node_from_obj_wired!(scene, "assets/obj/earth", "earth"));
     obj.borrow().set_position(28., 0., 0.);
     scene.add(obj.clone());
     let a_scene = Rc::new(scene);
     let mut editor = Editor::new(a_scene.clone());
 
-    editor.set_active_node(obj.clone());
+    editor.set_active_node(cube);
     let a_editor = rc_rcell(editor);
     //sun.borrow()
     //.rotate_by(UnitQuaternion::from_euler_angles(0., PI / 3., 0.));

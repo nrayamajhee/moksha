@@ -3,7 +3,7 @@ use crate::{
     node,
     renderer::RenderFlags,
     scene::{LightType, Node, Scene},
-    Mesh, 
+    Mesh,
 };
 use genmesh::generators::{Circle, Cone, Cube, Cylinder, IcoSphere, Plane, SphereUv, Torus};
 use nalgebra::UnitQuaternion;
@@ -236,9 +236,30 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowTip) -> Node {
     node.own(y_p);
     node.own(z_p);
     if arrow_type == ArrowTip::Sphere {
-        let n_x = create_arrow(scene, [1.0, 0.0, 0.0, 1.0], arrow_type, "snap-x", false, true);
-        let n_y = create_arrow(scene, [0.0, 1.0, 0.0, 1.0], arrow_type, "snap-y", false, true);
-        let n_z = create_arrow(scene, [0.0, 0.0, 1.0, 1.0], arrow_type, "snap-z", false, true);
+        let n_x = create_arrow(
+            scene,
+            [1.0, 0.0, 0.0, 1.0],
+            arrow_type,
+            "snap-x",
+            false,
+            true,
+        );
+        let n_y = create_arrow(
+            scene,
+            [0.0, 1.0, 0.0, 1.0],
+            arrow_type,
+            "snap-y",
+            false,
+            true,
+        );
+        let n_z = create_arrow(
+            scene,
+            [0.0, 0.0, 1.0, 1.0],
+            arrow_type,
+            "snap-z",
+            false,
+            true,
+        );
         n_x.set_position(6., 0., 0.);
         n_y.set_position(0., -6., 0.);
         n_z.set_position(0., 0., -6.);

@@ -1,8 +1,7 @@
 #version 300 es
 uniform mat4 model, view, proj;
 uniform vec3 eye;
-uniform bool wire_overlay;
-uniform bool has_albedo;
+uniform bool wire_overlay, has_albedo;
 
 in vec3 position, normal, barycentric;
 in vec2 tex_coords;

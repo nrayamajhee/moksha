@@ -33,7 +33,7 @@ pub mod scene;
 pub use crate::{
     controller::{MouseButton, ProjectionType, Viewport},
     editor::Editor,
-    mesh::{Geometry, Material, Mesh, Transform},
+    mesh::{Geometry, Material, Mesh, TextureType, Transform},
     renderer::Renderer,
     scene::{Light, LightType, Node, ObjectInfo, Primitive, Scene, Storage},
 };

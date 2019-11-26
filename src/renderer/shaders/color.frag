@@ -86,7 +86,6 @@ void main() {
 		texture(sampler, frag_tex).rgb:
 		color.rgb;
 
-
 	for (int i = 0; i < num_l_amb; i++) {
 		result += calc_amb_light(amb_lights[i], frag_color);
 	}
@@ -101,6 +100,6 @@ void main() {
 	}
 
 	outputColor = wire_overlay?
-		vec4(mix(color.xyz,result, edgeFactor()), 1.0):
+		vec4(mix(color.rgb,result, edgeFactor()), 1.0):
 		vec4(result, 1.0);
 }

@@ -1,10 +1,10 @@
-use crate::{dom_factory::add_event, rc_rcell};
+use crate::{dom_factory::add_event, rc_rcell, TextureType};
 use js_sys::{Float32Array, Uint16Array, Uint8Array};
 use nalgebra::Matrix4;
 use std::rc::Rc;
 use wasm_bindgen::JsValue;
 use web_sys::{
-    HtmlImageElement, WebGl2RenderingContext as GL, WebGlProgram, WebGlShader, WebGlTexture, Url,
+    HtmlImageElement, Url, WebGl2RenderingContext as GL, WebGlProgram, WebGlShader, WebGlTexture,
 };
 
 use strum_macros::{Display, EnumIter};
@@ -12,8 +12,9 @@ use strum_macros::{Display, EnumIter};
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Display, EnumIter)]
 pub enum ShaderType {
     Simple,
-    Color,
     Wireframe,
+    Color,
+    CubeMap,
     VertexColor,
 }
 
@@ -124,45 +125,101 @@ pub fn link_program(
             .unwrap_or_else(|| String::from("Unknown error creating program object")))
     }
 }
-pub fn bind_texture(gl: &GL, url: &str, is_img_obj: bool) -> Result<Rc<WebGlTexture>, JsValue> {
+pub fn bind_texture(
+    gl: &GL,
+    urls: &[String],
+    tex_type: TextureType,
+    is_img_obj: bool,
+) -> Result<Rc<WebGlTexture>, JsValue> {
     let texture = gl.create_texture().expect("Can't create texture!");
-    gl.bind_texture(GL::TEXTURE_2D, Some(&texture));
-    let pixel = unsafe { Uint8Array::view(&[255, 0, 255, 255]) };
-    gl.tex_image_2d_with_i32_and_i32_and_i32_and_format_and_type_and_opt_array_buffer_view(
-        GL::TEXTURE_2D,
-        0,
-        GL::RGBA as i32,
-        1,
-        1,
-        0,
-        GL::RGBA,
-        GL::UNSIGNED_BYTE,
-        Some(&pixel),
-    )?;
-    let image = Rc::new(HtmlImageElement::new().expect("Can't create Image Element"));
-    let img = image.clone();
-    let texture = Rc::new(texture);
-    let tex = texture.clone();
-    // couldn't avoid this
-    let gl = gl.clone();
-    add_event(&image, "load", move |_| {
-        if is_img_obj {
-            Url::revoke_object_url(&img.src());
+    let gl_tex_type = match tex_type {
+        TextureType::CubeMap => GL::TEXTURE_CUBE_MAP,
+        _ => GL::TEXTURE_2D,
+    };
+    gl.bind_texture(gl_tex_type, Some(&texture));
+    if tex_type == TextureType::CubeMap {
+        for i in 0..6 {
+            gl.tex_image_2d_with_i32_and_i32_and_i32_and_format_and_type_and_opt_u8_array(
+                GL::TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                0,
+                GL::RGBA as i32,
+                1,
+                1,
+                0,
+                GL::RGBA,
+                GL::UNSIGNED_BYTE,
+                Some(&[255, 0, 255, 255]),
+            )?;
         }
-        gl.bind_texture(GL::TEXTURE_2D, Some(&tex));
-        gl.tex_image_2d_with_u32_and_u32_and_html_image_element(
+    } else {
+        gl.tex_image_2d_with_i32_and_i32_and_i32_and_format_and_type_and_opt_u8_array(
             GL::TEXTURE_2D,
             0,
             GL::RGBA as i32,
+            1,
+            1,
+            0,
             GL::RGBA,
             GL::UNSIGNED_BYTE,
-            &img,
-        )
-        .expect("Couldn't bind image as texture!");
-        gl.generate_mipmap(GL::TEXTURE_2D);
-        //gl.tex_parameteri(GL::TEXTURE_2D, GL::TEXTURE_MAG_FILTER as u32, GL::NEARESR as i32);
-    });
-    image.set_src(url);
+            Some(&[255, 0, 255, 255]),
+        )?;
+    }
+    let texture = Rc::new(texture);
+    // couldn't avoid this
+    let gl = Rc::new(gl.clone());
+    for (i, url) in urls.iter().enumerate() {
+        let image = Rc::new(HtmlImageElement::new().expect("Can't create Image Element"));
+        let img = image.clone();
+        let tex = texture.clone();
+        let last = urls.len() - 1;
+        let gl = gl.clone();
+        add_event(&image, "load", move |_| {
+            if is_img_obj {
+                Url::revoke_object_url(&img.src());
+            }
+            use crate::log;
+            crate::log!("Loaded Image" img.src());
+            match tex_type {
+                TextureType::Tex2d => {
+                    if i == 0 {
+                        gl.bind_texture(GL::TEXTURE_2D, Some(&tex));
+                    }
+                    gl.tex_image_2d_with_u32_and_u32_and_html_image_element(
+                        GL::TEXTURE_2D,
+                        0,
+                        GL::RGBA as i32,
+                        GL::RGBA,
+                        GL::UNSIGNED_BYTE,
+                        &img,
+                    )
+                    .expect("Couldn't bind image as texture!");
+                    if i == last {
+                        gl.generate_mipmap(GL::TEXTURE_2D);
+                    }
+                }
+                TextureType::CubeMap => {
+                    if i == 0 {
+                        gl.bind_texture(GL::TEXTURE_CUBE_MAP, Some(&tex));
+                    }
+                    gl.tex_image_2d_with_u32_and_u32_and_html_image_element(
+                        GL::TEXTURE_CUBE_MAP_POSITIVE_X + i as u32,
+                        0,
+                        GL::RGBA as i32,
+                        GL::RGBA,
+                        GL::UNSIGNED_BYTE,
+                        &img,
+                    )
+                    .expect("Couldn't bind image as texture!");
+                    if i == last {
+                        gl.generate_mipmap(GL::TEXTURE_CUBE_MAP);
+                    }
+                }
+                _ => (),
+            }
+            //gl.tex_parameteri(GL::TEXTURE_2D, GL::TEXTURE_MAG_FILTER as u32, GL::NEARESR as i32);
+        });
+        image.set_src(url);
+    }
     Ok(texture)
 }
 pub fn bind_attribute(gl: &GL, program: &WebGlProgram, name: &str, size: i32) {
@@ -240,4 +297,8 @@ pub fn set_mat4(gl: &GL, program: &WebGlProgram, attribute: &str, matrix: &Matri
         .get_uniform_location(program, attribute)
         .unwrap_or_else(|| panic!("Can't bind uniform: {}", attribute));
     gl.uniform_matrix4fv_with_f32_array(Some(&mat_attrib), false, &mat);
+}
+
+fn is_power_of_2(val: u32) -> bool {
+    return (val & (val - 1)) == 0;
 }

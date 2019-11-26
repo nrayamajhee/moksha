@@ -13,11 +13,12 @@ pub use storage::Storage;
 
 use crate::{
     dom_factory::{add_event, window},
-    log, node, rc_rcell,
+    log, node, rc_rcell, TextureType,
     renderer::{bind_texture, CursorType, DrawMode, RenderFlags, Renderer},
     scene::primitives::create_light_node,
     Geometry, Material, Mesh, MouseButton, RcRcell, Transform, Viewport,
 };
+use genmesh::generators::Cube;
 use nalgebra::Vector3;
 use strum_macros::{Display, EnumIter, EnumString};
 use wasm_bindgen::JsCast;
@@ -90,11 +91,11 @@ impl Scene {
             None,
             Default::default(),
             ObjectInfo {
-                name: "root".into(),
+                name: "Scene".into(),
                 ..Default::default()
             },
             false,
-            false
+            false,
         ));
         let scene = Self {
             root,
@@ -154,6 +155,23 @@ impl Scene {
             self.set_visibility_only(child, visible);
         }
     }
+    pub fn set_skybox(&self, dir: &str, ext: &str) {
+        let mesh = Mesh::new(
+            Geometry::from_genmesh(&Cube::new()),
+            Material::new_cube_map(
+                [
+                    &format!("{}/posx.{}",dir,ext),
+                    &format!("{}/negx.{}",dir,ext),
+                    &format!("{}/posy.{}",dir,ext),
+                    &format!("{}/negy.{}",dir,ext),
+                    &format!("{}/posz.{}",dir,ext),
+                    &format!("{}/negz.{}",dir,ext),
+                ],
+            ),
+        );
+        let cube = node!(&self, Some(mesh), RenderFlags::no_cull());
+        self.show(&cube);
+    }
     pub fn show_only(&self, node: &Node) {
         self.set_visibility_only(node, true);
     }
@@ -187,10 +205,10 @@ impl Scene {
                 mesh.setup_unique_vertices();
             }
             let vao = renderer.create_vao(&mesh);
-            let urls = &mesh.material.texture_urls;
+            let urls = &mesh.material.texture_urls[..];
             if urls.len() > 0 {
                 let tex_i = storage.add_texture(
-                    bind_texture(renderer.context(), &urls[0], is_img_obj)
+                    bind_texture(renderer.context(), urls, mesh.material.tex_type, is_img_obj)
                         .expect("Couldn't bind albedo texture"),
                 );
                 mesh.material.texture_indices.push(tex_i);
@@ -209,7 +227,7 @@ impl Scene {
             Default::default(),
             Default::default(),
             false,
-            setup_unique_vertices
+            setup_unique_vertices,
         )
     }
     pub fn empty(&self, name: &str) -> Node {
@@ -297,14 +315,8 @@ impl Scene {
             indices,
             normals,
         };
-        let material = Self::load_material(
-            dir,
-            object,
-            mat_set,
-            tex_coords,
-            img_obj_url
-        );
-        let node = self.from_mesh(Some(Mesh{geometry, material}), false);
+        let material = Self::load_material(dir, object, mat_set, tex_coords, img_obj_url);
+        let node = self.from_mesh(Some(Mesh { geometry, material }), false);
         let mut info = node.info();
         info.draw_mode = DrawMode::Arrays;
         info.name = object.name.clone();
@@ -331,24 +343,29 @@ impl Scene {
                             each.alpha as f32,
                         );
                         if let Some(name) = &each.uv_map {
-                            if let Some(urls) = img_obj_url {
+                            let url = if let Some(urls) = img_obj_url {
                                 if let Some(url) = urls.get(name) {
-                                    material = material.texture(url, tex_coords)
+                                    Some(url.to_string())
                                 } else {
-                                    log!("The file with name " name.to_string() " was not uploaded. Resorting to color")
+                                    log!("The file with name " name.to_string() " was not uploaded. Resorting to color");
+                                    None
                                 }
                             } else {
-                                if dir == "" {
-                                    log!("Invalid texture path! Won't load any texture for " name.to_string() ".");
+                                if dir != "" {
+                                    Some(format!("{}/{}", dir, name))
                                 } else {
-                                    material = material.texture(&format!("{}/{}", dir, name), tex_coords)
+                                    log!("Invalid texture path! Won't load any texture for " name.to_string() ".");
+                                    None
                                 }
+                            };
+                            if let Some(url) = url {
+                                material = material.tex_type(TextureType::Tex2d).tex_coords(tex_coords).texture(&url);
                             }
                         }
                         if object.geometry[0].shapes[0].smoothing_groups.is_empty() {
                             material = material.flat();
                         }
-                        break;
+                        return material;
                     }
                 }
             }
@@ -431,20 +448,21 @@ impl Scene {
             indices,
             normals,
         };
-        let material = Self::load_material(
-            dir,
-            object,
-            mat_set,
-            tex_coords,
-            img_obj_url
-        );
+        let material = Self::load_material(dir, object, mat_set, tex_coords, img_obj_url);
         node!(
             &self,
             Some(Mesh { geometry, material }),
             object.name.clone()
         )
     }
-    pub fn object_from_obj(&self, dir: &str, obj_src: &str, mtl_src: Option<&str>, img_obj_url: Option<&HashMap<String, String>>, wire_overlay: bool) -> Node {
+    pub fn object_from_obj(
+        &self,
+        dir: &str,
+        obj_src: &str,
+        mtl_src: Option<&str>,
+        img_obj_url: Option<&HashMap<String, String>>,
+        wire_overlay: bool,
+    ) -> Node {
         let obj_set = obj::parse(obj_src).unwrap();
         assert!(!obj_set.objects.is_empty(), "No objects in the obj file");
         let mat_set = if let Some(src) = mtl_src {
@@ -453,15 +471,27 @@ impl Scene {
             None
         };
         if wire_overlay {
-            let mut root = self.load_object_from_obj_wired(dir, &obj_set.objects[0], &mat_set, img_obj_url);
+            let mut root =
+                self.load_object_from_obj_wired(dir, &obj_set.objects[0], &mat_set, img_obj_url);
             for object in obj_set.objects.iter().skip(1) {
-                root.add(rc_rcell(self.load_object_from_obj_wired(dir, &object, &mat_set, img_obj_url)));
+                root.add(rc_rcell(self.load_object_from_obj_wired(
+                    dir,
+                    &object,
+                    &mat_set,
+                    img_obj_url,
+                )));
             }
             root
         } else {
-            let mut root = self.load_object_from_obj(dir, &obj_set.objects[0], &mat_set, img_obj_url);
+            let mut root =
+                self.load_object_from_obj(dir, &obj_set.objects[0], &mat_set, img_obj_url);
             for object in obj_set.objects.iter().skip(1) {
-                root.add(rc_rcell(self.load_object_from_obj(dir, &object, &mat_set, img_obj_url)));
+                root.add(rc_rcell(self.load_object_from_obj(
+                    dir,
+                    &object,
+                    &mat_set,
+                    img_obj_url,
+                )));
             }
             root
         }

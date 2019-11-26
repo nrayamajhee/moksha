@@ -59,11 +59,11 @@ The entire project is deployed at <http://moksha.rayamajhee.com>. This is contin
 
 This was the initial setup for moksha-three. My goal is to eventually write abstractions (editors, shdaers, etc.) to be able to recreate this:
 
-![screenshot](data/img/flight.png)
+![screenshot](assets/img/flight.jpg)
 
 This is what the editor currently looks like:
 
-![screenshot](data/img/editor.png)
+![screenshot](assets/img/editor.jpg)
 
 ## Rust-lang usages
 
@@ -71,74 +71,49 @@ Although, I have been learning rust for a while and was writing some C/C++ in th
 
 Due to wasm-bingen's lack of support for rust lifetime annotations, I make heavy use of Rc<RefCell> to pass around the various structs to event handlers. Although, I can ditch wasm-bindgen endpoint and use lifetimes notations, I think it is better to expose all my structs and functions to javascript so that if anyone wants to use this library from javascript, it is as feature rich and complete.
 
-# Done
-
-- System
-    - Storage to hold all the data
-    - Reorganize VAOs into Storage
-
-- Scene
-    - Scene tree that allows node creations
-    - Add primitive meshes
-    
-- Renderer
-    - Rendering component that holds, compiles, and binds shaders
-    - Unshaded Color
-    - Vertext Color
-    - Per pixel shading (Flat + Smooth)
-    - Albedo  Map
-    - Barycentric Wireframe
-    - Lights (Ambient, Point, Directional, Spot)
-    
-- Editor
-    - Custom logging screen
-    - Node tree viewer
-		- Implment open/collapse and render toggle to Node tree view
-		- Implement drag and drop for node parent/child relations.
-    - Zoom and Switch Perspective controls
-	- Add menu to add mesh and lights
-
-- Viewport
-    - Perspective Projection
-    - Orthographic Projection
-    - Third Person Controls
-
-# Doing
-- Scene
-  - load obj (geometry + albedo texure)
-
-- System
-    - Cap the framerate for performance.
-
-- World
-    - Load milkyway skybox
-    - Displace the icosphere vertices with noise function
-    - Add plane model.
-
 # ToDo
+
 - System
-    - Cap the framerate for performance.
+    [x] Storage to hold all the data
+    [x] Reorganize VAOs into Storage
+    [ ] Cap the framerate for performance.
     - Debug firefox's memory leaks.
 
 - Scene
-    - load obj
-    - load gltf
-
+    [x] Scene tree that allows node creations
+    [x] Add primitive meshes
+	[x] Add obj from included/uploaded files
+	[x] Add cubemap skybox
+	[ ] Load scene from GLTF
+    
 - Renderer
+    [x] Rendering component that holds, compiles, and binds shaders
+    [x] Unshaded Color
+    [x]- Albedo  Map
+    [x] Lights (Ambient, Point, Directional, Spot)
+    [x] Barycentric Wireframe
+    [ ] Blinn-Phong Shading Model 
+    [ ] Vertext Color
     - Normal Map
     - Metallic/Roughness Map
     - Occlusion Map
     - Reflection and HDR Cubemaps
     - Volumetrics
     - Procedulal Texures (Cloud, Fbm, Perlin, Voronoi, etc.)
-    - Fancy Wireframe (Points + Line + Depth Fade)
   
 - Editor
+    [x] Custom logging screen
+	- Toolbar
+		[x] Zoom and Switch Perspective controls
+		[x] Add menu to add mesh andlights
+    - Node tree viewer
+		[x] Implment open/collapse and render toggle. 
+		[x] Implement drag and drop for node parent/child relations.
 	- Implement a nofitication panel and notify macro with progress bars
-    - Fancy mesh outline while selecting
+    - Mesh outline while selecting
     - Configuration Editor
     - Create a fps meter
-    - Implement translation gizmo.
+    [x] Implement translation gizmo.
     - Implement rotational gizmo.
     - IMplement scaling gizmo.
     - Implement a pan guide gizmo. (This might need rendering on a separate framebuffer)
@@ -146,20 +121,24 @@ Due to wasm-bingen's lack of support for rust lifetime annotations, I make heavy
 - Viewport
     - First Person Constrol
     - Allow camera animations
+    [x] Third Person Controls
+    [x] Perspective Projection
+    [x] Orthographic Projection
+
+- World
+    - Load milkyway skybox
+    - Displace the icosphere vertices with noise function
+    - Add plane model.
+    - Render Sky Model for Day/Night cycle
+    - Implement level of detail for icosphere vertices.
+    - Add plane model.
+    - Volumetric Clouds
+    - Instanced Trees
     
 - Controller
     - Fly Navigation: accelerate, Deaccelerate, Roll, Pitch, and yaw movements
     - Walk Navigation: Acceleraete, Deaccelerate, Turn, Jump, Roll, Crouch, Crawl
     - Drive Navigation: Acceleraete, Deaccelerate, Turn
-
-- World
-    - Load milkyway skybox
-    - Render Sky Model for Day/Night cycle
-    - Displace the icosphere vertices with noise function
-    - Implement level of detail for icosphere vertices.
-    - Add plane model.
-    - Volumetric Clouds
-    - Instanced Trees
 
 - Physics
     - Gravity

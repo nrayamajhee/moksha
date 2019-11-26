@@ -2,21 +2,20 @@ use super::scene_tree::build_node;
 use super::NodeRef;
 use crate::{
     dom_factory::{
-        add_event, body, document, get_el, get_progress, get_target_file_result,
-        get_target_files, get_target_innerh, icon_btn_w_id, query_els,
-        query_html_el, set_timeout, 
+        add_event, body, document, get_el, get_progress, get_target_file_result, get_target_files,
+        get_target_innerh, icon_btn_w_id, query_els, query_html_el, set_timeout,
     },
     log, rc_rcell,
     scene::primitives::create_primitive_node,
     Editor, LightType, Primitive, RcRcell, Viewport,
 };
 use maud::html;
-use std::rc::Rc;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
 use wasm_bindgen::JsCast;
-use web_sys::{EventTarget, FileReader, Url, File};
+use web_sys::{EventTarget, File, FileReader, Url};
 pub fn build(editor: &Editor) {
     body()
         .insert_adjacent_html("beforeend", markup().as_str())
@@ -166,7 +165,8 @@ fn add_events(editor: &Editor) {
                     log!("Progress" progress.to_string());
                     progress_el
                         .style()
-                        .set_property("width", &format!("{}%", *progress)).unwrap();
+                        .set_property("width", &format!("{}%", *progress))
+                        .unwrap();
                     if *progress == 100. {
                         let p = progress_el.clone();
                         set_timeout(
@@ -197,13 +197,8 @@ fn add_events(editor: &Editor) {
                         if tex.len() == 0 {
                             log!("No texture file uploaded. Will not load textures.");
                             let scene = editor.scene();
-                            let node = scene.object_from_obj(
-                                "",
-                                &obj_src,
-                                Some(&mtl_src),
-                                None,
-                                true
-                            );
+                            let node =
+                                scene.object_from_obj("", &obj_src, Some(&mtl_src), None, true);
                             node.copy_location(&editor.spawn_origin.borrow());
                             scene.add(rc_rcell(node));
                         } else {
@@ -229,7 +224,7 @@ fn add_events(editor: &Editor) {
                                             &a_o_src,
                                             Some(&m_src),
                                             Some(&loaded_urls),
-                                            false
+                                            false,
                                         );
                                         node.copy_location(&editor.spawn_origin.borrow());
                                         scene.add(rc_rcell(node));
@@ -245,13 +240,7 @@ fn add_events(editor: &Editor) {
                 } else {
                     log!("No material file uploaded. Will load default material instead.");
                     let scene = editor.scene();
-                    let node = scene.object_from_obj(
-                        "",
-                        &obj_src,
-                        None,
-                        None,
-                        false
-                    );
+                    let node = scene.object_from_obj("", &obj_src, None, None, false);
                     node.copy_location(&editor.spawn_origin.borrow());
                     scene.add(rc_rcell(node));
                 }
