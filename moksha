@@ -10,7 +10,10 @@ case $1 in
 	"c" | "clippy")
 		cargo clippy --all-features -- -D warnings
 	;;
-	"d" | "doc")
+	"t" | "test")
+		wasm-pack test --headless --chrome
+	;;
+	"d" | "docs")
 		cargo doc --document-private-items --open
 	;;
 	"s" | "serve")
@@ -18,6 +21,6 @@ case $1 in
 		npm run start
 	;;
 	*)
-		echo "moksha [(w)atch | (b)uild | (c)lippy | (d)oc | (s)erve]"
+		echo "moksha [(w)atch | (b)uild | (c)lippy | (d)ocs | (s)erve | (t)est]"
 	;;
 esac

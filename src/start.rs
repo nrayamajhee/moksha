@@ -41,7 +41,7 @@ fn cube(scene: &Scene, renderer: &Renderer) -> Node {
         0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, // Left
         0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
     ];
-    let cube_tex = Material::new_texture("assets/img/box_tex.png", tex_coords);
+    let cube_tex = Material::new_texture("assets/img/box_tex.jpg", tex_coords);
     let cube_mesh = Mesh::new(cube_geometry.clone(), cube_tex);
     let mut cube = node!(scene, Some(cube_mesh), "Wooden Cube", DrawMode::Arrays);
     cube.set_position(5., 0., 5.);
