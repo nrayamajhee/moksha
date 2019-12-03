@@ -78,6 +78,30 @@ canvas {
 #toolbar button {
     margin-bottom: 0;
 }
+#fps {
+	position: absolute;
+	bottom: var(--pad);
+	right: var(--pad);
+}
+#fps > * {
+	display: block;
+}
+#fps span {
+	z-index: 2;
+	position: absolute;
+	top: 40%;
+	left: 50%;
+	transform: translate(-50%, 0%);
+	width: 2em;
+	text-align: center;
+}
+#fps svg {
+	z-index: 1;
+	height: 46px;
+	max-width: 92px; 
+	width: auto;
+	transform: scaleY(-1);
+}
 hr {
 	height: 0;
 	margin: var(--small-pad) 0;

@@ -169,6 +169,6 @@ pub fn start() -> Result<(), JsValue> {
             //a_editor.borrow().track_gizmo();
             a_rndr.borrow_mut().render(&a_scene, &a_view.borrow());
         }
-    });
+    }, Some(60.));
     Ok(())
 }

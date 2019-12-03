@@ -12,7 +12,7 @@ pub use node::Node;
 pub use storage::Storage;
 
 use crate::{
-    dom_factory::{add_event, window},
+    dom_factory::{add_event, window, now, set_timeout, request_animation_frame},
     log, node, rc_rcell, TextureType,
     renderer::{bind_texture, CursorType, DrawMode, RenderFlags, Renderer},
     scene::primitives::create_light_node,
@@ -21,7 +21,7 @@ use crate::{
 use genmesh::generators::Cube;
 use nalgebra::Vector3;
 use strum_macros::{Display, EnumIter, EnumString};
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{JsCast, closure::Closure};
 use wavefront_obj::{mtl, obj};
 use web_sys::{MouseEvent, WheelEvent};
 

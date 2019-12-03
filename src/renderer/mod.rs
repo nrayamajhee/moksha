@@ -373,12 +373,15 @@ impl Renderer {
                 let gl = &self.ctx;
                 gl.use_program(Some(&program));
                 if each == ShaderType::CubeMap {
-                    //set_mat4(gl, &program, "view", &viewport.view());
                     set_mat4(gl, &program, "view", &viewport.transform().rotation.to_homogeneous());
                 } else {
                     set_mat4(gl, &program, "view", &viewport.view());
                 }
-                set_mat4(gl, &program, "proj", &viewport.proj());
+                if each == ShaderType::CubeMap && viewport.projection_type() == ProjectionType::Orthographic {
+                    set_mat4(gl, &program, "proj", &viewport.get_proj(ProjectionType::Perspective).to_matrix());
+                } else {
+                    set_mat4(gl, &program, "proj", &viewport.proj());
+                }
                 if each == ShaderType::Color {
                     set_vec3(gl, program, "eye", &viewport.eye());
                 }

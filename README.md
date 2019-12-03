@@ -1,16 +1,28 @@
-Here what follows is terrible English and absolutely horrendous Rust code. You may copy, modify, redistribute modified or verbatim copies according to one or both of the licenses mentioned below.
+Here what follows is terrible English and absolutely horrendous Rust code. You may copy, modify and redistribute modified or verbatim copies according to one or both of the licenses mentioned below.
 
 # Moksha
 
 This is an experimental video game written in rust. Building an editor of some sorts is the first priority; the actual game will follow. Keep note that this can be used as a library but is not intended as such since the code quality and feature set has a long way to go before being library worthy.
 
-After many attempts and blunders, I have finally settled for wasm-bindgen. My first attempt was to try three-rs (<https://gitlab.com/nrayamajhee/moksha-three>). It was a good starting point, but I eventually learned some WebGL and GLSL, which led me to abandon three-rs's three-js like abstraction. I then thought, I would instead write my own vulkan based renderer (<https://gitlab.com/nrayamajhee/moksha-vk>), which turned out to be an agonizing journey that was well beyond my capabilities. Hence, I am here, using wasm-bindgen's webgl binding. Hopefully someday WebGPU kicks off and drags me back to vulkan like code base.
+After many attempts and blunders, I have finally settled for wasm-bindgen. My first attempt was to try three-rs (<https://gitlab.com/nrayamajhee/moksha-three>). It was a good starting point, but I eventually learned some WebGL and GLSL, which led me to abandon three-rs's three-js like abstraction. I then thought, I would instead write my own vulkan renderer (<https://gitlab.com/nrayamajhee/moksha-vk>), which turned out to be an agonizing journey that was well beyond my capabilities. Hence, I am here, using wasm-bindgen's webgl binding. Hopefully someday WebGPU kicks off and drags me back to vulkan like code base.
+
+## Preview 
+
+The entire project is deployed at <http://moksha.rayamajhee.com>. This is continuously deployed with every commit in `master`.
+
+This was the initial setup for `moksha-three`. My goal is to eventually write abstractions (editors, shaders, etc.) to be able to recreate this:
+
+![screenshot](assets/img/flight.jpg)
+
+This is what the editor currently looks like:
+
+![screenshot](assets/img/editor.jpg)
 
 ## How to?
 
 ### Setup:
 
-To install rust. Follow the `custom` setup and choose `nightly` after running the following command:
+To install `rust`. Follow the `custom` setup and choose `nightly` after running the following command:
 
 ```bash
 curl https://sh.rustup.rs -sSf | sh
@@ -31,7 +43,7 @@ To install wasm-pack:
 curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh 
 ```
 
-(Alternative) If you are on Arch, you can find `wasm-pack` in `AUR`.
+(Alternative) If you are on Arch, you can find [wasm-pack](https://aur.archlinux.org/packages/wasm-pack/) in `AUR`.
 
 ### Run the game:
 
@@ -44,11 +56,13 @@ cd moksha
 
 ### Run tests:
 
+ Tests are non-existent at the moment so I will revisit this later.
+ 
 ```bash
 ./moksha test
 ```
 
-Running test headless on `firefox` seems to break CI/CD at the moment, so I use `chrome` for testing. Tests are non existent at the moment so will revisit this later.
+Running test headless on `firefox` seems to break CI/CD at the moment, so I use `chrome` for testing.
 
 ### Generate docs:
 
@@ -56,40 +70,47 @@ Running test headless on `firefox` seems to break CI/CD at the moment, so I use 
 ./moksha docs
 ```
 
-The `moksha` script runs basic `wasm-pack` commands. Check it for further details. This is the current options
+The `moksha` script runs basic `wasm-pack` commands. Check it for further details. This is the current options:
 
 ```bash
 ./moksha
 moksha [(w)atch | (b)uild | (c)lippy | (d)ocs | (s)erve | (t)est]
 ```
 
-## Preview 
-
-The entire project is deployed at <http://moksha.rayamajhee.com>. This is continuously deployed with every commit in `master`.
-
-This was the initial setup for `moksha-three`. My goal is to eventually write abstractions (editors, shaers, etc.) to be able to recreate this:
-
-![screenshot](assets/img/flight.jpg)
-
-This is what the editor currently looks like:
-
-![screenshot](assets/img/editor.jpg)
-
 ## Rust-lang usage, browsers, and performance
 
 Although, I have been learning rust for a while and was writing some C/C++ in the past, I am in no capability to judge how idiomatic my code is nor how healthy its memory management is. This program, although robust to my eyes does have some memory issues. I can't quite figure out if its my code, or firefox's WebGL driver, but I suspect there's some memory leaks as firefox's memory usage only climbs when run. Chrome, on the other hand, works perfectly fine. Also note that firefox on linux has very poor WebGL performance. There are multiple issues on Bugzilla about this. Although firefox is my browser of choice, I recommend running chrome for maximum performance.
 
-Due to wasm-bingen's lack of support for rust lifetime annotations, I make heavy use of `Rc<RefCell>` pattern to pass the structs to event handlers. Although, I can ditch wasm-bindgen's javascript endpoint and use lifetimes notations, I think it is better to expose all my structs and functions to javascript so that if anyone wants to use this library from javascript, it is as feature rich and complete.
+Due to wasm-bingen's lack of support for rust lifetime annotations, I make heavy use of `Rc<RefCell>` pattern to pass the structs to event handlers. Although, I can ditch wasm-bindgen's javascript endpoint and use lifetimes notations, I think it is better to expose all my structs and functions to javascript so that if anyone wants to use this as a javascript library, it is as feature rich and complete.
 
-The core engine strives to be data-oriented (ECS like). I am no expert here and although I should have chosen a rust library that already provides efficient data structure. But I refuse to do so mainly because of ergonomic reasons and also my personal hubris. This is my attempt at writing a large code base and thus intentionally will carry all my crude vocabulary. I am still moving internal states around as I learn various approaches, but I hopes someday the essential states and components will live in a performant and coherent structure.
+The core engine strives to be data-oriented (ECS like). I am no expert here and although I should have chosen a rust library that already provides efficient data structures, I refuse to do so mainly because for ergonomic reasons and my personal hubris. This is my personal attempt at maintaining a fairly large code, so it will intentionally carry my crude vocabulary. I am developing this as I am learning WebGL/OpenGL so many internal states will move around as I learn various approaches to manage them.
+
+## Resources
+
+The following websites were invaluable in making this possible:
+- [MDN](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial)
+- [WebGL2 Fundamentals](https://webgl2fundamentals.org)
+- [Learn OpenGL](https://learnopengl.com)
+
+There are still a lot of things to be implemented from Learn OpenGL. My current goal is to complete PBR and Deferred Shading for the editor before developing game logic.
 
 ## ToDo
+
+- [ ] Add selection outline with stencil buffer
+- [ ] Scene node with child and parent data
+- [ ] Object Deletion!
+- [ ] Scene props: Hide/Show grid, Background/Skybox switcher, Show hide light nodes and origin.
+- [ ] Gizmos, Gizmos, Gizmos!!!!
+- [ ] Status bar with project info, source code link, and mouse action hints
+
+
+## Progress Checklist
 
 ### Storage
 
 - [x] Storage to hold all the data
 - [x] Reorganize VAOs into Storage
-- [ ] Cap the framerate for performance.
+* [x] Cap the framerate for performance.
 - Debug firefox's memory leaks.
 - Follow Raph Levien's approach (<https://youtu.be/4YTfxresvS8>) and integrate child parent relation into storage itself.
 
@@ -131,14 +152,14 @@ The core engine strives to be data-oriented (ECS like). I am no expert here and 
 - Implement a notification panel and notify macro with progress bars
 - Mesh outline while selecting
 - Configuration Editor
-- Create a fps meter
+- [x] Create a fps meter
 - Transformation Gizmo
 	- [x] Translation
 	- Rotation
 	- Scale
 	- Implement a view snapping gizmo. (This will need rendering on a separate framebuffer)
 
-## Viewport
+### Viewport
 
 - First Person Control
 - Allow multiple cameras and animations
@@ -183,6 +204,6 @@ Data contained in the repository (images, gltf, blend, etc.) that are created by
 Refer to https://creativecommons.org/licenses/by/4.0/ for the details. For others,
 please refer to the links at /assets/credits for individual attributions for the blend file used to generate the skybox, and the deep star map from NASA.
 
-A final note to smart/evil humans out there: If you don't care nor respect legal documents and simply hate any slight attempt at bureaucracy, what the above words mean is that if you use this source code, please kindly recognize my copyright. You may use it permissively (aka. in a non-copyleft manner). If you ever get delusional and believe that you've somehow struck gold here and can trade it for petty human dollars, I simply don't give a shit about your efforts, nor do I demand your modifications back. A humble acknowledgment will suffice. This is merely a past-time, an attempt at liberation from this monotonous and lonely life, a dream from a mind full of darkness, a sink to all my erratic musing, and obviously incompetent scribbles.
+A final note to smart/evil humans out there: If you don't care nor respect legal documents and simply hate any slight attempt at bureaucracy, what the above words mean is that if you use this source code, please kindly recognize my copyright. You may use it permissively (aka. in a non-copyleft manner). If you ever get delusional and believe that you've somehow struck gold here and can trade it for petty human dollars, I simply don't give a shit about your efforts, nor do I demand your modifications back. A humble acknowledgment will suffice. This is merely a past-time, an attempt at liberation from this monotonous and lonely life, a dream from a mind full of darkness, a sink to all my erratic musing and obviously incompetent scribbles.
 
 If you want to collaborate, or have questions, please do hit me up. Create an issue, or email me, or send a pull request: do what you usually do.

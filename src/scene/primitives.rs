@@ -129,7 +129,9 @@ pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) 
                 Geometry::from_genmesh_no_normals(&Cone::new(8)),
                 Material::new_wire(color[0], color[1], color[2], 1.),
             )),
-            light_type.to_string()
+            light_type.to_string(),
+            RenderFlags::blend_cull(),
+            DrawMode::Arrays
         ),
         LightType::Directional => {
             let mut n = node!(scene, None, light_type.to_string());

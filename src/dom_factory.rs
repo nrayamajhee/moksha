@@ -1,7 +1,6 @@
-use crate::rc_rcell;
+use crate::{rc_rcell, editor::fps};
 use maud::{html, Markup};
-use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{closure::Closure, JsCast, JsValue};
 use web_sys::{
     Document, Element, Event, EventTarget, FileList, FileReader, HtmlCanvasElement, HtmlCollection,
     HtmlElement, HtmlInputElement, Node, NodeList, ProgressEvent, Window,
@@ -19,15 +18,28 @@ pub fn body() -> HtmlElement {
     document().body().expect("Document has no body!")
 }
 
-pub fn loop_animation_frame<F>(closure: F)
+pub fn loop_animation_frame<F>(closure: F, fps: Option<f64>)
 where
     F: 'static + Fn(),
 {
     let f = rc_rcell(None);
     let g = f.clone();
+    let fps_viewer = fps::setup(fps);
+    let fps_v = fps_viewer.clone();
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
+        let then = now();
         closure();
-        request_animation_frame(f.borrow().as_ref().unwrap());
+        if let Some(fps) = fps {
+            let delay = (1000. / fps - (now() - then)) as i32;
+            let h = f.clone();
+            set_timeout(move || {
+                fps::log(1000. / (now() - then));
+                request_animation_frame(h.borrow().as_ref().unwrap());
+            }, delay);
+        } else {
+            fps::log(1000. / (now() - then));
+            request_animation_frame(f.borrow().as_ref().unwrap());
+        }
     }) as Box<dyn FnMut()>));
     request_animation_frame(g.borrow().as_ref().unwrap());
 }

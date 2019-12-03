@@ -206,7 +206,7 @@ fn add_drag_events(el: &Element, editor: &Editor) {
             let target_node = scene.find_node_w_name(&drop_target_name).unwrap();
             parent_node.borrow_mut().remove(&dragged_el_name);
             target_node.borrow_mut().add(dragged_node.clone());
-            if dragged_parent_name.as_str() != "root" {
+            if dragged_parent_name.as_str() != "Scene" {
                 let li = create_el("li");
                 let g_p_el = get_parent(&dragged_el, 6).unwrap();
                 build_node(&editor, &li, NodeRef::Mutable(parent_node));
