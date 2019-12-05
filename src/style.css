@@ -89,16 +89,13 @@ canvas {
 #fps span {
 	z-index: 2;
 	position: absolute;
-	top: 40%;
+	top: 60%;
 	left: 50%;
-	transform: translate(-50%, 0%);
-	width: 2em;
-	text-align: center;
+	transform: translate(-50%, -50%);
 }
 #fps svg {
 	z-index: 1;
 	height: 46px;
-	max-width: 92px; 
 	width: auto;
 	transform: scaleY(-1);
 }

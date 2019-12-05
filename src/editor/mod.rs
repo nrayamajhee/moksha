@@ -28,16 +28,16 @@ pub mod fps {
     use std::str::FromStr;
     pub fn setup(capped_fps: Option<f64>){
         let height = if let Some(fps) = capped_fps {
-            fps * 2.
+            fps
         } else {
             100.
         };
         let width = height * 2.;
-        let dx = width / 100.;
-        let viewbox = format!("-{} -{} {} {}", dx.floor(), dx.floor(), (width + 2. * dx).ceil(), (height + 2. * dx).ceil());
+        let d = width / 100.;
+        let viewbox = format!("-{} -{} {} {}", 2. * d, 2. * d, width, height);
         let mut path = format!("M 0 0");
         for i in 0..101 {
-            path.push_str(&format!(" L {} 0", i as f64 * dx));
+            path.push_str(&format!(" L {} 0", i as f64 * d));
         }
         path.push_str(&format!(" L {} 0 Z", width));
         crate::dom_factory::body()
@@ -47,7 +47,7 @@ pub mod fps {
                     div#fps {
                         span{}
                         svg viewbox=(viewbox) xmlns="http://www.w3.org/2000/svg" {
-                            path d=(path) stroke="#aaa" fill="#222" stroke-width=(dx.to_string()) {} 
+                            path d=(path) stroke="#aaa" fill="#222" stroke-width=(d.to_string()) {} 
                         }
                     }
                 }
@@ -76,21 +76,22 @@ pub mod fps {
             let attr = svg.get_attribute("viewBox").unwrap();
             let attrib: Vec<&str> = attr.split(" ").collect();
             let height = f64::from_str(attrib[3]).unwrap();
-            let width = if (top_fps - height).abs() > 1. {
+            let (width, d) = if (top_fps - height).abs() > 5. {
                 let height = top_fps;
                 let width = height * 2.;
-                let dx = width / 100.;
-                let viewbox = format!("-{} -{} {} {}", dx.floor(), dx.floor(), (width + 2. * dx).ceil(), (height + 2. * dx).ceil());
+                let d = width / 100.;
+                let dd = d * 2.;
+                let viewbox = format!("-{} -{} {} {}", dd, dd, width + dd, height + dd);
                 svg.set_attribute("viewBox", &viewbox).unwrap();
-                line.set_attribute("stroke-width", &dx.to_string()).unwrap();
-                width
+                line.set_attribute("stroke-width", &d.to_string()).unwrap();
+                (width, d)
             } else {
-                100.
+                let w = height * 2.;
+                (w, w / 100.)
             };
-            let dx = width / 100.;
             let mut new_attr = format!("M 0 0 L 0 {}", new_data[0]);
             for i in 1..101 {
-                new_attr.push_str(&format!(" L {} {}", i as f64 * dx, new_data[i]));
+                new_attr.push_str(&format!(" L {} {}", i as f64 * d, new_data[i]));
             }
             new_attr.push_str(&format!(" L {} 0 Z", width));
             line.set_attribute("d", &new_attr).unwrap();
