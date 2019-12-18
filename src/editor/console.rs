@@ -14,7 +14,7 @@ pub struct ConsoleConfig {
     pub change_history: bool,
 }
 
-pub fn console_setup(config: ConsoleConfig) {
+pub fn setup(config: ConsoleConfig) {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
     body()

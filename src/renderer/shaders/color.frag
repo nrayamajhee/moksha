@@ -13,6 +13,7 @@ float edgeFactor(){
 #define POINT 1
 #define SPOT 2
 #define MAX_NUM_LIGHTS 20
+uniform bool blinn_shade;
 
 struct Light {
 	vec3 position;
@@ -41,8 +42,14 @@ vec3 calc_light(Light light, vec3 normal, int type, vec3 f_color) {
 
 	// specular
 	float spec_fac = 1.0;
-	vec3 reflection = reflect(-light_dir, normal);
-	float spec = pow(max(dot(view_dir, reflection), 0.0), 64.0);
+	float spec = 0.0;
+	if (blinn_shade) {
+		vec3 halfway_dir = normalize(light_dir + view_dir);
+		spec = pow(max(dot(normal, halfway_dir), 0.0), 64.0);
+	} else {
+		vec3 reflection = reflect(-light_dir, normal);
+		spec = pow(max(dot(view_dir, reflection), 0.0), 64.0);
+	}
 	vec3 specular = spec_fac * spec * light.color;
 
 	// attenuation
@@ -72,6 +79,7 @@ uniform Light point_lights[MAX_NUM_LIGHTS];
 uniform Light dir_lights[MAX_NUM_LIGHTS];
 uniform Light spot_lights[MAX_NUM_LIGHTS];
 uniform bool flat_shade, wire_overlay, has_albedo;
+uniform vec4 wire_color;
 in vec2 frag_tex;
 uniform sampler2D sampler;
 
@@ -100,6 +108,6 @@ void main() {
 	}
 
 	outputColor = wire_overlay?
-		vec4(mix(color.rgb,result, edgeFactor()), 1.0):
+		vec4(mix(wire_color.rgb,result, edgeFactor()), 1.0):
 		vec4(result, 1.0);
 }

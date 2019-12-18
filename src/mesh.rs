@@ -34,6 +34,12 @@ impl Transform {
     pub fn identity() -> Self {
         Self::from(Isometry3::identity())
     }
+    pub fn from_scale(scale: f32) -> Self {
+        Self {
+            isometry: Isometry3::identity(),
+            scale: Vector3::new(scale, scale, scale),
+        }
+    }
 }
 
 impl From<Isometry3<f32>> for Transform {
@@ -198,12 +204,47 @@ pub enum TextureType {
     None,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Color {
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+    pub a: f32,
+}
+
+impl Color {
+    pub fn rgba(r: f32, g: f32, b: f32, a: f32) -> Self {
+        Self{r,g,b,a}
+    }
+    pub fn rgb(r: f32, g: f32, b: f32) -> Self {
+        Self{r,g,b,a: 1.}
+    }
+}
+
+impl Into<[f32;4]> for Color {
+    fn into(self) -> [f32;4] { 
+        [self.r, self.g, self.b, self.a]
+    }
+}
+
+impl From<[f32;4]> for Color {
+    fn from(c: [f32;4]) -> Self { 
+        Self {
+            r: c[0],
+            g: c[1],
+            b: c[2],
+            a: c[3],
+        }
+    }
+}
+
 /// Material for a 3D object; can contain either color, vertex colors, or texture.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Material {
     pub shader_type: ShaderType,
     pub flat_shade: bool,
-    pub wire_overlay: bool,
+    pub wire_overlay: Option<Color>,
+    pub outline: Option<f32>,
     pub color: Option<[f32; 4]>,
     pub vertex_colors: Option<Vec<f32>>,
     pub tex_type: TextureType,
@@ -217,7 +258,8 @@ impl Default for Material {
         Self {
             shader_type: ShaderType::Simple,
             flat_shade: false,
-            wire_overlay: false,
+            wire_overlay: None,
+            outline: None,
             color: None,
             vertex_colors: None,
             tex_type: TextureType::None,
@@ -238,8 +280,9 @@ impl Material {
             .shader_type(ShaderType::Color)
     }
     pub fn new_wire(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Self::new_color(r, g, b, a)
-            .wire_overlay()
+        Self::default()
+            .color(r, g, b, a)
+            .wire_overlay_colored(Color::rgba(r, g, b, a))
             .shader_type(ShaderType::Wireframe)
     }
     pub fn new_texture(url: &str, tex_coords: Vec<f32>) -> Self {
@@ -265,6 +308,10 @@ impl Material {
         self.flat_shade = true;
         self
     }
+    pub fn outline(mut self) -> Self {
+        self.outline = Some(1.2);
+        self
+    }
     pub fn shader_type(mut self, shader: ShaderType) -> Self {
         self.shader_type = shader;
         self
@@ -274,7 +321,15 @@ impl Material {
         self
     }
     pub fn wire_overlay(mut self) -> Self {
-        self.wire_overlay = true;
+        let color = if let Some(c) = self.color {
+            Color::from(c)
+        } else {
+            Color::rgb(1.,1.,1.)
+        };
+        self.wire_overlay_colored(color)
+    }
+    pub fn wire_overlay_colored(mut self, color: Color) -> Self {
+        self.wire_overlay = Some(color);
         self
     }
     pub fn tex_coords(mut self, tex_coords: Vec<f32>) -> Self {

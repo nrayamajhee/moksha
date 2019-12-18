@@ -141,7 +141,7 @@ pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) 
                     Geometry::from_genmesh_no_normals(&Cube::new()),
                     Material::new_color_no_shade(color[0], color[1], color[2], 1.),
                 )),
-                "plane",
+                "Plane",
                 DrawMode::Triangle
             );
             cube.set_scale_vec(0.5, 0.5, 0.05);
@@ -149,7 +149,7 @@ pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) 
             cube.set_position(0., 0., -1.);
             n.own(cube);
             for i in 0..5 {
-                let ray = create_arrow(scene, [1., 1., 0., 1.], ArrowTip::Cone, "ray", true, false);
+                let ray = create_arrow(scene, [1., 1., 0., 1.], ArrowTip::Cone, "Ray", true, false);
                 ray.set_scale(0.1);
                 match i % 5 {
                     0 => {
@@ -175,9 +175,9 @@ pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) 
 
 pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowTip) -> Node {
     let name = match arrow_type {
-        ArrowTip::Cone => "translation",
-        ArrowTip::Sphere => "look",
-        ArrowTip::Cube => "scale",
+        ArrowTip::Cone => "Translation",
+        ArrowTip::Sphere => "Look",
+        ArrowTip::Cube => "Scale",
         ArrowTip::None => "",
     };
     let x = create_arrow(scene, [0.8, 0., 0., 1.], arrow_type, "XAxis", true, true);

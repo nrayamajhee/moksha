@@ -5,12 +5,15 @@
 precision mediump float;
 uniform vec4 color;
 uniform bool drawing_points;
+uniform float width, feather;
 in vec3 frag_bc;
 out vec4 outputColor;
 
 float edgeFactor(){
-	vec3 d = fwidth(frag_bc);
-	vec3 a3 = smoothstep(vec3(0.0), d*1.5, frag_bc);
+	float w1 = width - feather * 0.5;
+	vec3 bary = vec3(frag_bc.x, frag_bc.y, 1.0 - frag_bc.x - frag_bc.y);
+	vec3 d = fwidth(bary);
+	vec3 a3 = smoothstep(d * w1, d * (w1 + feather), bary);
 	return min(min(a3.x, a3.y), a3.z);
 }
 
@@ -23,7 +26,7 @@ void main() {
 		outputColor = vec4(0,0,0, alpha);
 	} else  {
 		outputColor = gl_FrontFacing?
-			vec4(color.xyz, (1.0-edgeFactor())*0.95): 
-			vec4(color.xyz, (1.0-edgeFactor())*0.5);
+			vec4(color.rgb, (color.a-edgeFactor())*0.95): 
+			vec4(color.rgb, (color.a-edgeFactor())*0.5);
 	}
 }

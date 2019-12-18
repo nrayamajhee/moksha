@@ -169,7 +169,7 @@ impl Scene {
                 ],
             ),
         );
-        let cube = node!(&self, Some(mesh), RenderFlags::no_cull());
+        let cube = node!(&self, Some(mesh), "Skybox", RenderFlags::no_cull());
         self.show(&cube);
     }
     pub fn show_only(&self, node: &Node) {

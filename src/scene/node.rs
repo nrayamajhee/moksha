@@ -1,4 +1,6 @@
-use crate::{mesh::multiply, Mesh, ObjectInfo, RcRcell, Storage, Transform};
+use crate::{
+    mesh::multiply, renderer::ShaderType, Color, Mesh, ObjectInfo, RcRcell, Storage, Transform,
+};
 use nalgebra::{Isometry3, Point3, UnitQuaternion, Vector3};
 use ncollide3d::{query::Ray, query::RayCast, shape::ConvexHull};
 
@@ -229,5 +231,14 @@ impl Node {
         let mut mesh = self.mesh().unwrap();
         mesh.material = mesh.material.color(color[0], color[1], color[2], 1.);
         self.set_mesh(Some(mesh));
+    }
+    pub fn set_outline(&self, outline_scale: Option<f32>) {
+        if let Some(mut mesh) = self.mesh() {
+            mesh.material.outline = outline_scale;
+            self.set_mesh(Some(mesh));
+        }
+        for each in self.owned_children() {
+            each.set_outline(outline_scale);
+        }
     }
 }

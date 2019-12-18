@@ -5,7 +5,7 @@ use crate::{
     log,
     mesh::Mesh,
     scene::Scene,
-    LightType, ProjectionType, Storage, TextureType,
+    LightType, ProjectionType, Storage, TextureType, Transform,
 };
 use maud::html;
 use nalgebra::{UnitQuaternion, Vector3};
@@ -49,6 +49,7 @@ pub struct RenderFlags {
     pub render: bool,
     pub depth: bool,
     pub blend: bool,
+    pub stencil: bool,
     pub view_transform: bool,
     pub cull_face: bool,
 }
@@ -58,6 +59,7 @@ impl Default for RenderFlags {
         Self {
             render: false,
             depth: true,
+            stencil: false,
             blend: false,
             view_transform: true,
             cull_face: true,
@@ -80,8 +82,14 @@ impl RenderFlags {
             ..Default::default()
         }
     }
+    pub fn stencil() -> Self {
+        Self {
+            stencil: true,
+            ..Default::default()
+        }
+    }
     pub fn no_cull() -> Self {
-        Self{
+        Self {
             cull_face: false,
             ..Default::default()
         }
@@ -99,6 +107,11 @@ impl RenderFlags {
 pub struct RendererConfig {
     pub id: &'static str,
     pub pixel_ratio: f64,
+}
+
+#[derive(Serialize)]
+pub struct ContextOptions {
+    pub stencil: bool,
 }
 
 /// WebGL renderer that compiles, binds and executes all shaders; also capable of handling window resizes and configuration changes
@@ -122,9 +135,10 @@ impl Renderer {
             .insert_adjacent_html("beforeend", dom.into_string().as_str())
             .expect("Couldn't insert markup into the DOM!");
         let mut canvas = get_canvas(config.id);
+        let stencil_param = JsValue::from_serde(&ContextOptions { stencil: true }).unwrap();
         let aspect_ratio = resize_canvas(&mut canvas, config.pixel_ratio);
         let ctx = canvas
-            .get_context("webgl2")
+            .get_context_with_context_options("webgl2", &stencil_param)
             .expect("Can't create webgl2 context. Make sure your browser supports WebGL2")
             .unwrap()
             .dyn_into::<GL>()
@@ -194,7 +208,7 @@ impl Renderer {
         // bind vertices
         bind_buffer_and_attribute(&self.ctx, &program, "position", &mesh.geometry.vertices, 3)
             .expect("Can't bind postion");
-        if mesh.material.wire_overlay || shader_type == ShaderType::Wireframe {
+        if mesh.material.wire_overlay != None || shader_type == ShaderType::Wireframe {
             let mut bary_buffer = Vec::new();
             let barycentric: [f32; 9] = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
             for _ in 0..mesh.geometry.vertices.len() / 9 {
@@ -241,6 +255,7 @@ impl Renderer {
         gl.depth_func(render_config.depth_fn);
         gl.front_face(render_config.front_face);
         gl.cull_face(render_config.cull_face);
+        gl.stencil_op(GL::KEEP, GL::KEEP, GL::REPLACE);
         gl.blend_func(GL::SRC_ALPHA, GL::ONE_MINUS_SRC_ALPHA);
         log!("Renderer is ready to draw");
     }
@@ -373,12 +388,24 @@ impl Renderer {
                 let gl = &self.ctx;
                 gl.use_program(Some(&program));
                 if each == ShaderType::CubeMap {
-                    set_mat4(gl, &program, "view", &viewport.transform().rotation.to_homogeneous());
+                    set_mat4(
+                        gl,
+                        &program,
+                        "view",
+                        &viewport.transform().rotation.to_homogeneous(),
+                    );
                 } else {
                     set_mat4(gl, &program, "view", &viewport.view());
                 }
-                if each == ShaderType::CubeMap && viewport.projection_type() == ProjectionType::Orthographic {
-                    set_mat4(gl, &program, "proj", &viewport.get_proj(ProjectionType::Perspective).to_matrix());
+                if each == ShaderType::CubeMap
+                    && viewport.projection_type() == ProjectionType::Orthographic
+                {
+                    set_mat4(
+                        gl,
+                        &program,
+                        "proj",
+                        &viewport.get_proj(ProjectionType::Perspective).to_matrix(),
+                    );
                 } else {
                     set_mat4(gl, &program, "proj", &viewport.proj());
                 }
@@ -395,6 +422,14 @@ impl Renderer {
             }
             false => {
                 gl.disable(GL::BLEND);
+            }
+        }
+        match render_flags.depth {
+            true => {
+                gl.enable(GL::STENCIL_TEST);
+            }
+            flse => {
+                gl.disable(GL::STENCIL_TEST);
             }
         }
         match render_flags.depth {
@@ -439,7 +474,14 @@ impl Renderer {
             }
             if shader_type == ShaderType::Color {
                 set_bool(gl, program, "flat_shade", mesh.material.flat_shade);
-                set_bool(gl, program, "wire_overlay", mesh.material.wire_overlay);
+                set_bool(gl, program, "blinn_shade", true);
+                if let Some(color) = mesh.material.wire_overlay {
+                    let w_color: [f32; 4] = color.into();
+                    set_bool(gl, program, "wire_overlay", true);
+                    set_vec4(gl, program, "wire_color", &w_color[..]);
+                } else {
+                    set_bool(gl, program, "wire_overlay", false);
+                }
                 if !mesh.material.texture_indices.is_empty() {
                     set_bool(gl, program, "has_albedo", true);
                     let tex_i = mesh.material.texture_indices[0];
@@ -467,17 +509,20 @@ impl Renderer {
 
             if shader_type == ShaderType::Wireframe {
                 gl.enable(GL::SAMPLE_ALPHA_TO_COVERAGE);
+                set_f32(gl, &program, "width", 1.0);
+                set_f32(gl, &program, "feather", 0.5);
+                set_bool(gl, program, "drawing_points", false);
             } else {
                 gl.disable(GL::SAMPLE_ALPHA_TO_COVERAGE);
             }
             Self::set_flags(&gl, info.render_flags);
+            if mesh.material.outline != None && shader_type != ShaderType::Wireframe {
+                // first pass for object outline
+                gl.stencil_func(GL::ALWAYS, 1, 0xFF);
+                gl.stencil_mask(0xFF);
+            }
             match info.draw_mode {
                 DrawMode::Arrays => {
-                    if shader_type == ShaderType::Wireframe {
-                        //gl.draw_arrays(GL::POINTS, 0, indices.len() as i32);
-                        //set_bool(gl, program, "drawing_points", true);
-                        set_bool(gl, program, "drawing_points", false);
-                    }
                     gl.draw_arrays(GL::TRIANGLES, 0, indices.len() as i32);
                 }
                 DrawMode::Lines => {
@@ -505,17 +550,52 @@ impl Renderer {
                     );
                 }
             }
+            if let Some(scale) = mesh.material.outline {
+                // second pass for drawing outlines
+                if shader_type == ShaderType::Wireframe {
+                    set_f32(gl, &program, "width", 3.0);
+                    set_vec4(gl, &program, "color", &[1., 1., 0., 0.8]);
+                    gl.draw_arrays(GL::TRIANGLES, 0, indices.len() as i32);
+                } else {
+                    gl.stencil_func(GL::NOTEQUAL, 1, 0xFF);
+                    gl.stencil_mask(0x00);
+                    let program = self.shaders.get(&ShaderType::Simple).unwrap();
+                    gl.use_program(Some(&program));
+                    let model = storage.parent_tranform(i)
+                        * storage.transform(i)
+                        * Transform::from_scale(mesh.material.outline.unwrap());
+                    set_mat4(gl, &program, "model", &model.to_homogeneous());
+                    set_vec4(gl, &program, "color", &[1., 1., 0., 1.]);
+                    let indices = &mesh.geometry.indices;
+                    bind_index_buffer(gl, &indices).expect("Can't bind index buffer!");
+                    match storage.info(i).draw_mode {
+                        DrawMode::Arrays => {
+                            gl.draw_arrays(GL::TRIANGLES, 0, indices.len() as i32);
+                        }
+                        _ => {
+                            gl.draw_elements_with_i32(
+                                GL::TRIANGLES,
+                                indices.len() as i32,
+                                GL::UNSIGNED_SHORT,
+                                0,
+                            );
+                        }
+                    }
+                    gl.stencil_func(GL::ALWAYS, 1, 0xFF);
+                    gl.stencil_mask(0x00);
+                }
+            }
         }
     }
     pub fn render(&self, scene: &Scene, viewport: &Viewport) {
         let gl = &self.ctx;
-        gl.clear(GL::COLOR_BUFFER_BIT | GL::DEPTH_BUFFER_BIT);
+        gl.clear(GL::COLOR_BUFFER_BIT | GL::DEPTH_BUFFER_BIT | GL::STENCIL_BUFFER_BIT);
         let storage = scene.storage();
         let storage = storage.borrow();
         self.setup_lights(&storage);
         let len = storage.meshes().len();
         self.update_viewport(viewport);
-        let render_stage = |condition: Box<dyn Fn(bool, Option<ShaderType>) -> bool>| {
+        let render_stage = |condition: Box<dyn Fn(RenderFlags, Option<ShaderType>) -> bool>| {
             for i in 0..len {
                 let info = storage.info(i);
                 let shader_type = if let Some(mesh) = storage.mesh(i) {
@@ -523,26 +603,21 @@ impl Renderer {
                 } else {
                     None
                 };
-                if info.render_flags.render && condition(info.render_flags.depth, shader_type) {
+                if info.render_flags.render && condition(info.render_flags, shader_type) {
                     self.render_mesh(&storage, i);
                 }
             }
         };
-        // render normal meshes
-        render_stage(Box::new(|depth, shader_type| {
-            // has depth but isn't wireframe
-            depth && shader_type != Some(ShaderType::Wireframe)
+        // render meshes that have depth first
+        render_stage(Box::new(|r_f, s_t| {
+            r_f.depth && s_t != Some(ShaderType::CubeMap)
         }));
-        // render wireframe
-        render_stage(Box::new(|_, shader_type| {
-            shader_type == Some(ShaderType::Wireframe)
-        }));
-        // render cubemap 
-        render_stage(Box::new(|_, shader_type| {
+        //// render cubemap
+        render_stage(Box::new(|r_f, shader_type| {
             shader_type == Some(ShaderType::CubeMap)
         }));
         // render depthless mesh
-        render_stage(Box::new(|depth, _| !depth));
+        render_stage(Box::new(|r_f, _| !r_f.depth));
         gl.bind_vertex_array(None);
         gl.bind_buffer(GL::ARRAY_BUFFER, None);
         gl.bind_buffer(GL::ELEMENT_ARRAY_BUFFER, None);

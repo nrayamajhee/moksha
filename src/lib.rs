@@ -8,6 +8,9 @@
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+#[macro_use]
+extern crate serde_derive;
+
 mod log_macro;
 mod node_macro;
 
@@ -33,7 +36,7 @@ pub mod scene;
 pub use crate::{
     controller::{MouseButton, ProjectionType, Viewport},
     editor::Editor,
-    mesh::{Geometry, Material, Mesh, TextureType, Transform},
+    mesh::{Geometry, Material, Mesh, TextureType, Transform, Color},
     renderer::Renderer,
     scene::{Light, LightType, Node, ObjectInfo, Primitive, Scene, Storage},
 };
