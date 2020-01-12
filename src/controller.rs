@@ -1,4 +1,6 @@
-use crate::Node;
+use crate::{ Node, Events,
+    events::{ViewportEvent, CanvasEvent},
+};
 use nalgebra::{
     Isometry3, Matrix4, Orthographic3, Perspective3, Point3, Unit, UnitQuaternion, Vector3,
 };
@@ -31,6 +33,12 @@ impl Projection {
             Projection::Perspective(proj) => Matrix4::from(proj),
         }
     }
+    pub fn to_matrix_f32(self) -> Matrix4<f32> {
+        match self {
+            Projection::Orthographic(proj) => Matrix4::from(proj),
+            Projection::Perspective(proj) => Matrix4::from(proj),
+        }
+    }
     pub fn unproject_point(&self, point: &Point3<f32>) -> Point3<f32> {
         match self {
             Projection::Orthographic(proj) => proj.unproject_point(&point),
@@ -48,13 +56,13 @@ pub enum ProjectionType {
 
 fn ortho_from_persp(
     fov: f32,
-    aspect_ratio: f32,
+    aspect_ratio: f64,
     distance: f32,
     clip_len: f32,
 ) -> Orthographic3<f32> {
     let halfy = fov / 2.;
     let height = distance * halfy.tan();
-    let width = height * aspect_ratio;
+    let width = height * aspect_ratio as f32;
     Orthographic3::new(-width, width, -height, height, -clip_len, clip_len)
 }
 
@@ -66,19 +74,19 @@ pub struct Viewport {
     view: Isometry3<f32>,
     initial_view: Isometry3<f32>,
     target: Isometry3<f32>,
-    aspect_ratio: f32,
-    speed: f32,
+    aspect_ratio: f64,
+    speed: f64,
     button: Option<MouseButton>,
     rotate: bool,
     zoom: bool,
 }
 
 impl Viewport {
-    pub fn new(proj_config: ProjectionConfig, aspect_ratio: f32) -> Self {
+    pub fn new(proj_config: ProjectionConfig, aspect_ratio: f64) -> Self {
         let view = Isometry3::look_at_rh(&[0., 3., 3.].into(), &[0., 0., 0.].into(), &Vector3::y());
 
         let proj = Projection::Perspective(Perspective3::new(
-            aspect_ratio,
+            aspect_ratio as f32,
             proj_config.fov,
             proj_config.near,
             proj_config.far,
@@ -100,6 +108,33 @@ impl Viewport {
             button,
             rotate,
             zoom,
+        }
+    }
+    pub fn update(&mut self, event: &Events, dt: f64) {
+        //crate::log!("Viewport changed at"  crate::dom_factory::now());
+        match event.canvas {
+            CanvasEvent::Grab => {
+                self.enable_rotation();
+            },
+            CanvasEvent::Zoom => {
+                self.enable_zoom();
+            },
+            CanvasEvent::Point => {
+                self.disable_zoom();
+                self.disable_rotation();
+            },
+            _=>()
+        }
+        match event.viewport {
+            ViewportEvent::Rotate(dx, dy) => {
+                self.update_rot(dx as f64 * dt, dy as f64 * dt);
+            }
+            ViewportEvent::Zoom(dw) => {
+                self.enable_zoom();
+                self.update_zoom(dw as f64 * dt);
+                self.disable_zoom();
+            }
+            _=>()
         }
     }
     pub fn view(&self) -> Matrix4<f32> {
@@ -130,24 +165,24 @@ impl Viewport {
         let v = v.normalize();
         [v.x, v.y, v.z]
     }
-    pub fn update_rot(&mut self, dx: i32, dy: i32, _dt: f32) {
+    pub fn update_rot(&mut self, dx: f64, dy: f64) {
         if self.rotate {
-            let pitch = dy as f32 * 0.01 * self.speed;
-            let yaw = dx as f32 * 0.01 * self.speed;
+            let pitch = dy * 0.001 * self.speed;
+            let yaw = dx * 0.001 * self.speed;
             let delta_rot = {
                 let axis = Unit::new_normalize(self.view.rotation.conjugate() * Vector3::x());
-                let q_ver = UnitQuaternion::from_axis_angle(&axis, pitch);
+                let q_ver = UnitQuaternion::from_axis_angle(&axis, pitch as f32);
                 let axis = Unit::new_normalize(self.target.rotation.conjugate() * Vector3::y());
-                let q_hor = UnitQuaternion::from_axis_angle(&axis, yaw);
+                let q_hor = UnitQuaternion::from_axis_angle(&axis, yaw as f32);
                 q_ver * q_hor
             };
             self.view.rotation *= &delta_rot;
         }
     }
-    pub fn update_zoom(&mut self, ds: i32) {
-        if self.zoom && ds != 0 {
-            let delta = if ds > 0 { 1.05 } else { 0.95 };
-            self.view.translation.vector = self.speed * delta * self.view.translation.vector;
+    pub fn update_zoom(&mut self, ds: f64) {
+        if self.zoom && ds != 0. {
+            let delta = if ds > 0. { 1.05 } else { 0.95 };
+            self.view.translation.vector = (self.speed * delta) as f32 * self.view.translation.vector;
             self.update_ortho();
         }
     }
@@ -161,7 +196,7 @@ impl Viewport {
             Projection::Orthographic(_) => self.get_proj(ProjectionType::Perspective),
         };
     }
-    pub fn resize(&mut self, aspect_ratio: f32) {
+    pub fn resize(&mut self, aspect_ratio: f64) {
         self.aspect_ratio = aspect_ratio;
         self.proj = match self.proj {
             Projection::Orthographic(_) => self.get_proj(ProjectionType::Orthographic),
@@ -208,7 +243,7 @@ impl Viewport {
     pub fn get_proj(&self, proj_type: ProjectionType) -> Projection {
         if proj_type == ProjectionType::Perspective {
             Projection::Perspective(Perspective3::new(
-                self.aspect_ratio,
+                self.aspect_ratio as f32,
                 self.proj_config.fov,
                 self.proj_config.near,
                 self.proj_config.far,

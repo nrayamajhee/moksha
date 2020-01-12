@@ -1,7 +1,6 @@
-mod node;
+pub mod node;
 pub mod primitives;
 mod storage;
-
 use std::collections::HashMap;
 
 #[doc(inline)]
@@ -14,7 +13,9 @@ pub use storage::Storage;
 use crate::{
     dom_factory::{add_event, window, now, set_timeout, request_animation_frame},
     log, node, rc_rcell, TextureType,
-    renderer::{bind_texture, CursorType, DrawMode, RenderFlags, Renderer},
+    renderer::{bind_texture, DrawMode, RenderFlags, Renderer},
+    Events,
+    events::{ViewportEvent,CanvasEvent},
     scene::primitives::create_light_node,
     Geometry, Material, Mesh, MouseButton, RcRcell, Transform, Viewport,
 };
@@ -97,13 +98,11 @@ impl Scene {
             false,
             false,
         ));
-        let scene = Self {
+        Self {
             root,
             renderer,
             viewport,
-        };
-        scene.add_viewport_events();
-        scene
+        }
     }
     pub fn root(&self) -> RcRcell<Node> {
         self.root.clone()
@@ -264,21 +263,21 @@ impl Scene {
     ) -> Node {
         let mut buf_vertices = Vec::new();
         for vertex in &object.vertices {
-            buf_vertices.push(vertex.x as f32);
-            buf_vertices.push(vertex.y as f32);
-            buf_vertices.push(vertex.z as f32);
+            buf_vertices.push(vertex.x);
+            buf_vertices.push(vertex.y);
+            buf_vertices.push(vertex.z);
         }
         let mut buf_normals = Vec::new();
         for normal in &object.normals {
-            buf_normals.push(normal.x as f32);
-            buf_normals.push(normal.y as f32);
-            buf_normals.push(normal.z as f32);
+            buf_normals.push(normal.x);
+            buf_normals.push(normal.y);
+            buf_normals.push(normal.z);
         }
         let mut buf_tex_coords = Vec::new();
         for normal in &object.normals {
-            buf_tex_coords.push(normal.x as f32);
-            buf_tex_coords.push(normal.y as f32);
-            buf_tex_coords.push(normal.z as f32);
+            buf_tex_coords.push(normal.x);
+            buf_tex_coords.push(normal.y);
+            buf_tex_coords.push(normal.z);
         }
         let mut vertices = Vec::new();
         let mut normals = Vec::new();
@@ -294,16 +293,16 @@ impl Scene {
                     {
                         let (e, ue, ne) = (*a * 3, *ua, *na);
                         indices.push(e as u16);
-                        vertices.push(buf_vertices[e]);
-                        vertices.push(buf_vertices[e + 1]);
-                        vertices.push(buf_vertices[e + 2]);
-                        normals.push(buf_vertices[e]);
-                        normals.push(buf_vertices[e + 1]);
-                        normals.push(buf_vertices[e + 2]);
-                        let u = object.tex_vertices[ue].u as f32;
-                        let v = -object.tex_vertices[ue].v as f32;
-                        tex_coords.push(u);
-                        tex_coords.push(v);
+                        vertices.push(buf_vertices[e] as f32);
+                        vertices.push(buf_vertices[e + 1] as f32);
+                        vertices.push(buf_vertices[e + 2] as f32);
+                        normals.push(buf_vertices[e] as f32);
+                        normals.push(buf_vertices[e + 1] as f32);
+                        normals.push(buf_vertices[e + 2] as f32);
+                        let u = object.tex_vertices[ue].u as f64;
+                        let v = -object.tex_vertices[ue].v as f64;
+                        tex_coords.push(u as f32);
+                        tex_coords.push(v as f32);
                     }
                 } else {
                     log!("obj file doesn't have normal or uv indices. Only vertices are loaded");
@@ -331,6 +330,10 @@ impl Scene {
         img_obj_url: Option<&HashMap<String, String>>,
     ) -> Material {
         let mut material = Material::new_color(1., 1., 1., 1.);
+        if object.geometry[0].shapes[0].smoothing_groups.is_empty() {
+            log!("No smooting group found. Mesh will be rendered flat.");
+            material = material.flat();
+        }
         if let Some(material_name) = &object.geometry[0].material_name {
             if let Some(mat_set) = mat_set {
                 for each in &mat_set.materials {
@@ -361,9 +364,6 @@ impl Scene {
                             if let Some(url) = url {
                                 material = material.tex_type(TextureType::Tex2d).tex_coords(tex_coords).texture(&url);
                             }
-                        }
-                        if object.geometry[0].shapes[0].smoothing_groups.is_empty() {
-                            material = material.flat();
                         }
                         return material;
                     }
@@ -424,9 +424,9 @@ impl Scene {
                         let duplicate_u = current_tex != -1. && current_tex != v;
                         if duplicate_u || duplicate_v {
                             indices.push((vertices.len() / 3) as u16);
-                            vertices.push(vertices[e]);
-                            vertices.push(vertices[e + 1]);
-                            vertices.push(vertices[e + 2]);
+                            vertices.push(vertices[e] as f32);
+                            vertices.push(vertices[e + 1] as f32);
+                            vertices.push(vertices[e + 2] as f32);
                             normals.push(normals[e]);
                             normals.push(normals[e + 1]);
                             normals.push(normals[e + 2]);
@@ -465,6 +465,9 @@ impl Scene {
     ) -> Node {
         let obj_set = obj::parse(obj_src).unwrap();
         assert!(!obj_set.objects.is_empty(), "No objects in the obj file");
+        if obj_set.objects.len() > 1 {
+            log!("Please note that the obj file has multiple objects. Hence they'll have a single origin which might affect transformations and object outlining.");
+        }
         let mat_set = if let Some(src) = mtl_src {
             Some(mtl::parse(src).unwrap())
         } else {
@@ -528,67 +531,73 @@ impl Scene {
             false,
         )
     }
-    fn add_viewport_events(&self) {
-        let window = window();
-        let perf = window.performance().unwrap();
-
+    pub fn add_events(&self, events: RcRcell<Events>) {
         let renderer = self.renderer.borrow();
         let canvas = renderer.canvas();
-
-        let a_view = self.viewport.clone();
+        let ev = events.clone();
         add_event(&canvas, "mousemove", move |e| {
+            let mut events = ev.borrow_mut();
             let me = e.dyn_into::<MouseEvent>().unwrap();
-            let dt = perf.now();
-            a_view
-                .borrow_mut()
-                .update_rot(me.movement_x(), me.movement_y(), dt as f32);
+            events.viewport = ViewportEvent::Rotate(me.movement_x(), me.movement_y());
         });
-
-        let b_view = self.viewport.clone();
+        let ev = events.clone();
         add_event(&canvas, "wheel", move |e| {
-            let mut view = b_view.borrow_mut();
+            let mut events = ev.borrow_mut();
             let we = e.dyn_into::<WheelEvent>().unwrap();
-            view.enable_zoom();
-            view.update_zoom(we.delta_y() as i32);
-            view.disable_zoom();
+            events.viewport = ViewportEvent::Zoom(we.delta_y());
         });
-
+        let window = window();
         if let Some(button) = self.viewport.borrow().button() {
-            let a_view = self.viewport.clone();
-            let a_rndr = self.renderer.clone();
+            let ev = events.clone();
             add_event(canvas, "mousedown", move |e| {
-                let mut view = a_view.borrow_mut();
-                let renderer = a_rndr.borrow_mut();
+                let mut events = ev.borrow_mut();
                 let me = e.dyn_into::<MouseEvent>().unwrap();
                 if me.button() == button as i16 {
-                    renderer.change_cursor(CursorType::Grab);
-                    view.enable_rotation();
+                    events.canvas = CanvasEvent::Grab
                 }
                 if me.button() == MouseButton::MIDDLE as i16 {
-                    view.enable_zoom();
+                    events.canvas = CanvasEvent::Zoom
                 }
             });
-            let a_view = self.viewport.clone();
-            let a_rndr = self.renderer.clone();
+            let ev = events.clone();
             add_event(&window, "mouseup", move |e| {
-                let mut view = a_view.borrow_mut();
-                let renderer = a_rndr.borrow_mut();
+                let mut events = ev.borrow_mut();
                 let me = e.dyn_into::<MouseEvent>().unwrap();
                 let pressed_btn = me.button();
                 if (pressed_btn == button as i16) || (pressed_btn == MouseButton::MIDDLE as i16) {
-                    renderer.change_cursor(CursorType::Pointer);
-                    view.disable_rotation();
-                    view.disable_zoom()
+                    events.canvas = CanvasEvent::Point
                 }
             });
         }
-
-        let a_rndr = self.renderer.clone();
-        let a_view = self.viewport.clone();
+        let ev = events.clone();
         add_event(&window, "resize", move |_| {
-            let mut renderer = a_rndr.borrow_mut();
-            renderer.resize();
-            a_view.borrow_mut().resize(renderer.aspect_ratio());
+            let mut events = ev.borrow_mut();
+            events.canvas = CanvasEvent::Resize;
         });
+    }
+    pub fn update(&self, events: &Events) {
+        let mut renderer = self.renderer.borrow_mut();
+        let canvas_style = renderer.canvas().style();
+        match events.canvas {
+            CanvasEvent::Point => {
+                canvas_style
+                    .set_property("cursor", "var(--cursor-auto)")
+                    .unwrap();
+            }
+            CanvasEvent::Grab => {
+                canvas_style
+                    .set_property("cursor", "var(--cursor-grab)")
+                    .unwrap();
+            }
+            CanvasEvent::Zoom => {
+                canvas_style
+                    .set_property("cursor", "var(--cursor-zoom)")
+                    .unwrap();
+            }
+            CanvasEvent::Resize => {
+                renderer.resize();
+                self.viewport.borrow_mut().resize(renderer.aspect_ratio());
+            }
+        }
     }
 }

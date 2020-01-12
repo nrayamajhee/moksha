@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 case $1 in
 	"w" | "watch")
@@ -14,7 +14,54 @@ case $1 in
 		wasm-pack test --headless --chrome
 	;;
 	"d" | "docs")
-		cargo doc --document-private-items --open
+		D_PRIVATE="--document-private-items"
+		D_OPEN="--open"
+		VALID=true
+		SECOND="$2"
+		while [ "$2" != "" ]; do
+			if [[ ${SECOND:1:1} == "-" ]]; then
+				echo "Double"
+				case $2 in
+					"--public")
+						D_PRIVATE=""
+					;;
+					"--quiet")
+						D_OPEN=""
+					;;
+					*)
+						VALID=false
+					;;
+				esac
+			else
+				if [ ${SECOND:0:1} == "-" ]; then
+					LEN=$()
+					for i in $(seq -s " " 1 ${#SECOND}); do
+						case ${SECOND:i:1} in
+							"p")
+								D_PRIVATE=""
+							;;
+							"q")
+								D_OPEN=""
+							;;
+							"")
+								break
+							;;
+							*)
+								VALID=false
+							;;
+						esac
+					done
+				else
+					VALID=false
+				fi
+			fi
+			shift
+		done
+		if [ "$VALID" = true ]; then
+			cargo doc $D_PRIVATE $D_OPEN
+		else
+			echo "moksha docs [-|--] [(p)ublic | (q)uiet]"
+		fi
 	;;
 	"s" | "serve")
 		cd www

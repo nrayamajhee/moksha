@@ -77,9 +77,9 @@ impl Editor {
         if view.projection_type() == ProjectionType::Perspective {
             let eye = Point3::from(view.eye());
             let o_pos = Point3::from(node.global_position());
-            (eye - o_pos).magnitude() / 60.
+            (eye - o_pos).magnitude().into()
         } else {
-            view.transform().translation.vector.magnitude() 
+            view.transform().translation.vector.magnitude().into()
         }
     }
     pub fn scale_gizmos(&self) {
@@ -96,7 +96,7 @@ impl Editor {
         if let Some(node) = self.active_node.borrow().as_ref() {
             node.borrow().set_outline(None);
         }
-        node.borrow().set_outline(Some(1.05));
+        node.borrow().set_outline(Some(2.));
         *self.active_node.borrow_mut() = Some(node);
         self.scale_gizmos();
     }
@@ -152,7 +152,7 @@ impl Editor {
             let view = editor.scene().view();
             {
                 let me = e.dyn_into::<MouseEvent>().unwrap();
-                view.borrow_mut().update_zoom(me.movement_y());
+                view.borrow_mut().update_zoom(me.movement_y() as f64);
             }
             if view.borrow().zooming() {
                 editor.scale_gizmos();
@@ -217,8 +217,8 @@ impl Editor {
         );
         let (x, y) = (me.offset_x() as f32 - hw, hh - me.offset_y() as f32);
         let (x, y) = (x / hw, y / hh);
-        let ray_pos = view.screen_to_world([x, y, -1.0]);
-        let ray_vec = view.screen_to_ray([x, y]);
+        let ray_pos = view.screen_to_world([x as f32, y as f32, -1.0]);
+        let ray_vec = view.screen_to_ray([x as f32, y as f32]);
         Ray::new(ray_pos.into(), ray_vec.into())
     }
 }

@@ -29,7 +29,11 @@ struct Light {
 };
 
 vec3 calc_amb_light(Light light, vec3 f_color) {
-	return light.color * f_color * light.intensity;
+	// attenuation
+	float distance = length(light.position - object_pos);
+	float attenuation = 1.0 / (1.0 + light.linear * distance + light.quadratic * (distance * distance));
+
+	return light.color * attenuation * f_color * light.intensity;
 }
 
 vec3 calc_light(Light light, vec3 normal, int type, vec3 f_color) {

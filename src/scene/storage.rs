@@ -63,7 +63,7 @@ impl Storage {
     pub fn transform(&self, indx: usize) -> Transform {
         *self.transforms.get(indx).expect("No such transform found!")
     }
-    pub fn parent_tranform(&self, indx: usize) -> Transform {
+    pub fn parent_transform(&self, indx: usize) -> Transform {
         *self
             .parent_transforms
             .get(indx)

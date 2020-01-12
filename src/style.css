@@ -18,6 +18,7 @@
 
 	--cursor-auto:  auto;
 	--cursor-pointer: pointer;
+	--cursor-zoom: zoom-in;
 	--cursor-grab: grab;
 }
 *:focus {

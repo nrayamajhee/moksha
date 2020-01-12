@@ -56,14 +56,14 @@ pub fn get_canvas(id: &str) -> HtmlCanvasElement {
         .expect("Can't convert the dom element to HtmlCanvasElement!")
 }
 
-pub fn resize_canvas(canvas: &HtmlCanvasElement, pixel_ratio: f64) -> f32 {
+pub fn resize_canvas(canvas: &HtmlCanvasElement, pixel_ratio: f64) -> f64 {
     let window = window();
     let pixel_ratio = window.device_pixel_ratio() / pixel_ratio;
-    let width: u32 = (window.inner_width().unwrap().as_f64().unwrap() * pixel_ratio) as u32;
-    let height: u32 = (window.inner_height().unwrap().as_f64().unwrap() * pixel_ratio) as u32;
-    canvas.set_width(width);
-    canvas.set_height(height);
-    width as f32 / height as f32
+    let width = window.inner_width().unwrap().as_f64().unwrap() * pixel_ratio;
+    let height = window.inner_height().unwrap().as_f64().unwrap() * pixel_ratio;
+    canvas.set_width(width as u32);
+    canvas.set_height(height as u32);
+    width / height
 }
 
 pub fn add_event<H>(target: &EventTarget, event_type: &str, event_listener: H)

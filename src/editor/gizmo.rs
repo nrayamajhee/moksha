@@ -133,12 +133,12 @@ impl Gizmo {
                     .inverse()
                     .transform_vector(&self.offset);
                 let p = match self.collision_constraint {
-                    CollisionConstraint::XAxis => [poi.x, pos[1], pos[2]],
-                    CollisionConstraint::YAxis => [pos[0], poi.y, pos[2]],
-                    CollisionConstraint::ZAxis => [pos[0], pos[1], poi.z],
+                    CollisionConstraint::XAxis => [poi.x, pos[1] as f32, pos[2] as f32],
+                    CollisionConstraint::YAxis => [pos[0] as f32, poi.y, pos[2] as f32],
+                    CollisionConstraint::ZAxis => [pos[0] as f32, pos[1] as f32, poi.z],
                     _ => [poi.x, poi.y, poi.z],
                 };
-                node.set_position(p[0] - o.x, p[1] - o.y, p[2] - o.z);
+                node.set_position((p[0] - o.x).into(), (p[1] - o.y).into(), (p[2] - o.z).into());
                 self.apply_target_transform(&node);
             }
         }

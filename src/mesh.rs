@@ -40,6 +40,12 @@ impl Transform {
             scale: Vector3::new(scale, scale, scale),
         }
     }
+    pub fn from_scale_vec(x: f32, y: f32, z: f32) -> Self {
+        Self {
+            isometry: Isometry3::identity(),
+            scale: Vector3::new(x, y, z),
+        }
+    }
 }
 
 impl From<Isometry3<f32>> for Transform {
@@ -309,7 +315,7 @@ impl Material {
         self
     }
     pub fn outline(mut self) -> Self {
-        self.outline = Some(1.2);
+        self.outline = Some(5.);
         self
     }
     pub fn shader_type(mut self, shader: ShaderType) -> Self {

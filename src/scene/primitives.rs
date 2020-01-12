@@ -149,7 +149,7 @@ pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) 
             cube.set_position(0., 0., -1.);
             n.own(cube);
             for i in 0..5 {
-                let ray = create_arrow(scene, [1., 1., 0., 1.], ArrowTip::Cone, "Ray", true, false);
+                let ray = create_arrow(scene, [0.8, 0.8, 0.8, 1.], ArrowTip::Cone, "Ray", true, false);
                 ray.set_scale(0.1);
                 match i % 5 {
                     0 => {

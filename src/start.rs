@@ -1,10 +1,12 @@
 use crate::{
     controller::ProjectionConfig,
-    dom_factory::{document, loop_animation_frame},
+    dom_factory::{document, loop_animation_frame, window, now},
     editor::console::{self, ConsoleConfig},
     node, node_from_obj, node_from_obj_wired, rc_rcell,
     renderer::{Renderer, RendererConfig},
     scene::LightType,
+    Events,
+    events::{ViewportEvent, CanvasEvent},
     Color,
     Editor, Geometry, Material, Mesh, Node, Scene, Viewport,
 };
@@ -75,7 +77,7 @@ pub fn start() -> Result<(), JsValue> {
     let a_view = rc_rcell(viewport);
     let scene = Scene::new(a_rndr.clone(), a_view.clone());
     scene.set_skybox("assets/img/milkyway", "jpg");
-    let ambient = scene.light(LightType::Ambient, [1.0, 1.0, 1.0], 0.5);
+    let ambient = scene.light(LightType::Ambient, [1.0, 1.0, 1.0], 0.2);
     let amb_node = ambient.node();
     amb_node.borrow().set_position(10., 0., 10.);
 
@@ -103,31 +105,26 @@ pub fn start() -> Result<(), JsValue> {
     ////scene.add_light(point);
     scene.add_light(&directional);
 
-    let sphere = rc_rcell(node!(&scene,
-    Some(Mesh::new(Geometry::from_genmesh(&IcoSphere::subdivide(2)),
-    Material::new_color(0.5,0.5,0.5,1.0).wire_overlay())), "earth", DrawMode::Arrays));
-
     //let obj = rc_rcell(node_from_obj!(scene, "../assets/obj/earth", "earth"));
-    //let obj = rc_rcell(node_from_obj_wired!(scene, "assets/obj/earth", "earth"));
+    ////let obj = rc_rcell(node_from_obj_wired!(scene, "assets/obj/earth", "earth"));
     //obj.borrow().set_position(28., 0., 0.);
     //scene.add(obj.clone());
-    scene.add(sphere.clone());
+    let events = rc_rcell(Events::new());
+    scene.add_events(events.clone());
     let a_scene = Rc::new(scene);
     let mut editor = Editor::new(a_scene.clone());
 
-    editor.set_active_node(sphere);
     let a_editor = rc_rcell(editor);
-    //sun.borrow()
-    //.rotate_by(UnitQuaternion::from_euler_angles(0., PI / 3., 0.));
+    let then = rc_rcell(now());
     loop_animation_frame(move || {
-        {
-            //a_earth.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.02, 0.));
-            //sun.borrow().rotate_by(UnitQuaternion::from_euler_angles(0., 0.01, 0.));
-        }
-        {
-            //a_editor.borrow().track_gizmo();
-            a_rndr.borrow_mut().render(&a_scene, &a_view.borrow());
-        }
+        let mut then = then.borrow_mut();
+        let mut events = events.borrow_mut();
+        let dt = now() - *then;
+        a_scene.update(&events);
+        a_view.borrow_mut().update(&events, dt);
+        a_rndr.borrow_mut().render(&a_scene, &a_view.borrow());
+        events.clear();
+        *then = now(); 
     }, Some(60.));
     Ok(())
 }

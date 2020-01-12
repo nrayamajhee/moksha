@@ -7,7 +7,7 @@ use crate::{
     },
     log, rc_rcell,
     scene::primitives::create_primitive_node,
-    Editor, LightType, Primitive, RcRcell, Viewport,
+    Editor, LightType, Node, Primitive, RcRcell, Scene, Viewport,
 };
 use maud::html;
 use std::collections::HashMap;
@@ -162,7 +162,7 @@ fn add_events(editor: &Editor) {
                     let mut progress = progress.borrow_mut();
                     let pe = get_progress(e);
                     *progress += (pe.loaded() * 100.) / (pe.total() * total as f64);
-                    log!("Progress" progress.to_string());
+                    log!("Loaded" progress.to_string());
                     progress_el
                         .style()
                         .set_property("width", &format!("{}%", *progress))
@@ -187,6 +187,16 @@ fn add_events(editor: &Editor) {
             add_event(&obj_reader, "load", move |e| {
                 let obj_src = Rc::new(get_target_file_result(&e));
                 let editor = editor.clone();
+                let add_obj_to_scene = |scene: &Scene, node: Node, editor: &Editor| {
+                    node.copy_location(&editor.spawn_origin.borrow());
+                    scene.add(rc_rcell(node));
+                    query_html_el("#scene-tree > ul").remove();
+                    build_node(
+                        &editor,
+                        &get_el("scene-tree"),
+                        NodeRef::Mutable(scene.root()),
+                    );
+                };
                 if let Some(file) = &mtl {
                     let mat_reader = Rc::new(FileReader::new().unwrap());
                     let o_src = obj_src.clone();
@@ -199,8 +209,7 @@ fn add_events(editor: &Editor) {
                             let scene = editor.scene();
                             let node =
                                 scene.object_from_obj("", &obj_src, Some(&mtl_src), None, true);
-                            node.copy_location(&editor.spawn_origin.borrow());
-                            scene.add(rc_rcell(node));
+                            add_obj_to_scene(&scene, node, &editor);
                         } else {
                             let h_m: HashMap<String, String> = HashMap::new();
                             let mut loaded_urls = rc_rcell(h_m);
@@ -226,8 +235,7 @@ fn add_events(editor: &Editor) {
                                             Some(&loaded_urls),
                                             false,
                                         );
-                                        node.copy_location(&editor.spawn_origin.borrow());
-                                        scene.add(rc_rcell(node));
+                                        add_obj_to_scene(&scene, node, &editor);
                                     }
                                 });
                                 update_progress(tex_reader.clone(), p.clone(), total);
@@ -241,8 +249,7 @@ fn add_events(editor: &Editor) {
                     log!("No material file uploaded. Will load default material instead.");
                     let scene = editor.scene();
                     let node = scene.object_from_obj("", &obj_src, None, None, false);
-                    node.copy_location(&editor.spawn_origin.borrow());
-                    scene.add(rc_rcell(node));
+                    add_obj_to_scene(&scene, node, &editor);
                 }
             });
             update_progress(obj_reader.clone(), progress.clone(), total);

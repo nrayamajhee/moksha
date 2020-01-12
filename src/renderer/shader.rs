@@ -1,5 +1,5 @@
 use crate::{dom_factory::add_event, rc_rcell, TextureType};
-use js_sys::{Float32Array, Uint16Array, Uint8Array};
+use js_sys::{Float32Array, Uint16Array, Uint8Array, Float64Array};
 use nalgebra::Matrix4;
 use std::rc::Rc;
 use wasm_bindgen::JsValue;
@@ -230,7 +230,7 @@ pub fn bind_attribute(gl: &GL, program: &WebGlProgram, name: &str, size: i32) {
 pub fn bind_buffer_f32(gl: &GL, data: &[f32]) -> Result<(), JsValue> {
     let buffer = gl.create_buffer().ok_or("failed to create buffer")?;
     gl.bind_buffer(GL::ARRAY_BUFFER, Some(&buffer));
-    let buffer_array = unsafe { Float32Array::view(&data) };
+    let buffer_array = unsafe { Float32Array::view(data) };
     gl.buffer_data_with_array_buffer_view(GL::ARRAY_BUFFER, &buffer_array, GL::STATIC_DRAW);
     Ok(())
 }

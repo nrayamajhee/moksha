@@ -49,7 +49,6 @@ pub struct RenderFlags {
     pub render: bool,
     pub depth: bool,
     pub blend: bool,
-    pub stencil: bool,
     pub view_transform: bool,
     pub cull_face: bool,
 }
@@ -59,7 +58,6 @@ impl Default for RenderFlags {
         Self {
             render: false,
             depth: true,
-            stencil: false,
             blend: false,
             view_transform: true,
             cull_face: true,
@@ -79,12 +77,6 @@ impl RenderFlags {
             blend: true,
             depth: false,
             cull_face: false,
-            ..Default::default()
-        }
-    }
-    pub fn stencil() -> Self {
-        Self {
-            stencil: true,
             ..Default::default()
         }
     }
@@ -120,7 +112,7 @@ pub struct ContextOptions {
 pub struct Renderer {
     canvas: HtmlCanvasElement,
     ctx: GL,
-    aspect_ratio: f32,
+    aspect_ratio: f64,
     shaders: HashMap<ShaderType, WebGlProgram>,
     config: RendererConfig,
     render_config: RenderConfig,
@@ -206,7 +198,7 @@ impl Renderer {
         let vao = self.ctx.create_vertex_array().expect("Can't creat VAO");
         self.ctx.bind_vertex_array(Some(&vao));
         // bind vertices
-        bind_buffer_and_attribute(&self.ctx, &program, "position", &mesh.geometry.vertices, 3)
+        bind_buffer_and_attribute(&self.ctx, &program, "position", &mesh.geometry.vertices[..], 3)
             .expect("Can't bind postion");
         if mesh.material.wire_overlay != None || shader_type == ShaderType::Wireframe {
             let mut bary_buffer = Vec::new();
@@ -216,18 +208,18 @@ impl Renderer {
                     bary_buffer.push(*each);
                 }
             }
-            bind_buffer_and_attribute(&self.ctx, &program, "barycentric", &bary_buffer, 3)
+            bind_buffer_and_attribute(&self.ctx, &program, "barycentric", &bary_buffer[..], 3)
                 .expect("Can't bind postion");
         }
         // bind normals
         if shader_type == ShaderType::Color {
-            bind_buffer_and_attribute(&self.ctx, &program, "normal", &mesh.geometry.normals, 3)
+            bind_buffer_and_attribute(&self.ctx, &program, "normal", &mesh.geometry.normals[..], 3)
                 .expect("Can't bind normals");
         }
         // bind texture
         if let Some(coords) = mesh.material.tex_coords.as_ref() {
             if mesh.material.tex_type == TextureType::Tex2d {
-                bind_buffer_and_attribute(&self.ctx, &program, "tex_coords", coords, 2)
+                bind_buffer_and_attribute(&self.ctx, &program, "tex_coords", &coords[..], 2)
                     .expect("Couldn't bind tex coordinates");
             }
         }
@@ -255,6 +247,7 @@ impl Renderer {
         gl.depth_func(render_config.depth_fn);
         gl.front_face(render_config.front_face);
         gl.cull_face(render_config.cull_face);
+        gl.enable(GL::STENCIL_TEST);
         gl.stencil_op(GL::KEEP, GL::KEEP, GL::REPLACE);
         gl.blend_func(GL::SRC_ALPHA, GL::ONE_MINUS_SRC_ALPHA);
         log!("Renderer is ready to draw");
@@ -271,110 +264,89 @@ impl Renderer {
             if !light.light {
                 continue;
             }
+            let (attrib, index) = match light.light_type {
+                LightType::Point => ("point_lights", num_l_point),
+                LightType::Spot => ("spot_lights", num_l_spot),
+                LightType::Ambient => ("amb_lights", num_l_amb),
+                LightType::Directional => ("dir_lights", num_l_dir)
+            };
+            let vector = (storage.parent_transform(light.node_id)
+                * storage.transform(light.node_id))
+            .isometry
+            .translation
+            .vector;
+            let position = [vector.x as f32, vector.y as f32, vector.z as f32];
+            let range = 100.;
+            let linear = 4.5 / range;
+            let quadratic = 7.5 / (range * range);
+            set_f32(
+                gl,
+                program,
+                &format!("{}[{}].linear", attrib, index),
+                linear,
+            );
+            set_f32(
+                gl,
+                program,
+                &format!("{}[{}].quadratic", attrib, index),
+                quadratic,
+            );
+            set_vec3(
+                gl,
+                program,
+                &format!("{}[{}].position", attrib, index),
+                &position[..],
+            );
+            if light.light_type == LightType::Directional
+                || light.light_type == LightType::Spot
+            {
+                let vector = (storage.parent_transform(light.node_id)
+                    * storage.transform(light.node_id))
+                .isometry
+                .rotation
+                .transform_vector(&Vector3::identity());
+                // The cone and arrows mesh is intrinsically oriented 90 deg
+                let dir = UnitQuaternion::from_euler_angles(0., PI / 2., 0.)
+                    .transform_vector(&vector);
+                let direction = [dir.x as f32, dir.y as f32, dir.z as f32];
+                set_vec3(
+                    gl,
+                    program,
+                    &format!("{}[{}].direction", attrib, index),
+                    &direction[..],
+                );
+            }
+            if light.light_type == LightType::Spot {
+                set_f32(
+                    gl,
+                    program,
+                    &format!("{}[{}].cutoff", attrib, index),
+                    f32::cos(PI / 30.),
+                );
+                set_f32(
+                    gl,
+                    program,
+                    &format!("{}[{}].outer_cutoff", attrib, index),
+                    f32::cos(std::f32::consts::PI / 25.),
+                );
+            }
+            set_vec3(
+                gl,
+                program,
+                &format!("{}[{}].color", attrib, index),
+                &light.color[..],
+            );
+            set_f32(
+                gl,
+                program,
+                &format!("{}[{}].intensity", attrib, index),
+                light.intensity as f32,
+            );
             match light.light_type {
-                LightType::Ambient => {
-                    set_vec3(
-                        gl,
-                        program,
-                        &format!("amb_lights[{}].color", num_l_amb),
-                        &light.color,
-                    );
-                    set_f32(
-                        gl,
-                        program,
-                        &format!("amb_lights[{}].intensity", num_l_amb),
-                        light.intensity,
-                    );
-                    num_l_amb += 1;
-                }
-                LightType::Point | LightType::Directional | LightType::Spot => {
-                    let (attrib, index) = if light.light_type == LightType::Point {
-                        ("point_lights", num_l_point)
-                    } else if light.light_type == LightType::Spot {
-                        ("spot_lights", num_l_spot)
-                    } else {
-                        ("dir_lights", num_l_dir)
-                    };
-                    let position = (storage.parent_tranform(light.node_id)
-                        * storage.transform(light.node_id))
-                    .isometry
-                    .translation
-                    .vector
-                    .data;
-                    let range = 100.;
-                    let linear = 4.5 / range;
-                    let quadratic = 7.5 / (range * range);
-                    set_f32(
-                        gl,
-                        program,
-                        &format!("{}[{}].linear", attrib, index),
-                        linear,
-                    );
-                    set_f32(
-                        gl,
-                        program,
-                        &format!("{}[{}].quadratic", attrib, index),
-                        quadratic,
-                    );
-                    set_vec3(
-                        gl,
-                        program,
-                        &format!("{}[{}].position", attrib, index),
-                        &position,
-                    );
-                    if light.light_type == LightType::Directional
-                        || light.light_type == LightType::Spot
-                    {
-                        let vector = (storage.parent_tranform(light.node_id)
-                            * storage.transform(light.node_id))
-                        .isometry
-                        .rotation
-                        .transform_vector(&Vector3::identity());
-                        // The cone and arrows mesh is intrinsically oriented 90 deg
-                        let direction = UnitQuaternion::from_euler_angles(0., PI / 2., 0.)
-                            .transform_vector(&vector)
-                            .data;
-                        set_vec3(
-                            gl,
-                            program,
-                            &format!("{}[{}].direction", attrib, index),
-                            &direction,
-                        );
-                    }
-                    if light.light_type == LightType::Spot {
-                        set_f32(
-                            gl,
-                            program,
-                            &format!("{}[{}].cutoff", attrib, index),
-                            f32::cos(PI / 30.),
-                        );
-                        set_f32(
-                            gl,
-                            program,
-                            &format!("{}[{}].outer_cutoff", attrib, index),
-                            f32::cos(std::f32::consts::PI / 25.),
-                        );
-                    }
-                    set_vec3(
-                        gl,
-                        program,
-                        &format!("{}[{}].color", attrib, index),
-                        &light.color,
-                    );
-                    set_f32(
-                        gl,
-                        program,
-                        &format!("{}[{}].intensity", attrib, index),
-                        light.intensity,
-                    );
-                    if light.light_type == LightType::Point {
-                        num_l_point += 1;
-                    } else if light.light_type == LightType::Spot {
-                        num_l_spot += 1;
-                    } else {
-                        num_l_dir += 1;
-                    };
-                }
+                LightType::Point => {num_l_point += 1;}
+                LightType::Spot => {num_l_spot += 1;}
+                LightType::Ambient => {num_l_amb += 1;}
+                LightType::Directional => {num_l_dir += 1;}
             }
         }
         set_i32(gl, program, "num_l_amb", num_l_amb as i32);
@@ -388,11 +360,12 @@ impl Renderer {
                 let gl = &self.ctx;
                 gl.use_program(Some(&program));
                 if each == ShaderType::CubeMap {
+                    let rotation: nalgebra::Matrix4<f32> = viewport.transform().rotation.to_homogeneous().into();
                     set_mat4(
                         gl,
                         &program,
                         "view",
-                        &viewport.transform().rotation.to_homogeneous(),
+                        &rotation,
                     );
                 } else {
                     set_mat4(gl, &program, "view", &viewport.view());
@@ -404,13 +377,13 @@ impl Renderer {
                         gl,
                         &program,
                         "proj",
-                        &viewport.get_proj(ProjectionType::Perspective).to_matrix(),
+                        &viewport.get_proj(ProjectionType::Perspective).to_matrix_f32(),
                     );
                 } else {
                     set_mat4(gl, &program, "proj", &viewport.proj());
                 }
                 if each == ShaderType::Color {
-                    set_vec3(gl, program, "eye", &viewport.eye());
+                    set_vec3(gl, program, "eye", &viewport.eye()[..]);
                 }
             }
         }
@@ -500,7 +473,7 @@ impl Renderer {
                 gl.bind_texture(GL::TEXTURE_CUBE_MAP, Some(&texture));
                 set_i32(gl, program, "sampler", 0);
             }
-            let model = storage.parent_tranform(i) * storage.transform(i);
+            let model = storage.parent_transform(i) * storage.transform(i);
             if shader_type != ShaderType::CubeMap {
                 set_mat4(gl, program, "model", &model.to_homogeneous());
             }
@@ -520,6 +493,9 @@ impl Renderer {
                 // first pass for object outline
                 gl.stencil_func(GL::ALWAYS, 1, 0xFF);
                 gl.stencil_mask(0xFF);
+            } else {
+                gl.stencil_func(GL::ALWAYS, 1, 0xFF);
+                gl.stencil_mask(0x00);
             }
             match info.draw_mode {
                 DrawMode::Arrays => {
@@ -561,9 +537,11 @@ impl Renderer {
                     gl.stencil_mask(0x00);
                     let program = self.shaders.get(&ShaderType::Simple).unwrap();
                     gl.use_program(Some(&program));
-                    let model = storage.parent_tranform(i)
-                        * storage.transform(i)
-                        * Transform::from_scale(mesh.material.outline.unwrap());
+                    let o_s = mesh.material.outline.unwrap() / 100.;
+                    let mut t = storage.transform(i);
+                    let t_s = &t.scale;
+                    t.scale = Vector3::new(t_s.x + o_s, t_s.y + o_s, t_s.z + o_s);
+                    let model = storage.parent_transform(i) * t;
                     set_mat4(gl, &program, "model", &model.to_homogeneous());
                     set_vec4(gl, &program, "color", &[1., 1., 0., 1.]);
                     let indices = &mesh.geometry.indices;
@@ -581,10 +559,10 @@ impl Renderer {
                             );
                         }
                     }
-                    gl.stencil_func(GL::ALWAYS, 1, 0xFF);
-                    gl.stencil_mask(0x00);
                 }
             }
+        } else {
+            log!("There's no mesh at the given index. So won't render anything");
         }
     }
     pub fn render(&self, scene: &Scene, viewport: &Viewport) {
@@ -595,26 +573,23 @@ impl Renderer {
         self.setup_lights(&storage);
         let len = storage.meshes().len();
         self.update_viewport(viewport);
-        let render_stage = |condition: Box<dyn Fn(RenderFlags, Option<ShaderType>) -> bool>| {
+        let render_stage = |condition: Box<dyn Fn(&RenderFlags, ShaderType) -> bool>| {
             for i in 0..len {
                 let info = storage.info(i);
-                let shader_type = if let Some(mesh) = storage.mesh(i) {
-                    Some(mesh.material.shader_type)
-                } else {
-                    None
+                if let Some(mesh) = storage.mesh(i) {
+                    if info.render_flags.render
+                        && condition(&info.render_flags, mesh.material.shader_type)
+                    {
+                        self.render_mesh(&storage, i);
+                    }
                 };
-                if info.render_flags.render && condition(info.render_flags, shader_type) {
-                    self.render_mesh(&storage, i);
-                }
             }
         };
         // render meshes that have depth first
-        render_stage(Box::new(|r_f, s_t| {
-            r_f.depth && s_t != Some(ShaderType::CubeMap)
-        }));
+        render_stage(Box::new(|r_f, s_t| r_f.depth && s_t != ShaderType::CubeMap));
         //// render cubemap
         render_stage(Box::new(|r_f, shader_type| {
-            shader_type == Some(ShaderType::CubeMap)
+            shader_type == ShaderType::CubeMap
         }));
         // render depthless mesh
         render_stage(Box::new(|r_f, _| !r_f.depth));
@@ -640,7 +615,7 @@ impl Renderer {
     pub fn canvas(&self) -> &HtmlCanvasElement {
         &self.canvas
     }
-    pub fn aspect_ratio(&self) -> f32 {
+    pub fn aspect_ratio(&self) -> f64 {
         self.aspect_ratio
     }
     pub fn width(&self) -> u32 {
@@ -649,29 +624,4 @@ impl Renderer {
     pub fn height(&self) -> u32 {
         self.canvas.height()
     }
-    pub fn change_cursor(&self, cursory_type: CursorType) {
-        let canvas_style = self
-            .canvas
-            .clone()
-            .dyn_into::<HtmlElement>()
-            .unwrap()
-            .style();
-        match cursory_type {
-            CursorType::Pointer => {
-                canvas_style
-                    .set_property("cursor", "var(--cursor-auto)")
-                    .unwrap();
-            }
-            CursorType::Grab => {
-                canvas_style
-                    .set_property("cursor", "var(--cursor-grab)")
-                    .unwrap();
-            }
-        }
-    }
-}
-
-pub enum CursorType {
-    Pointer,
-    Grab,
 }

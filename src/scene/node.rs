@@ -113,7 +113,7 @@ impl Node {
     }
     pub fn parent_transform(&self) -> Transform {
         let storage = self.storage.borrow();
-        storage.parent_tranform(self.index)
+        storage.parent_transform(self.index)
     }
     pub fn set_parent_transform(&self, transform: Transform) {
         let mut storage = self.storage.borrow_mut();
@@ -174,9 +174,12 @@ impl Node {
     pub fn owned_children(&self) -> &Vec<Node> {
         &self.owned_children
     }
-    pub fn owned_children_collide_w_ray(&self, ray: &Ray<f32>) -> Option<Isometry3<f32>> {
+    pub fn collies_w_owned_children_recursive(&self, ray: &Ray<f32>) -> Option<Isometry3<f32>> {
+        if let Some(t) = self.collides_w_ray(ray) {
+            return Some(t);
+        }
         for child in self.owned_children() {
-            if let Some(t) = child.collides_w_ray(ray) {
+            if let Some(t) = child.collies_w_owned_children_recursive(ray) {
                 return Some(t);
             }
         }
@@ -194,8 +197,10 @@ impl Node {
                 return Some(result);
             }
         }
-        if let Some(t) = node.borrow().owned_children_collide_w_ray(ray) {
-            return Some((node.clone(), t));
+        for child in node.borrow().owned_children() {
+            if let Some(t) = child.collies_w_owned_children_recursive(ray) {
+                return Some((node.clone(), t));
+            }
         }
         None
     }
@@ -216,7 +221,7 @@ impl Node {
                 .geometry
                 .vertices
                 .chunks(3)
-                .map(|c| Point3::new(c[0] * s.x, c[1] * s.y, c[2] * s.z))
+                .map(|c| Point3::new(c[0] as f32 * s.x, c[1] as f32 * s.y, c[2] as f32 * s.z))
                 .collect();
             if let Some(target) = ConvexHull::try_from_points(&verts) {
                 let transform = (p_t * t).isometry;
