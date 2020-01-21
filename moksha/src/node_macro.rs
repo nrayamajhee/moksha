@@ -23,7 +23,7 @@ macro_rules! node_from_obj {
     }};
 }
 #[macro_export]
-macro_rules! node {
+macro_rules! object {
     ($scene: expr, $mesh: expr, $($x:expr),*) => {
         {
             let mut setup_unique_vertices = false;
@@ -34,31 +34,31 @@ macro_rules! node {
                     }
                 }
             )*
-            let node = $scene.from_mesh($mesh, setup_unique_vertices);
+            let object = $scene.from_mesh($mesh, setup_unique_vertices);
             use std::any::Any;
             use crate::{ ObjectInfo, renderer::{DrawMode, RenderFlags}};
             $(
                 if let Some(name) = (&$x as &dyn Any).downcast_ref::<&str>() {
-                    let mut info = node.info();
+                    let mut info = object.info();
                     info.name = String::from(*name);
-                    node.set_info(info);
+                    object.set_info(info);
                 } else if let Some(name) = (&$x as &dyn Any).downcast_ref::<String>() {
-                    let mut info = node.info();
+                    let mut info = object.info();
                     info.name = String::from(name);
-                    node.set_info(info);
+                    object.set_info(info);
                 } else if let Some(info) = (&$x as &dyn Any).downcast_ref::<ObjectInfo>() {
-                    node.set_info(info.to_owned());
+                    object.set_info(info.to_owned());
                 } else if let Some(mode) = (&$x as &dyn Any).downcast_ref::<DrawMode>() {
-                    let mut info = node.info();
+                    let mut info = object.info();
                     info.draw_mode = *mode;
-                    node.set_info(info);
+                    object.set_info(info);
                 } else if let Some(flags) = (&$x as &dyn Any).downcast_ref::<RenderFlags>() {
-                    let mut info = node.info();
+                    let mut info = object.info();
                     info.render_flags = *flags;
-                    node.set_info(info);
+                    object.set_info(info);
                 }
             )*
-            node
+            object
         }
     }
 }

@@ -6,12 +6,12 @@ mod toolbar;
 use crate::{
     dom_factory::{add_event, get_el, window},
     mesh::{Geometry, Material},
-    node, rc_rcell,
+    object, rc_rcell,
     scene::{
         primitives::{create_origin, create_transform_gizmo, ArrowTip},
-        Node, Scene,
+        Object, Scene,
     },
-    Mesh, ProjectionType, RcRcell, Viewport,
+    Mesh, Projection, RcRcell, Viewport,
 };
 use genmesh::generators::Plane;
 pub use gizmo::{CollisionConstraint, Gizmo};
@@ -29,18 +29,18 @@ use web_sys::{HtmlCanvasElement, KeyboardEvent, MouseEvent};
 pub struct Editor {
     scene: Rc<Scene>,
     gizmo: RcRcell<Gizmo>,
-    active_node: RcRcell<Option<RcRcell<Node>>>,
-    spawn_origin: RcRcell<Node>,
+    active_node: RcRcell<Option<RcRcell<Object>>>,
+    spawn_origin: RcRcell<Object>,
 }
 
 pub enum NodeRef<'a> {
-    Mutable(RcRcell<Node>),
-    Owned(&'a Node),
+    Mutable(RcRcell<Object>),
+    Owned(&'a Object),
 }
 
 impl Editor {
     pub fn new(scene: Rc<Scene>) -> Self {
-        let grid = node!(
+        let grid = object!(
             &scene,
             Some(Mesh::new(
                 Geometry::from_genmesh_no_normals(&Plane::subdivide(100, 100)),
@@ -71,33 +71,33 @@ impl Editor {
         editor.add_events();
         editor
     }
-    pub fn scale_wrt_eye(&self, node: &Node) -> f32 {
+    pub fn scale_wrt_eye(&self, object: &Object) -> f32 {
         let view = self.scene().view();
         let view = view.borrow();
-        if view.projection_type() == ProjectionType::Perspective {
+        if view.projection_type() == Projection::Perspective {
             let eye = Point3::from(view.eye());
-            let o_pos = Point3::from(node.global_position());
+            let o_pos = Point3::from(object.global_position());
             (eye - o_pos).magnitude().into()
         } else {
-            view.transform().translation.vector.magnitude().into()
+            view.isometry().translation.vector.magnitude().into()
         }
     }
     pub fn scale_gizmos(&self) {
         let gizmo = self.gizmo.borrow();
-        let gizmo = gizmo.node();
+        let gizmo = gizmo.object();
         gizmo.set_scale(self.scale_wrt_eye(&gizmo) / 60.);
         let origin = self.spawn_origin.borrow();
         origin.set_scale(self.scale_wrt_eye(&origin) / 60.);
     }
-    pub fn set_active_node(&self, node: RcRcell<Node>) {
-        self.scene.view().borrow_mut().focus(&node.borrow());
+    pub fn set_active_node(&self, object: RcRcell<Object>) {
+        self.scene.view().borrow_mut().focus(&object.borrow());
         let gizmo = self.gizmo.borrow();
-        gizmo.apply_target_transform(&node.borrow());
-        if let Some(node) = self.active_node.borrow().as_ref() {
-            node.borrow().set_outline(None);
+        gizmo.apply_target_transform(&object.borrow());
+        if let Some(object) = self.active_node.borrow().as_ref() {
+            object.borrow().set_outline(None);
         }
-        node.borrow().set_outline(Some(2.));
-        *self.active_node.borrow_mut() = Some(node);
+        object.borrow().set_outline(Some(2.));
+        *self.active_node.borrow_mut() = Some(object);
         self.scale_gizmos();
     }
     fn add_events(&mut self) {
@@ -120,8 +120,8 @@ impl Editor {
                 .borrow_mut()
                 .handle_mousedown(&ray, &view.borrow())
             {
-                if let Some((node, _)) = editor.scene.root().borrow().collides_w_children(&ray) {
-                    editor.set_active_node(node);
+                if let Some((object, _)) = editor.scene.root().borrow().collides_w_children(&ray) {
+                    editor.set_active_node(object);
                 }
             }
         });
@@ -183,8 +183,8 @@ impl Editor {
             } else if keycode == "KeyZ" {
                 view.borrow_mut().enable_zoom();
             } else if keycode == "KeyF" {
-                if let Some(node) = editor.active_node.borrow().as_ref() {
-                    view.borrow_mut().focus(&node.borrow());
+                if let Some(object) = editor.active_node.borrow().as_ref() {
+                    view.borrow_mut().focus(&object.borrow());
                     editor.scale_gizmos();
                 }
             } else if keycode == "KeyR" {

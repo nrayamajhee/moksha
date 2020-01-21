@@ -2,13 +2,13 @@ use crate::{
     controller::ProjectionConfig,
     dom_factory::{document, loop_animation_frame, window, now},
     editor::console::{self, ConsoleConfig},
-    node, node_from_obj, node_from_obj_wired, rc_rcell,
+    object, node_from_obj, node_from_obj_wired, rc_rcell,
     renderer::{Renderer, RendererConfig},
     scene::LightType,
     Events,
     events::{ViewportEvent, CanvasEvent},
     Color,
-    Editor, Geometry, Material, Mesh, Node, Scene, Viewport,
+    Editor, Geometry, Material, Mesh, Object, Scene, Viewport,
 };
 use genmesh::generators::{Cube, IcoSphere, SphereUv};
 use nalgebra::UnitQuaternion;
@@ -17,7 +17,7 @@ use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 
-fn cube(scene: &Scene, renderer: &Renderer) -> Node {
+fn cube(scene: &Scene, renderer: &Renderer) -> Object {
     let cube_geometry = Geometry::from_genmesh(&Cube::new());
     let mut colors = Vec::new();
     let face_colors = vec![
@@ -46,7 +46,7 @@ fn cube(scene: &Scene, renderer: &Renderer) -> Node {
     ];
     let cube_tex = Material::new_texture("assets/img/box_tex.jpg", tex_coords);
     let cube_mesh = Mesh::new(cube_geometry.clone(), cube_tex);
-    let mut cube = node!(scene, Some(cube_mesh), "Wooden Cube", DrawMode::Arrays);
+    let mut cube = object!(scene, Some(cube_mesh), "Wooden Cube", DrawMode::Arrays);
     cube.set_position(5., 0., 5.);
     cube.set_scale(0.2);
     cube
@@ -73,28 +73,30 @@ pub fn start() -> Result<(), JsValue> {
         renderer.aspect_ratio(),
     );
 
+    let events = rc_rcell(Events::new());
+
     let a_rndr = rc_rcell(renderer);
     let a_view = rc_rcell(viewport);
-    let scene = Scene::new(a_rndr.clone(), a_view.clone());
+    let scene = Scene::new(a_rndr.clone(), a_view.clone(), events.clone());
     scene.set_skybox("assets/img/milkyway", "jpg");
     let ambient = scene.light(LightType::Ambient, [1.0, 1.0, 1.0], 0.2);
-    let amb_node = ambient.node();
+    let amb_node = ambient.object();
     amb_node.borrow().set_position(10., 0., 10.);
 
     //let spot = scene.light(LightType::Spot, [1., 1., 1.], 1.0);
-    //let spot_node = spot.node();
+    //let spot_node = spot.object();
     //spot_node.borrow().set_position(25., 0., 10.);
 
     //let point = scene.light(LightType::Point, [1., 1., 1.], 1.0);
-    //let point_node = point.node();
+    //let point_node = point.object();
     //point_node.borrow().set_position(15., 0., 10.);
 
     //let point2 = scene.light(LightType::Point, [1., 1., 1.], 1.0);
-    //let point2_node = point2.node();
+    //let point2_node = point2.object();
     //point2_node.borrow().set_position(15., 0., -10.);
 
     let directional = scene.light(LightType::Directional, [1., 1., 1.], 1.0);
-    let dir_node = directional.node();
+    let dir_node = directional.object();
     dir_node.borrow().set_position(30., 0., -10.);
 
     //scene.add(sun.clone());
@@ -105,26 +107,15 @@ pub fn start() -> Result<(), JsValue> {
     ////scene.add_light(point);
     scene.add_light(&directional);
 
-    //let obj = rc_rcell(node_from_obj!(scene, "../assets/obj/earth", "earth"));
-    ////let obj = rc_rcell(node_from_obj_wired!(scene, "assets/obj/earth", "earth"));
-    //obj.borrow().set_position(28., 0., 0.);
-    //scene.add(obj.clone());
-    let events = rc_rcell(Events::new());
-    scene.add_events(events.clone());
+    let obj = rc_rcell(node_from_obj!(scene, "../assets/obj/earth", "earth"));
+    //let obj = rc_rcell(node_from_obj_wired!(scene, "assets/obj/earth", "earth"));
+    obj.borrow().set_position(28., 0., 0.);
+    scene.add(obj.clone());
+
     let a_scene = Rc::new(scene);
     let mut editor = Editor::new(a_scene.clone());
 
-    let a_editor = rc_rcell(editor);
-    let then = rc_rcell(now());
-    loop_animation_frame(move || {
-        let mut then = then.borrow_mut();
-        let mut events = events.borrow_mut();
-        let dt = now() - *then;
-        a_scene.update(&events);
-        a_view.borrow_mut().update(&events, dt);
-        a_rndr.borrow_mut().render(&a_scene, &a_view.borrow());
-        events.clear();
-        *then = now(); 
-    }, Some(60.));
+    a_scene.update(|_, _| {
+    });
     Ok(())
 }

@@ -7,7 +7,7 @@ use crate::{
     },
     log, rc_rcell,
     scene::primitives::create_primitive_node,
-    Editor, LightType, Node, Primitive, RcRcell, Scene, Viewport,
+    Editor, LightType, Object, Primitive, RcRcell, Scene, Viewport,
 };
 use maud::html;
 use std::collections::HashMap;
@@ -88,8 +88,8 @@ fn add_events(editor: &Editor) {
         &document().get_element_by_id("focus").unwrap(),
         "click",
         move |_| {
-            if let Some(node) = a_active.borrow().as_ref() {
-                a_view.borrow_mut().focus(&node.borrow());
+            if let Some(object) = a_active.borrow().as_ref() {
+                a_view.borrow_mut().focus(&object.borrow());
             }
         },
     );
@@ -111,12 +111,12 @@ fn add_events(editor: &Editor) {
             "click",
             move |e| {
                 let scene = &editor.scene;
-                let node = create_primitive_node(
+                let object = create_primitive_node(
                     scene,
                     Primitive::from_str(&get_target_innerh(&e)).unwrap(),
                 );
-                node.copy_location(&editor.spawn_origin.borrow());
-                scene.add(rc_rcell(node));
+                object.copy_location(&editor.spawn_origin.borrow());
+                scene.add(rc_rcell(object));
                 query_html_el("#scene-tree > ul").remove();
                 build_node(
                     &editor,
@@ -187,9 +187,9 @@ fn add_events(editor: &Editor) {
             add_event(&obj_reader, "load", move |e| {
                 let obj_src = Rc::new(get_target_file_result(&e));
                 let editor = editor.clone();
-                let add_obj_to_scene = |scene: &Scene, node: Node, editor: &Editor| {
-                    node.copy_location(&editor.spawn_origin.borrow());
-                    scene.add(rc_rcell(node));
+                let add_obj_to_scene = |scene: &Scene, object: Object, editor: &Editor| {
+                    object.copy_location(&editor.spawn_origin.borrow());
+                    scene.add(rc_rcell(object));
                     query_html_el("#scene-tree > ul").remove();
                     build_node(
                         &editor,
@@ -207,9 +207,9 @@ fn add_events(editor: &Editor) {
                         if tex.len() == 0 {
                             log!("No texture file uploaded. Will not load textures.");
                             let scene = editor.scene();
-                            let node =
+                            let object =
                                 scene.object_from_obj("", &obj_src, Some(&mtl_src), None, true);
-                            add_obj_to_scene(&scene, node, &editor);
+                            add_obj_to_scene(&scene, object, &editor);
                         } else {
                             let h_m: HashMap<String, String> = HashMap::new();
                             let mut loaded_urls = rc_rcell(h_m);
@@ -228,14 +228,14 @@ fn add_events(editor: &Editor) {
                                     loaded_urls.insert(n.clone(), url);
                                     if loaded_urls.len() == len {
                                         let scene = editor.scene();
-                                        let node = scene.object_from_obj(
+                                        let object = scene.object_from_obj(
                                             "",
                                             &a_o_src,
                                             Some(&m_src),
                                             Some(&loaded_urls),
                                             false,
                                         );
-                                        add_obj_to_scene(&scene, node, &editor);
+                                        add_obj_to_scene(&scene, object, &editor);
                                     }
                                 });
                                 update_progress(tex_reader.clone(), p.clone(), total);
@@ -248,8 +248,8 @@ fn add_events(editor: &Editor) {
                 } else {
                     log!("No material file uploaded. Will load default material instead.");
                     let scene = editor.scene();
-                    let node = scene.object_from_obj("", &obj_src, None, None, false);
-                    add_obj_to_scene(&scene, node, &editor);
+                    let object = scene.object_from_obj("", &obj_src, None, None, false);
+                    add_obj_to_scene(&scene, object, &editor);
                 }
             });
             update_progress(obj_reader.clone(), progress.clone(), total);
@@ -273,7 +273,7 @@ fn add_events(editor: &Editor) {
                     1.0,
                 );
                 light
-                    .node()
+                    .object()
                     .borrow()
                     .copy_location(&editor.spawn_origin.borrow());
                 scene.add_light(&light);

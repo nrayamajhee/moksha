@@ -1,4 +1,4 @@
-use crate::{Node, RcRcell, Viewport};
+use crate::{Object, RcRcell, Viewport};
 use nalgebra::{Isometry3, Vector3};
 use ncollide3d::{
     query::Ray,
@@ -20,53 +20,53 @@ pub enum CollisionConstraint {
 }
 
 pub struct Gizmo {
-    node: Node,
+    object: Object,
     collision_constraint: CollisionConstraint,
     transform: Isometry3<f32>,
     offset: Vector3<f32>,
 }
 
 impl Gizmo {
-    pub fn new(node: Node) -> Self {
+    pub fn new(object: Object) -> Self {
         Self {
-            node,
+            object,
             collision_constraint: CollisionConstraint::None,
             transform: Isometry3::identity(),
             offset: Vector3::identity(),
         }
     }
-    pub fn node(&self) -> &Node {
-        &self.node
+    pub fn object(&self) -> &Object {
+        &self.object
     }
-    pub fn apply_target_transform(&self, target: &Node) {
-        self.node.set_parent_transform(
+    pub fn apply_target_transform(&self, target: &Object) {
+        self.object.set_parent_transform(
             (target.parent_transform() * target.transform())
                 .isometry
                 .into(),
         );
-        self.node
-            .apply_parent_transform(self.node.parent_transform() * self.node.transform());
+        self.object
+            .apply_parent_transform(self.object.parent_transform() * self.object.transform());
     }
     pub fn collision_constraint(&self) -> CollisionConstraint {
         self.collision_constraint
     }
     pub fn handle_mousedown(&mut self, ray: &Ray<f32>, view: &Viewport) -> bool {
-        let p_t = self.node.parent_transform();
-        let t = self.node.transform();
+        let p_t = self.object.parent_transform();
+        let t = self.object.transform();
         let gizmo_node_t = (p_t * t).isometry;
         let target = Ball::new(t.scale.x);
         // if the central white ball is clicked
         if target.intersects_ray(&gizmo_node_t, ray) {
             self.transform = Isometry3::from_parts(
                 gizmo_node_t.translation,
-                view.transform().inverse().rotation,
+                view.isometry().inverse().rotation,
             );
             self.offset = Vector3::new(0., 0., 0.);
             self.collision_constraint = CollisionConstraint::ViewPlane;
-            self.node().change_color([1., 1., 1.]);
+            self.object().change_color([1., 1., 1.]);
             return true;
         }
-        for child in self.node.owned_children() {
+        for child in self.object.owned_children() {
             let g_c = child.owned_children();
             // if the arrows are clicked
             let color = match child.info().name.as_str() {
@@ -105,13 +105,13 @@ impl Gizmo {
                 self.collision_constraint = constraint;
                 self.transform = transform;
                 self.offset =
-                    transform.translation.vector - Vector3::from(self.node.global_position());
+                    transform.translation.vector - Vector3::from(self.object.global_position());
                 return true;
             }
         }
         false
     }
-    pub fn handle_mousemove(&self, ray: &Ray<f32>, active_node: &Option<RcRcell<Node>>) {
+    pub fn handle_mousemove(&self, ray: &Ray<f32>, active_node: &Option<RcRcell<Object>>) {
         let collider = CollidePlane::new(match self.collision_constraint {
             CollisionConstraint::YAxis | CollisionConstraint::XPlane => Vector3::x_axis(),
             CollisionConstraint::XAxis
@@ -120,15 +120,15 @@ impl Gizmo {
             _ => Vector3::z_axis(),
         });
         if let Some(i) = collider.toi_and_normal_with_ray(&self.transform, &ray, false) {
-            if let Some(node) = active_node.as_ref() {
-                let node = node.borrow();
-                let pos = node.position();
+            if let Some(object) = active_node.as_ref() {
+                let object = object.borrow();
+                let pos = object.position();
                 // do calculation relative to parent element
-                let poi = node
+                let poi = object
                     .parent_transform()
                     .inverse()
                     .transform_point(&ray.point_at(i.toi));
-                let o = node
+                let o = object
                     .parent_transform()
                     .inverse()
                     .transform_vector(&self.offset);
@@ -138,8 +138,8 @@ impl Gizmo {
                     CollisionConstraint::ZAxis => [pos[0] as f32, pos[1] as f32, poi.z],
                     _ => [poi.x, poi.y, poi.z],
                 };
-                node.set_position((p[0] - o.x).into(), (p[1] - o.y).into(), (p[2] - o.z).into());
-                self.apply_target_transform(&node);
+                object.set_position((p[0] - o.x).into(), (p[1] - o.y).into(), (p[2] - o.z).into());
+                self.apply_target_transform(&object);
             }
         }
     }
@@ -151,9 +151,9 @@ impl Gizmo {
             _ => [0., 0., 0.8],
         };
         if self.collision_constraint == CollisionConstraint::ViewPlane {
-            self.node.change_color(color);
+            self.object.change_color(color);
         } else {
-            for child in self.node.owned_children() {
+            for child in self.object.owned_children() {
                 let name = child.info().name;
                 if name == self.collision_constraint.to_string() {
                     match name.as_str() {

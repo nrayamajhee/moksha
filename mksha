@@ -1,4 +1,5 @@
 #!/bin/sh
+cd moksha
 
 case $1 in
 	"w" | "watch")
@@ -20,7 +21,6 @@ case $1 in
 		SECOND="$2"
 		while [ "$2" != "" ]; do
 			if [[ ${SECOND:1:1} == "-" ]]; then
-				echo "Double"
 				case $2 in
 					"--public")
 						D_PRIVATE=""
@@ -55,19 +55,22 @@ case $1 in
 					VALID=false
 				fi
 			fi
-			shift
+			if [ "$VALID" = true ]; then
+				shift
+			fi
 		done
 		if [ "$VALID" = true ]; then
+			echo "cargo doc $D_PRIVATE $D_OPEN"
 			cargo doc $D_PRIVATE $D_OPEN
 		else
-			echo "moksha docs [-|--] [(p)ublic | (q)uiet]"
+			echo "mksha docs [-|--] [(p)ublic | (q)uiet]"
 		fi
 	;;
 	"s" | "serve")
-		cd www
+		cd ../www
 		npm run start
 	;;
 	*)
-		echo "moksha [(w)atch | (b)uild | (c)lippy | (d)ocs | (s)erve | (t)est]"
+		echo "mksha [(w)atch | (b)uild | (c)lippy | (d)ocs | (s)erve | (t)est]"
 	;;
 esac

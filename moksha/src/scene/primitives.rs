@@ -1,8 +1,8 @@
 use crate::{
     mesh::{Geometry, Material},
-    node,
+    object,
     renderer::RenderFlags,
-    scene::{LightType, Node, Scene},
+    scene::{LightType, Object, Scene},
     Mesh,
 };
 use genmesh::generators::{Circle, Cone, Cube, Cylinder, IcoSphere, Plane, SphereUv, Torus};
@@ -52,10 +52,10 @@ pub fn create_arrow(
     name: &str,
     has_stem: bool,
     depthless: bool,
-) -> Node {
-    let mut node = node!(scene, None, String::from(name));
+) -> Object {
+    let mut object = object!(scene, None, String::from(name));
     if has_stem {
-        let stem = node!(
+        let stem = object!(
             scene,
             Some(Mesh::new(
                 Geometry::from_genmesh_no_normals(&Cylinder::subdivide(8, 1)),
@@ -69,7 +69,7 @@ pub fn create_arrow(
             stem.set_info(info);
         }
         stem.set_scale_vec(0.2, 0.2, 5.);
-        node.own(stem);
+        object.own(stem);
     }
     let head_geo = match arrow_type {
         ArrowTip::Cone => Some(Geometry::from_genmesh(&Cone::new(8))),
@@ -78,7 +78,7 @@ pub fn create_arrow(
         ArrowTip::None => None,
     };
     if let Some(head_geo) = head_geo {
-        let head = node!(
+        let head = object!(
             scene,
             Some(Mesh::new(
                 head_geo,
@@ -93,14 +93,14 @@ pub fn create_arrow(
             info.render_flags = RenderFlags::no_depth();
             head.set_info(info);
         }
-        node.own(head);
+        object.own(head);
     }
-    node
+    object
 }
 
-pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) -> Node {
+pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) -> Object {
     match light_type {
-        LightType::Ambient => node!(
+        LightType::Ambient => object!(
             scene,
             Some(Mesh::new(
                 Geometry::from_genmesh_no_normals(&IcoSphere::new()),
@@ -111,7 +111,7 @@ pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) 
             DrawMode::Arrays
         ),
         LightType::Point => {
-            let p = node!(
+            let p = object!(
                 scene,
                 Some(Mesh::new(
                     Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(2)),
@@ -123,7 +123,7 @@ pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) 
             p.set_scale(0.5);
             p
         }
-        LightType::Spot => node!(
+        LightType::Spot => object!(
             scene,
             Some(Mesh::new(
                 Geometry::from_genmesh_no_normals(&Cone::new(8)),
@@ -134,8 +134,8 @@ pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) 
             DrawMode::Arrays
         ),
         LightType::Directional => {
-            let mut n = node!(scene, None, light_type.to_string());
-            let cube = node!(
+            let mut n = object!(scene, None, light_type.to_string());
+            let cube = object!(
                 scene,
                 Some(Mesh::new(
                     Geometry::from_genmesh_no_normals(&Cube::new()),
@@ -173,7 +173,7 @@ pub fn create_light_node(scene: &Scene, light_type: LightType, color: [f32; 3]) 
     }
 }
 
-pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowTip) -> Node {
+pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowTip) -> Object {
     let name = match arrow_type {
         ArrowTip::Cone => "Translation",
         ArrowTip::Sphere => "Look",
@@ -183,7 +183,7 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowTip) -> Node {
     let x = create_arrow(scene, [0.8, 0., 0., 1.], arrow_type, "XAxis", true, true);
     let y = create_arrow(scene, [0., 0.8, 0., 1.], arrow_type, "YAxis", true, true);
     let z = create_arrow(scene, [0., 0., 0.8, 1.], arrow_type, "ZAxis", true, true);
-    let mut node = node!(
+    let mut object = object!(
         scene,
         Some(Mesh::new(
             Geometry::from_genmesh(&IcoSphere::subdivide(2)),
@@ -192,7 +192,7 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowTip) -> Node {
         name,
         RenderFlags::no_depth()
     );
-    let x_p = node!(
+    let x_p = object!(
         scene,
         Some(Mesh::new(
             Geometry::from_genmesh(&Cube::new()),
@@ -201,7 +201,7 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowTip) -> Node {
         "XPlane",
         RenderFlags::no_depth()
     );
-    let y_p = node!(
+    let y_p = object!(
         scene,
         Some(Mesh::new(
             Geometry::from_genmesh(&Cube::new()),
@@ -210,7 +210,7 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowTip) -> Node {
         "YPlane",
         RenderFlags::no_depth()
     );
-    let z_p = node!(
+    let z_p = object!(
         scene,
         Some(Mesh::new(
             Geometry::from_genmesh(&Cube::new()),
@@ -231,12 +231,12 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowTip) -> Node {
     x_p.set_scale_vec(0.2, 1., 1.);
     y_p.set_scale_vec(1., 0.2, 1.);
     z_p.set_scale_vec(1., 1., 0.2);
-    node.own(x);
-    node.own(y);
-    node.own(z);
-    node.own(x_p);
-    node.own(y_p);
-    node.own(z_p);
+    object.own(x);
+    object.own(y);
+    object.own(z);
+    object.own(x_p);
+    object.own(y_p);
+    object.own(z_p);
     if arrow_type == ArrowTip::Sphere {
         let n_x = create_arrow(
             scene,
@@ -265,14 +265,14 @@ pub fn create_transform_gizmo(scene: &Scene, arrow_type: ArrowTip) -> Node {
         n_x.set_position(6., 0., 0.);
         n_y.set_position(0., -6., 0.);
         n_z.set_position(0., 0., -6.);
-        node.own(n_x);
-        node.own(n_y);
-        node.own(n_z);
+        object.own(n_x);
+        object.own(n_y);
+        object.own(n_z);
     }
-    node
+    object
 }
 
-pub fn create_origin(scene: &Scene) -> Node {
+pub fn create_origin(scene: &Scene) -> Object {
     let x = create_arrow(scene, [1., 0., 0., 1.], ArrowTip::None, "XAxis", true, true);
     let y = create_arrow(scene, [0., 1., 0., 1.], ArrowTip::None, "YAxis", true, true);
     let z = create_arrow(scene, [0., 0., 1., 1.], ArrowTip::None, "ZAxis", true, true);
@@ -282,7 +282,7 @@ pub fn create_origin(scene: &Scene) -> Node {
     x.set_scale(0.5);
     y.set_scale(0.5);
     z.set_scale(0.5);
-    let mut center = node!(
+    let mut center = object!(
         scene,
         Some(Mesh::new(
             Geometry::from_genmesh_no_normals(&IcoSphere::subdivide(2)),
@@ -297,7 +297,7 @@ pub fn create_origin(scene: &Scene) -> Node {
     center
 }
 
-pub fn create_primitive_node(scene: &Scene, primitive: Primitive) -> Node {
+pub fn create_primitive_node(scene: &Scene, primitive: Primitive) -> Object {
     let geo = match primitive {
         Primitive::Plane => Geometry::from_genmesh(&Plane::new()),
         Primitive::IcoSphere => Geometry::from_genmesh(&IcoSphere::new()),
@@ -311,7 +311,7 @@ pub fn create_primitive_node(scene: &Scene, primitive: Primitive) -> Node {
     };
     match primitive {
         Primitive::Empty => scene.empty("Empty"),
-        _ => node!(
+        _ => object!(
             scene,
             Some(Mesh::new(geo, Material::new_color(1.0, 1.0, 1.0, 1.0),)),
             primitive.to_string()

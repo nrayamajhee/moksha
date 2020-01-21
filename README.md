@@ -2,13 +2,13 @@ Here what follows is terrible English and absolutely horrendous Rust code. You m
 
 # Moksha
 
-This is an experimental video game written in rust. Building an editor of some sorts is the first priority; the actual game will follow. Keep note that this can be used as a library but is not intended as such since the code quality and feature set has a long way to go before being library worthy.
+This is an experimental video game written in rust. Building an editor of some sorts is the first priority; the actual game will follow. Keep note that this can be used as a library but is not intended as such since the code quality and feature set have a long way to go before being library worthy.
 
-After many attempts and blunders, I have finally settled for wasm-bindgen. My first attempt was to try three-rs (<https://gitlab.com/nrayamajhee/moksha-three>). It was a good starting point, but I eventually learned some WebGL and GLSL, which led me to abandon three-rs's three-js like abstraction. I then thought, I would instead write my own vulkan renderer (<https://gitlab.com/nrayamajhee/moksha-vk>), which turned out to be an agonizing journey that was well beyond my capabilities. Hence, I am here, using wasm-bindgen's webgl binding. Hopefully someday WebGPU kicks off and drags me back to vulkan like code base.
+After many attempts and blunders, I have finally settled for wasm-bindgen. My first attempt was to try three-rs (<https://gitlab.com/nrayamajhee/moksha-three>). It was a good starting point, but I eventually learned some WebGL and GLSL, which led me to abandon three-rs's three-js like abstraction. Then I thought, I would instead write my own vulkan renderer (<https://gitlab.com/nrayamajhee/moksha-vk>), which turned out to be an agonizing journey that was well beyond my capabilities. Hence, I am here, using wasm-bindgen's webgl binding. Hopefully someday WebGPU kicks off and drags me back to vulkan like code base.
 
 ## Preview 
 
-The entire project is deployed at <http://moksha.rayamajhee.com>. This is continuously deployed with every commit in `master`.
+The entire project is deployed at <http://moksha.rayamajhee.com>. This is continuously deployed with `master`. If you want to see the latest changes, the staging build is deployed at <https://nrayamajhee.gitlab.io/moksha>.
 
 This was the initial setup for `moksha-three`. My goal is to eventually write abstractions (editors, shaders, etc.) to be able to recreate this:
 
@@ -50,7 +50,7 @@ curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 ```bash
 git clone https://gitlab.com/nrayamajhee/moksha.git
 cd moksha
-./moksha build
+./mksha build
 ./mksha serve
 ```
 
@@ -59,7 +59,7 @@ cd moksha
  Tests are non-existent at the moment so I will revisit this later.
  
 ```bash
-./moksha test
+./mksha test
 ```
 
 Running test headless on `firefox` seems to break CI/CD at the moment, so I use `chrome` for testing.
@@ -67,14 +67,14 @@ Running test headless on `firefox` seems to break CI/CD at the moment, so I use 
 ### Generate docs:
 
 ```bash
-./moksha docs
+./mksha docs
 ```
 
-The `moksha` script runs basic `wasm-pack` commands. Check it for further details. This is the current options:
+The `moksha` script runs basic `wasm-pack` commands. Check it for further details. These are the current options:
 
 ```bash
-./moksha
-moksha [(w)atch | (b)uild | (c)lippy | (d)ocs | (s)erve | (t)est]
+./mksha
+mksha [(w)atch | (b)uild | (c)lippy | (d)ocs | (s)erve | (t)est]
 ```
 
 ## Rust-lang usage, browsers, and performance
@@ -91,6 +91,7 @@ The following websites were invaluable in making this possible:
 - [MDN](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial)
 - [WebGL2 Fundamentals](https://webgl2fundamentals.org)
 - [Learn OpenGL](https://learnopengl.com)
+- [Data Oriented GUI in Rust by Ralph Levien](https://youtu.be/4YTfxresvS8)
 
 There are still a lot of things to be implemented from Learn OpenGL. My current goal is to complete PBR and Deferred Shading for the editor before developing game logic.
 
@@ -146,9 +147,9 @@ There are still a lot of things to be implemented from Learn OpenGL. My current 
 - Toolbar
 	- [x] Zoom and Switch Perspective controls
 	- [x] Add menu to add mesh andlights
-- Node tree viewer
+- Scene tree viewer
 	- [x] Implment open/collapse and render toggle. 
-	- [x] Implement drag and drop for node parent/child relations.
+	- [x] Implement drag and drop for object parent/child relations.
 - Implement a notification panel and notify macro with progress bars
 - Mesh outline while selecting
 - Configuration Editor
@@ -191,7 +192,7 @@ There are still a lot of things to be implemented from Learn OpenGL. My current 
 
 ## License
 
-Although, I doubt that these are relevant at this point, nonetheless here it is: 
+I doubt that this is relevant at this point; nonetheless here it is: 
 
 Licensed under either of the following terms at your choice:
 
@@ -201,9 +202,8 @@ Licensed under either of the following terms at your choice:
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
 
 Data contained in the repository (images, gltf, blend, etc.) that are created by me are licensed under Creative Commons Attribution 4.0 International License (CC BY 4.0).
-Refer to https://creativecommons.org/licenses/by/4.0/ for the details. For others,
-please refer to the links at /assets/credits for individual attributions for the blend file used to generate the skybox, and the deep star map from NASA.
+Refer to https://creativecommons.org/licenses/by/4.0/ for details. Please refer to the links at /assets/credits for individual attributions to the blend file used to generate the skybox, and the deep star map from NASA.
 
-A final note to smart/evil humans out there: If you don't care nor respect legal documents and simply hate any slight attempt at bureaucracy, what the above words mean is that if you use this source code, please kindly recognize my copyright. You may use it permissively (aka. in a non-copyleft manner). If you ever get delusional and believe that you've somehow struck gold here and can trade it for petty human dollars, I simply don't give a shit about your efforts, nor do I demand your modifications back. A humble acknowledgment will suffice. This is merely a past-time, an attempt at liberation from this monotonous and lonely life, a dream from a mind full of darkness, a sink to all my erratic musing and obviously incompetent scribbles.
+A final note to savvy humans out there: If you don't care nor respect legal documents and simply hate any slight attempt at bureaucracy, what the above words mean is that if you use this source code, please kindly recognize my copyright. You may use it permissively (aka. in a non-copyleft manner). Also, if you ever get delusional and believe that you've somehow struck gold here and can trade it for petty human dollars, I simply don't give a shit about your fortune or efforts, nor do I demand your modifications back; a humble acknowledgment will suffice. This is merely a past-time, an attempt at liberation from this monotonous and lonely life, a dream from a mind full of darkness, a sink to all my erratic musing and obviously incompetent scribbles.
 
 If you want to collaborate, or have questions, please do hit me up. Create an issue, or email me, or send a pull request: do what you usually do.

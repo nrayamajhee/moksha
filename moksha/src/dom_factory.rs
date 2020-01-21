@@ -1,4 +1,4 @@
-use crate::{rc_rcell, editor::fps};
+use crate::{editor::fps, rc_rcell};
 use maud::{html, Markup};
 use wasm_bindgen::{closure::Closure, JsCast, JsValue};
 use web_sys::{
@@ -32,10 +32,13 @@ where
         if let Some(fps) = fps {
             let delay = (1000. / fps - (now() - then)) as i32;
             let h = f.clone();
-            set_timeout(move || {
-                fps::log(1000. / (now() - then));
-                request_animation_frame(h.borrow().as_ref().unwrap());
-            }, delay);
+            set_timeout(
+                move || {
+                    fps::log(1000. / (now() - then));
+                    request_animation_frame(h.borrow().as_ref().unwrap());
+                },
+                delay,
+            );
         } else {
             fps::log(1000. / (now() - then));
             request_animation_frame(f.borrow().as_ref().unwrap());

@@ -5,7 +5,7 @@ use crate::{
     log,
     mesh::Mesh,
     scene::Scene,
-    LightType, ProjectionType, Storage, TextureType, Transform,
+    LightType, Projection, Storage, TextureType, Transform,
 };
 use maud::html;
 use nalgebra::{UnitQuaternion, Vector3};
@@ -360,7 +360,7 @@ impl Renderer {
                 let gl = &self.ctx;
                 gl.use_program(Some(&program));
                 if each == ShaderType::CubeMap {
-                    let rotation: nalgebra::Matrix4<f32> = viewport.transform().rotation.to_homogeneous().into();
+                    let rotation: nalgebra::Matrix4<f32> = viewport.isometry().rotation.to_homogeneous().into();
                     set_mat4(
                         gl,
                         &program,
@@ -371,13 +371,13 @@ impl Renderer {
                     set_mat4(gl, &program, "view", &viewport.view());
                 }
                 if each == ShaderType::CubeMap
-                    && viewport.projection_type() == ProjectionType::Orthographic
+                    && viewport.projection_type() == Projection::Orthographic
                 {
                     set_mat4(
                         gl,
                         &program,
                         "proj",
-                        &viewport.get_proj(ProjectionType::Perspective).to_matrix_f32(),
+                        &viewport.get_proj(Projection::Perspective),
                     );
                 } else {
                     set_mat4(gl, &program, "proj", &viewport.proj());
@@ -565,11 +565,9 @@ impl Renderer {
             log!("There's no mesh at the given index. So won't render anything");
         }
     }
-    pub fn render(&self, scene: &Scene, viewport: &Viewport) {
+    pub fn render(&self, storage: &Storage, viewport: &Viewport) {
         let gl = &self.ctx;
         gl.clear(GL::COLOR_BUFFER_BIT | GL::DEPTH_BUFFER_BIT | GL::STENCIL_BUFFER_BIT);
-        let storage = scene.storage();
-        let storage = storage.borrow();
         self.setup_lights(&storage);
         let len = storage.meshes().len();
         self.update_viewport(viewport);

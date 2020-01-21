@@ -35,12 +35,12 @@ pub mod scene;
 
 #[doc(inline)]
 pub use crate::{
-    controller::{MouseButton, ProjectionType, Viewport},
+    controller::{MouseButton, Projection, Viewport},
     editor::Editor,
     mesh::{Geometry, Material, Mesh, TextureType, Transform, Color},
     renderer::Renderer,
     events::Events,
-    scene::{Light, LightType, Node, ObjectInfo, Primitive, Scene, Storage},
+    scene::{Light, LightType, Object, ObjectInfo, Primitive, Scene, Storage, Id},
 };
 
 mod start;

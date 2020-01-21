@@ -5,7 +5,7 @@ use crate::{
         get_parent, get_target_el, get_target_innerh, get_target_parent_el, insert_el,
         insert_el_at, query_el, remove_class,
     },
-    log, Editor, Node, RcRcell,
+    log, Editor, Object, RcRcell,
 };
 use maud::html;
 use wasm_bindgen::JsCast;
@@ -35,12 +35,12 @@ fn markup() -> String {
     markup.into_string()
 }
 
-pub fn build_node(editor: &Editor, parent: &Element, node: NodeRef) -> Element {
+pub fn build_node(editor: &Editor, parent: &Element, object: NodeRef) -> Element {
     let p = create_el("p");
     let li = create_el("li");
     insert_el(&li, &p);
     let ul = create_el("ul");
-    let add_collapse_icon = |children: &Vec<RcRcell<Node>>, owned_children: &Vec<Node>| {
+    let add_collapse_icon = |children: &Vec<RcRcell<Object>>, owned_children: &Vec<Object>| {
         if !children.is_empty() || !owned_children.is_empty() {
             let icon = if owned_children.is_empty() {
                 "expand_less"
@@ -54,7 +54,7 @@ pub fn build_node(editor: &Editor, parent: &Element, node: NodeRef) -> Element {
             insert_el(&li, &i);
         }
     };
-    let recurse_children = |children: &Vec<RcRcell<Node>>, owned_children: &Vec<Node>| {
+    let recurse_children = |children: &Vec<RcRcell<Object>>, owned_children: &Vec<Object>| {
         for child in children {
             let child_el = build_node(editor, &ul, NodeRef::Mutable(child.clone()));
             let li = create_el("li");
@@ -70,10 +70,10 @@ pub fn build_node(editor: &Editor, parent: &Element, node: NodeRef) -> Element {
         }
     };
     insert_el(&ul, &li);
-    let name = match node {
+    let name = match object {
         NodeRef::Mutable(n) => {
-            let node = n.borrow();
-            let (children, owned_children) = (node.children(), node.owned_children());
+            let object = n.borrow();
+            let (children, owned_children) = (object.children(), object.owned_children());
             add_collapse_icon(children, owned_children);
             if parent.id().as_str() != "scene-tree" {
                 let eyei = create_el_w_class_n_inner("i", "material-icons eye", "visibility");
@@ -83,7 +83,7 @@ pub fn build_node(editor: &Editor, parent: &Element, node: NodeRef) -> Element {
                 handle_node_folding(&ul);
             }
             add_drag_events(&p, editor);
-            let name = node.info().name;
+            let name = object.info().name;
             add_class(&ul, "shown");
             recurse_children(children, owned_children);
             p.set_attribute("draggable", "true").unwrap();
@@ -106,15 +106,15 @@ fn get_title_els(el: &Element) -> (Element, Element) {
     let children = el.children().item(0).unwrap().children();
     (children.item(0).unwrap(), children.item(2).unwrap())
 }
-fn add_node_events(editor: &Editor, el: &Element, node: RcRcell<Node>) {
+fn add_node_events(editor: &Editor, el: &Element, object: RcRcell<Object>) {
     let (p, eyei) = get_title_els(el);
     handle_node_folding(&el);
-    let a_node = node.clone();
+    let a_node = object.clone();
     let a_editor = editor.clone();
     add_event(&p, "click", move |_| {
         a_editor.set_active_node(a_node.clone());
     });
-    let a_node = node.clone();
+    let a_node = object.clone();
     let scene = editor.scene();
     add_event(&eyei, "click", move |e| {
         match get_target_innerh(&e).as_str() {

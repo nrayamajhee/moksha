@@ -1,3 +1,4 @@
+#[derive(Debug, Copy, Clone)]
 pub struct Events {
     pub viewport: ViewportEvent,
     pub canvas: CanvasEvent,
@@ -12,6 +13,9 @@ impl Events {
     }
     pub fn clear(&mut self) {
         self.viewport = ViewportEvent::None;
+        if self.canvas == CanvasEvent::Resize {
+            self.canvas = CanvasEvent::Point;
+        }
     }
 }
 

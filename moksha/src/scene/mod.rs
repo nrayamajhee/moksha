@@ -1,4 +1,4 @@
-pub mod node;
+mod object;
 pub mod primitives;
 mod storage;
 use std::collections::HashMap;
@@ -7,12 +7,12 @@ use std::collections::HashMap;
 pub use primitives::Primitive;
 
 #[doc(inline)]
-pub use node::Node;
-pub use storage::Storage;
-
+pub use object::Object;
+pub use storage::{Storage, Id};
 use crate::{
-    dom_factory::{add_event, window, now, set_timeout, request_animation_frame},
-    log, node, rc_rcell, TextureType,
+    dom_factory::{add_event, window, now, set_timeout, request_animation_frame,
+    loop_animation_frame},
+    log, object, rc_rcell, TextureType,
     renderer::{bind_texture, DrawMode, RenderFlags, Renderer},
     Events,
     events::{ViewportEvent,CanvasEvent},
@@ -24,7 +24,7 @@ use nalgebra::Vector3;
 use strum_macros::{Display, EnumIter, EnumString};
 use wasm_bindgen::{JsCast, closure::Closure};
 use wavefront_obj::{mtl, obj};
-use web_sys::{MouseEvent, WheelEvent};
+use web_sys::{MouseEvent, WheelEvent, HtmlCanvasElement};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Display, EnumIter, EnumString)]
 pub enum LightType {
@@ -45,12 +45,12 @@ pub struct LightInfo {
 
 pub struct Light {
     light_id: usize,
-    node: RcRcell<Node>,
+    object: RcRcell<Object>,
 }
 
 impl Light {
-    pub fn node(&self) -> RcRcell<Node> {
-        self.node.clone()
+    pub fn object(&self) -> RcRcell<Object> {
+        self.object.clone()
     }
     pub fn index(&self) -> usize {
         self.light_id
@@ -68,7 +68,7 @@ pub struct ObjectInfo {
 impl Default for ObjectInfo {
     fn default() -> Self {
         Self {
-            name: "node".into(),
+            name: "object".into(),
             draw_mode: DrawMode::Triangle,
             render_flags: Default::default(),
         }
@@ -78,13 +78,14 @@ impl Default for ObjectInfo {
 /// A Scene tree that facilitates creation of varieties of Nodes. Scene creates Storage that is
 /// then shared by all nodes.
 pub struct Scene {
-    root: RcRcell<Node>,
+    root: RcRcell<Object>,
     renderer: RcRcell<Renderer>,
     viewport: RcRcell<Viewport>,
+    events: RcRcell<Events>,
 }
 
 impl Scene {
-    pub fn new(renderer: RcRcell<Renderer>, viewport: RcRcell<Viewport>) -> Self {
+    pub fn new(renderer: RcRcell<Renderer>, viewport: RcRcell<Viewport>, events: RcRcell<Events>) -> Self {
         let storage = rc_rcell(Default::default());
         let root = rc_rcell(Self::object(
             storage,
@@ -98,13 +99,15 @@ impl Scene {
             false,
             false,
         ));
+        Self::add_events(events.clone(), &renderer.borrow().canvas(), viewport.borrow().button());
         Self {
             root,
             renderer,
             viewport,
+            events,
         }
     }
-    pub fn root(&self) -> RcRcell<Node> {
+    pub fn root(&self) -> RcRcell<Object> {
         self.root.clone()
     }
     pub fn view(&self) -> RcRcell<Viewport> {
@@ -113,44 +116,44 @@ impl Scene {
     pub fn renderer(&self) -> RcRcell<Renderer> {
         self.renderer.clone()
     }
-    pub fn turn_lights_visiblity(&self, node: &Node, visible: bool) {
+    pub fn turn_lights_visiblity(&self, object: &Object, visible: bool) {
         let s = self.storage();
         let mut storage = s.borrow_mut();
         for i in 0..storage.lights().len() {
-            if storage.light(i).node_id == node.index() {
+            if storage.light(i).node_id == object.index() {
                 storage.mut_light_info(i).light = visible;
                 break;
             }
         }
     }
-    pub fn turn_lights_on(&self, node: &Node) {
-        self.turn_lights_visiblity(node, true);
+    pub fn turn_lights_on(&self, object: &Object) {
+        self.turn_lights_visiblity(object, true);
     }
-    pub fn turn_lights_off(&self, node: &Node) {
-        self.turn_lights_visiblity(node, false);
+    pub fn turn_lights_off(&self, object: &Object) {
+        self.turn_lights_visiblity(object, false);
     }
-    pub fn show(&self, node: &Node) {
+    pub fn show(&self, object: &Object) {
         {
             let s = self.storage();
             let mut storage = s.borrow_mut();
-            let mut info = storage.mut_info(node.index());
+            let mut info = storage.mut_info(object.index());
             info.render_flags.render = true;
         }
-        for child in node.children() {
+        for child in object.children() {
             self.show(&child.borrow());
         }
-        for child in node.owned_children() {
+        for child in object.owned_children() {
             self.show(child);
         }
     }
-    pub fn set_visibility_only(&self, node: &Node, visible: bool) {
+    pub fn set_visibility_only(&self, object: &Object, visible: bool) {
         {
             let s = self.storage();
             let mut storage = s.borrow_mut();
-            let mut info = storage.mut_info(node.index());
+            let mut info = storage.mut_info(object.index());
             info.render_flags.render = visible;
         }
-        for child in node.owned_children() {
+        for child in object.owned_children() {
             self.set_visibility_only(child, visible);
         }
     }
@@ -168,21 +171,21 @@ impl Scene {
                 ],
             ),
         );
-        let cube = node!(&self, Some(mesh), "Skybox", RenderFlags::no_cull());
+        let cube = object!(&self, Some(mesh), "Skybox", RenderFlags::no_cull());
         self.show(&cube);
     }
-    pub fn show_only(&self, node: &Node) {
-        self.set_visibility_only(node, true);
+    pub fn show_only(&self, object: &Object) {
+        self.set_visibility_only(object, true);
     }
-    pub fn hide_only(&self, node: &Node) {
-        self.set_visibility_only(node, false);
+    pub fn hide_only(&self, object: &Object) {
+        self.set_visibility_only(object, false);
     }
-    pub fn add(&self, node: RcRcell<Node>) {
-        self.show(&node.borrow());
-        self.root.borrow_mut().add(node);
+    pub fn add(&self, object: RcRcell<Object>) {
+        self.show(&object.borrow());
+        self.root.borrow_mut().add(object);
     }
     pub fn add_light(&self, light: &Light) {
-        self.add(light.node());
+        self.add(light.object());
         let s = self.storage();
         let mut storage = s.borrow_mut();
         let mut info = storage.mut_light_info(light.index());
@@ -196,7 +199,7 @@ impl Scene {
         info: ObjectInfo,
         is_img_obj: bool,
         setup_unique_vertices: bool,
-    ) -> Node {
+    ) -> Object {
         let sto = storage.clone();
         let mut storage = storage.borrow_mut();
         let index = if let Some(mut mesh) = mesh {
@@ -216,9 +219,9 @@ impl Scene {
         } else {
             storage.add(None, None, transform, info)
         };
-        Node::new(index, sto)
+        Object::new(index, sto)
     }
-    pub fn from_mesh(&self, mesh: Option<Mesh>, setup_unique_vertices: bool) -> Node {
+    pub fn from_mesh(&self, mesh: Option<Mesh>, setup_unique_vertices: bool) -> Object {
         Self::object(
             self.storage(),
             &self.renderer.borrow(),
@@ -229,7 +232,7 @@ impl Scene {
             setup_unique_vertices,
         )
     }
-    pub fn empty(&self, name: &str) -> Node {
+    pub fn empty(&self, name: &str) -> Object {
         Self::object(
             self.storage(),
             &self.renderer.borrow(),
@@ -244,37 +247,37 @@ impl Scene {
         )
     }
     pub fn light(&self, light_type: LightType, color: [f32; 3], intensity: f32) -> Light {
-        let node = rc_rcell(create_light_node(&self, light_type, color));
+        let object = rc_rcell(create_light_node(&self, light_type, color));
         let light_id = self.storage().borrow_mut().add_light(LightInfo {
             light_type,
             intensity,
             color,
-            node_id: node.borrow().index(),
+            node_id: object.borrow().index(),
             light: false,
         });
-        Light { light_id, node }
+        Light { light_id, object }
     }
     pub fn load_object_from_obj_wired(
         &self,
         dir: &str,
-        object: &obj::Object,
+        obj_object: &obj::Object,
         mat_set: &Option<mtl::MtlSet>,
         img_obj_url: Option<&HashMap<String, String>>,
-    ) -> Node {
+    ) -> Object {
         let mut buf_vertices = Vec::new();
-        for vertex in &object.vertices {
+        for vertex in &obj_object.vertices {
             buf_vertices.push(vertex.x);
             buf_vertices.push(vertex.y);
             buf_vertices.push(vertex.z);
         }
         let mut buf_normals = Vec::new();
-        for normal in &object.normals {
+        for normal in &obj_object.normals {
             buf_normals.push(normal.x);
             buf_normals.push(normal.y);
             buf_normals.push(normal.z);
         }
         let mut buf_tex_coords = Vec::new();
-        for normal in &object.normals {
+        for normal in &obj_object.normals {
             buf_tex_coords.push(normal.x);
             buf_tex_coords.push(normal.y);
             buf_tex_coords.push(normal.z);
@@ -283,7 +286,7 @@ impl Scene {
         let mut normals = Vec::new();
         let mut indices = Vec::new();
         let mut tex_coords = Vec::new();
-        for shape in &object.geometry[0].shapes {
+        for shape in &obj_object.geometry[0].shapes {
             if let obj::Primitive::Triangle(a, b, c) = shape.primitive {
                 if a.1 != None && a.2 != None {
                     for ((a, ua), na) in [a.0, b.0, c.0]
@@ -299,8 +302,8 @@ impl Scene {
                         normals.push(buf_vertices[e] as f32);
                         normals.push(buf_vertices[e + 1] as f32);
                         normals.push(buf_vertices[e + 2] as f32);
-                        let u = object.tex_vertices[ue].u as f64;
-                        let v = -object.tex_vertices[ue].v as f64;
+                        let u = obj_object.tex_vertices[ue].u as f64;
+                        let v = -obj_object.tex_vertices[ue].v as f64;
                         tex_coords.push(u as f32);
                         tex_coords.push(v as f32);
                     }
@@ -314,27 +317,27 @@ impl Scene {
             indices,
             normals,
         };
-        let material = Self::load_material(dir, object, mat_set, tex_coords, img_obj_url);
-        let node = self.from_mesh(Some(Mesh { geometry, material }), false);
-        let mut info = node.info();
+        let material = Self::load_material(dir, obj_object, mat_set, tex_coords, img_obj_url);
+        let object = self.from_mesh(Some(Mesh { geometry, material }), false);
+        let mut info = object.info();
         info.draw_mode = DrawMode::Arrays;
-        info.name = object.name.clone();
-        node.set_info(info);
-        node
+        info.name = obj_object.name.clone();
+        object.set_info(info);
+        object
     }
     pub fn load_material(
         dir: &str,
-        object: &obj::Object,
+        obj_object: &obj::Object,
         mat_set: &Option<mtl::MtlSet>,
         tex_coords: Vec<f32>,
         img_obj_url: Option<&HashMap<String, String>>,
     ) -> Material {
         let mut material = Material::new_color(1., 1., 1., 1.);
-        if object.geometry[0].shapes[0].smoothing_groups.is_empty() {
+        if obj_object.geometry[0].shapes[0].smoothing_groups.is_empty() {
             log!("No smooting group found. Mesh will be rendered flat.");
             material = material.flat();
         }
-        if let Some(material_name) = &object.geometry[0].material_name {
+        if let Some(material_name) = &obj_object.geometry[0].material_name {
             if let Some(mat_set) = mat_set {
                 for each in &mat_set.materials {
                     if &each.name == material_name {
@@ -375,12 +378,12 @@ impl Scene {
     pub fn load_object_from_obj(
         &self,
         dir: &str,
-        object: &obj::Object,
+        obj_object: &obj::Object,
         mat_set: &Option<mtl::MtlSet>,
         img_obj_url: Option<&HashMap<String, String>>,
-    ) -> Node {
+    ) -> Object {
         let mut vertices = Vec::new();
-        for vertex in &object.vertices {
+        for vertex in &obj_object.vertices {
             vertices.push(vertex.x as f32);
             vertices.push(vertex.y as f32);
             vertices.push(vertex.z as f32);
@@ -391,9 +394,9 @@ impl Scene {
         let push_normals = |normals: &mut Vec<f32>, e: usize, ne: usize| {
             let current_normal = Vector3::new(normals[e], normals[e + 1], normals[e + 2]);
             let new_normal = Vector3::new(
-                object.normals[ne].x as f32,
-                object.normals[ne].y as f32,
-                object.normals[ne].z as f32,
+                obj_object.normals[ne].x as f32,
+                obj_object.normals[ne].y as f32,
+                obj_object.normals[ne].z as f32,
             )
             .normalize();
             let avg_normal = if current_normal.magnitude() == 1. {
@@ -405,7 +408,7 @@ impl Scene {
             normals[e + 1] = avg_normal.y;
             normals[e + 2] = avg_normal.z;
         };
-        for shape in &object.geometry[0].shapes {
+        for shape in &obj_object.geometry[0].shapes {
             if let obj::Primitive::Triangle(a, b, c) = shape.primitive {
                 if a.1 != None && a.2 != None {
                     for ((a, ua), na) in [a.0, b.0, c.0]
@@ -415,8 +418,8 @@ impl Scene {
                     {
                         let (e, ue, ne) = (*a * 3, *ua, *na);
                         push_normals(&mut normals, e, ne);
-                        let u = object.tex_vertices[ue].u as f32;
-                        let v = -object.tex_vertices[ue].v as f32;
+                        let u = obj_object.tex_vertices[ue].u as f32;
+                        let v = -obj_object.tex_vertices[ue].v as f32;
 
                         let current_tex = tex_coords[*a * 2];
                         let duplicate_v = current_tex != -1. && current_tex != u;
@@ -448,11 +451,11 @@ impl Scene {
             indices,
             normals,
         };
-        let material = Self::load_material(dir, object, mat_set, tex_coords, img_obj_url);
-        node!(
+        let material = Self::load_material(dir, obj_object, mat_set, tex_coords, img_obj_url);
+        object!(
             &self,
             Some(Mesh { geometry, material }),
-            object.name.clone()
+            obj_object.name.clone()
         )
     }
     pub fn object_from_obj(
@@ -462,7 +465,7 @@ impl Scene {
         mtl_src: Option<&str>,
         img_obj_url: Option<&HashMap<String, String>>,
         wire_overlay: bool,
-    ) -> Node {
+    ) -> Object {
         let obj_set = obj::parse(obj_src).unwrap();
         assert!(!obj_set.objects.is_empty(), "No objects in the obj file");
         if obj_set.objects.len() > 1 {
@@ -502,11 +505,11 @@ impl Scene {
     pub fn storage(&self) -> RcRcell<Storage> {
         self.root.borrow().storage()
     }
-    pub fn find_node_recursive(node: RcRcell<Node>, name: &str) -> Option<RcRcell<Node>> {
-        if node.borrow().info().name.as_str() == name {
-            Some(node)
+    pub fn find_node_recursive(object: RcRcell<Object>, name: &str) -> Option<RcRcell<Object>> {
+        if object.borrow().info().name.as_str() == name {
+            Some(object)
         } else {
-            for each in node.borrow().children() {
+            for each in object.borrow().children() {
                 if let Some(n) = Self::find_node_recursive(each.clone(), name) {
                     return Some(n);
                 }
@@ -514,13 +517,13 @@ impl Scene {
             None
         }
     }
-    pub fn find_node_w_name(&self, name: &str) -> Option<RcRcell<Node>> {
+    pub fn find_node_w_name(&self, name: &str) -> Option<RcRcell<Object>> {
         Self::find_node_recursive(self.root(), name)
     }
-    pub fn duplicate_node(&self, node: &Node) -> Node {
-        let transform = node.transform();
-        let info = node.info();
-        let mesh = node.mesh();
+    pub fn duplicate_node(&self, object: &Object) -> Object {
+        let transform = object.transform();
+        let info = object.info();
+        let mesh = object.mesh();
         Self::object(
             self.storage(),
             &self.renderer.borrow(),
@@ -531,9 +534,7 @@ impl Scene {
             false,
         )
     }
-    pub fn add_events(&self, events: RcRcell<Events>) {
-        let renderer = self.renderer.borrow();
-        let canvas = renderer.canvas();
+    fn add_events(events: RcRcell<Events>, canvas: &HtmlCanvasElement, button: Option<MouseButton>) {
         let ev = events.clone();
         add_event(&canvas, "mousemove", move |e| {
             let mut events = ev.borrow_mut();
@@ -547,7 +548,7 @@ impl Scene {
             events.viewport = ViewportEvent::Zoom(we.delta_y());
         });
         let window = window();
-        if let Some(button) = self.viewport.borrow().button() {
+        if let Some(button) = button {
             let ev = events.clone();
             add_event(canvas, "mousedown", move |e| {
                 let mut events = ev.borrow_mut();
@@ -575,8 +576,30 @@ impl Scene {
             events.canvas = CanvasEvent::Resize;
         });
     }
-    pub fn update(&self, events: &Events) {
-        let mut renderer = self.renderer.borrow_mut();
+    pub fn update<F>(&self, closure: F)
+    where
+        F: 'static + Fn(&Events, f64) {
+        let then = rc_rcell(now());
+        let storage = self.storage();
+        let events = self.events.clone();
+        let view = self.viewport.clone();
+        let rndr = self.renderer.clone();
+        let scene = self.clone();
+        loop_animation_frame(move || {
+            let mut then = then.borrow_mut();
+            let mut events = events.borrow_mut();
+            let mut rndr = rndr.borrow_mut();
+            let mut view = view.borrow_mut();
+            let dt = now() - *then;
+            view.update(&events, dt);
+            Self::update_canvas(&events, &mut rndr, &mut view);
+            closure(&events, dt);
+            rndr.render(&storage.borrow(), &view);
+            events.clear();
+            *then = now(); 
+        }, Some(60.));
+    }
+    fn update_canvas(events: &Events, renderer: &mut Renderer, viewport: &mut Viewport) {
         let canvas_style = renderer.canvas().style();
         match events.canvas {
             CanvasEvent::Point => {
@@ -596,8 +619,18 @@ impl Scene {
             }
             CanvasEvent::Resize => {
                 renderer.resize();
-                self.viewport.borrow_mut().resize(renderer.aspect_ratio());
+                viewport.resize(renderer.aspect_ratio());
             }
         }
     }
+}
+
+mod node;
+use node::Obj;
+use moksha_derive::Obj;
+
+#[derive(Obj)]
+pub struct LightO {
+    obj_id: Id,
+    storage: RcRcell<Storage>,
 }
