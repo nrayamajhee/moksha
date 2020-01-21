@@ -3,9 +3,10 @@ image: nrayamajhee/arch-wasm-pack
 pages:
   stage: deploy
   script:
+  - cd moksha
   - wasm-pack build
   - wasm-pack test --headless --chrome
-  - cd www
+  - cd ../www
   - npm install
   - npm run build
   - mv dist ../public

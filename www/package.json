@@ -27,7 +27,7 @@
   },
   "homepage": "https://github.com/rustwasm/create-wasm-app#readme",
   "dependencies": {
-    "moksha": "file:../pkg"
+    "moksha": "file:../moksha/pkg"
   },
   "devDependencies": {
     "copy-webpack-plugin": "^5.1.1",

@@ -15,10 +15,10 @@ module.exports = {
     },
     plugins: [
         new CopyWebpackPlugin(['index.html', '404.html', {
-            from: '../assets',
+            from: '../moksha/assets',
             to: 'assets'
         },{
-            from: '../src/style.css',
+            from: '../moksha/src/style.css',
             to: 'style.css'
         }])
     ],
