@@ -120,6 +120,9 @@ impl Storage {
     pub fn children(&self, index: Id) -> &Vec<Id> {
         &self.children.get(index).expect("No object found!")
     }
+    pub fn mut_children(&mut self, index: Id) -> &mut Vec<Id> {
+        self.children.get_mut(index).expect("No object found!")
+    }
     pub fn parent(&self, index: Id) -> Id {
         *self.parent.get(index).expect("No parent found!")
     }

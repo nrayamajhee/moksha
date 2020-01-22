@@ -629,7 +629,7 @@ mod node;
 use node::Obj;
 use moksha_derive::Obj;
 
-#[derive(Obj)]
+#[derive(Clone, Obj)]
 pub struct LightO {
     obj_id: Id,
     storage: RcRcell<Storage>,
