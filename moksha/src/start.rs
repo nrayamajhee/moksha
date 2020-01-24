@@ -1,14 +1,24 @@
 use crate::{
     controller::ProjectionConfig,
-    dom_factory::{document, loop_animation_frame, window, now},
+    dom_factory::{document, loop_animation_frame, now, window},
+    events::{CanvasEvent, ViewportEvent},
+    node_from_obj,
+    node_from_obj_wired,
     editor::console::{self, ConsoleConfig},
-    object, node_from_obj, node_from_obj_wired, rc_rcell,
+    object,
+    rc_rcell,
     renderer::{Renderer, RendererConfig},
     scene::LightType,
-    Events,
-    events::{ViewportEvent, CanvasEvent},
+    SceneObject,
     Color,
-    Editor, Geometry, Material, Mesh, Object, Scene, Viewport,
+    Events,
+    //Editor,
+    Geometry,
+    Material,
+    Mesh,
+    Object,
+    Scene,
+    Viewport,
 };
 use genmesh::generators::{Cube, IcoSphere, SphereUv};
 use nalgebra::UnitQuaternion;
@@ -17,7 +27,7 @@ use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 
-fn cube(scene: &Scene, renderer: &Renderer) -> Object {
+fn cube(scene: &Scene, renderer: &Renderer) -> SceneObject {
     let cube_geometry = Geometry::from_genmesh(&Cube::new());
     let mut colors = Vec::new();
     let face_colors = vec![
@@ -79,9 +89,8 @@ pub fn start() -> Result<(), JsValue> {
     let a_view = rc_rcell(viewport);
     let scene = Scene::new(a_rndr.clone(), a_view.clone(), events.clone());
     scene.set_skybox("assets/img/milkyway", "jpg");
-    let ambient = scene.light(LightType::Ambient, [1.0, 1.0, 1.0], 0.2);
-    let amb_node = ambient.object();
-    amb_node.borrow().set_position(10., 0., 10.);
+    let ambient = scene.light(LightType::Ambient, Color::white(), 0.2);
+    ambient.set_position(10., 0., 10.);
 
     //let spot = scene.light(LightType::Spot, [1., 1., 1.], 1.0);
     //let spot_node = spot.object();
@@ -95,27 +104,25 @@ pub fn start() -> Result<(), JsValue> {
     //let point2_node = point2.object();
     //point2_node.borrow().set_position(15., 0., -10.);
 
-    let directional = scene.light(LightType::Directional, [1., 1., 1.], 1.0);
-    let dir_node = directional.object();
-    dir_node.borrow().set_position(30., 0., -10.);
+    //let directional = scene.light(LightType::Directional, Color::white(), 1.0);
+    //directional.set_position(30., 0., -10.);
 
     //scene.add(sun.clone());
-    let cube = rc_rcell(cube(&scene, &a_rndr.borrow()));
-    scene.add(cube.clone());
+    let cube = cube(&scene, &a_rndr.borrow());
+    scene.add(&cube);
     scene.add_light(&ambient);
+    //scene.add_light(&directional);
     ////scene.add_light(point2);
     ////scene.add_light(point);
-    scene.add_light(&directional);
 
-    let obj = rc_rcell(node_from_obj!(scene, "../assets/obj/earth", "earth"));
+    //let obj = node_from_obj!(scene, "../assets/obj/earth", "earth");
     //let obj = rc_rcell(node_from_obj_wired!(scene, "assets/obj/earth", "earth"));
-    obj.borrow().set_position(28., 0., 0.);
-    scene.add(obj.clone());
+    //obj.set_position(28., 0., 0.);
+    //scene.add(&obj);
 
     let a_scene = Rc::new(scene);
-    let mut editor = Editor::new(a_scene.clone());
+    //let mut editor = Editor::new(a_scene.clone());
 
-    a_scene.update(|_, _| {
-    });
+    a_scene.update(|_, _| {});
     Ok(())
 }

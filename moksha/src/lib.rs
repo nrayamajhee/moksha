@@ -1,5 +1,3 @@
-//#![feature(type_alias_impl_trait)]
-//#![feature(associated_type_defaults)]
 #![feature(proc_macro_hygiene)]
 #![doc(
     html_logo_url = "https://moksha.rayamajhee.com/assets/img/icon.png",
@@ -31,6 +29,7 @@ pub mod events;
 pub mod controller;
 pub mod dom_factory;
 pub mod editor;
+pub mod color;
 pub mod mesh;
 pub mod renderer;
 pub mod scene;
@@ -38,11 +37,12 @@ pub mod scene;
 #[doc(inline)]
 pub use crate::{
     controller::{MouseButton, Projection, Viewport},
-    editor::Editor,
-    mesh::{Geometry, Material, Mesh, TextureType, Transform, Color},
+    //editor::Editor,
+    mesh::{Geometry, Material, Mesh, TextureType, Transform},
+    color::Color,
     renderer::Renderer,
     events::Events,
-    scene::{Light, LightType, Object, ObjectInfo, Primitive, Scene, Storage, Id},
+    scene::{Light, LightType, LightState, SceneObject, Object, ObjectInfo, Primitive, Scene, Storage, Id},
 };
 
 mod start;

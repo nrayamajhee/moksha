@@ -273,13 +273,13 @@ pub fn set_f32(gl: &GL, program: &WebGlProgram, name: &str, value: f32) {
         .unwrap_or_else(|| panic!("Can't bind uniform: {}", name));
     gl.uniform1f(Some(&attrib), value);
 }
-pub fn set_vec3(gl: &GL, program: &WebGlProgram, attribute: &str, vector: &[f32]) {
+pub fn set_vec3(gl: &GL, program: &WebGlProgram, attribute: &str, vector: &[f32; 3]) {
     let mat_attrib = gl
         .get_uniform_location(program, attribute)
         .unwrap_or_else(|| panic!("Can't bind uniform: {}", attribute));
     gl.uniform3f(Some(&mat_attrib), vector[0], vector[1], vector[2]);
 }
-pub fn set_vec4(gl: &GL, program: &WebGlProgram, attribute: &str, vector: &[f32]) {
+pub fn set_vec4(gl: &GL, program: &WebGlProgram, attribute: &str, vector: &[f32; 4]) {
     let mat_attrib = gl
         .get_uniform_location(program, attribute)
         .unwrap_or_else(|| panic!("Can't bind uniform: {}", attribute));

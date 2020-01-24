@@ -3,12 +3,11 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 
-#[proc_macro_derive(Obj)]
+#[proc_macro_derive(Object)]
 pub fn derive_object(input: TokenStream) -> TokenStream {
     let d_i = parse_macro_input!(input as DeriveInput);
     let name = &d_i.ident;
     (quote! {
-        use node::Node;
         impl Node for #name {
             fn storage(&self) -> RcRcell<Storage> {
                 self.storage.clone()
@@ -19,18 +18,18 @@ pub fn derive_object(input: TokenStream) -> TokenStream {
             fn update_id(&mut self, id: usize) {
                 self.obj_id = id;
             }
-            fn children(&self) -> Iterator<Item = Self> {
-                let storage = self.storage();
-                let storage = storage.borrow();
-                let children = Vec::new();
-                storage.children(self.obj_id()).iter().map(|id| {
-                    let child = self.clone();
-                    child.update_id(*id);
-                    child
-                }).into_iter()
+            fn children(&self) -> NodeIterator<Self> {
+                self.clone().into_iter()
             }
         }
-        impl Obj for #name {}
+        impl IntoIterator for #name {
+            type Item = #name;
+            type IntoIter = NodeIterator<Self::Item>;
+            fn into_iter(self) -> Self::IntoIter {
+                NodeIterator::<#name>::new(self)
+            }
+        }
+        impl Object for #name {}
     }).into()
 }
 

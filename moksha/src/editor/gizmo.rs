@@ -1,4 +1,4 @@
-use crate::{Object, RcRcell, Viewport};
+use crate::{SceneObject, RcRcell, Viewport};
 use nalgebra::{Isometry3, Vector3};
 use ncollide3d::{
     query::Ray,
@@ -20,7 +20,7 @@ pub enum CollisionConstraint {
 }
 
 pub struct Gizmo {
-    object: Object,
+    object: SceneObject,
     collision_constraint: CollisionConstraint,
     transform: Isometry3<f32>,
     offset: Vector3<f32>,

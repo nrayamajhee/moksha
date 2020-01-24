@@ -5,7 +5,7 @@ use crate::{
     log,
     mesh::Mesh,
     scene::Scene,
-    LightType, Projection, Storage, TextureType, Transform,
+    LightState, LightType, Projection, Storage, TextureType, Transform,
 };
 use maud::html;
 use nalgebra::{UnitQuaternion, Vector3};
@@ -198,8 +198,14 @@ impl Renderer {
         let vao = self.ctx.create_vertex_array().expect("Can't creat VAO");
         self.ctx.bind_vertex_array(Some(&vao));
         // bind vertices
-        bind_buffer_and_attribute(&self.ctx, &program, "position", &mesh.geometry.vertices[..], 3)
-            .expect("Can't bind postion");
+        bind_buffer_and_attribute(
+            &self.ctx,
+            &program,
+            "position",
+            &mesh.geometry.vertices[..],
+            3,
+        )
+        .expect("Can't bind postion");
         if mesh.material.wire_overlay != None || shader_type == ShaderType::Wireframe {
             let mut bary_buffer = Vec::new();
             let barycentric: [f32; 9] = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
@@ -261,21 +267,21 @@ impl Renderer {
         let mut num_l_dir = 0;
         let mut num_l_spot = 0;
         for light in storage.lights() {
-            if !light.light {
+            if light.state == LightState::Off {
                 continue;
             }
             let (attrib, index) = match light.light_type {
                 LightType::Point => ("point_lights", num_l_point),
                 LightType::Spot => ("spot_lights", num_l_spot),
                 LightType::Ambient => ("amb_lights", num_l_amb),
-                LightType::Directional => ("dir_lights", num_l_dir)
+                LightType::Directional => ("dir_lights", num_l_dir),
             };
-            let vector = (storage.parent_transform(light.node_id)
-                * storage.transform(light.node_id))
+            let position = (storage.parent_transform(light.obj_id)
+                * storage.transform(light.obj_id))
             .isometry
             .translation
             .vector;
-            let position = [vector.x as f32, vector.y as f32, vector.z as f32];
+            //let position = [vector.x as f32, vector.y as f32, vector.z as f32];
             let range = 100.;
             let linear = 4.5 / range;
             let quadratic = 7.5 / (range * range);
@@ -295,25 +301,23 @@ impl Renderer {
                 gl,
                 program,
                 &format!("{}[{}].position", attrib, index),
-                &position[..],
+                &position.into(),
             );
-            if light.light_type == LightType::Directional
-                || light.light_type == LightType::Spot
-            {
-                let vector = (storage.parent_transform(light.node_id)
-                    * storage.transform(light.node_id))
+            if light.light_type == LightType::Directional || light.light_type == LightType::Spot {
+                let vector = (storage.parent_transform(light.obj_id)
+                    * storage.transform(light.obj_id))
                 .isometry
                 .rotation
                 .transform_vector(&Vector3::identity());
                 // The cone and arrows mesh is intrinsically oriented 90 deg
-                let dir = UnitQuaternion::from_euler_angles(0., PI / 2., 0.)
-                    .transform_vector(&vector);
+                let dir =
+                    UnitQuaternion::from_euler_angles(0., PI / 2., 0.).transform_vector(&vector);
                 let direction = [dir.x as f32, dir.y as f32, dir.z as f32];
                 set_vec3(
                     gl,
                     program,
                     &format!("{}[{}].direction", attrib, index),
-                    &direction[..],
+                    &direction,
                 );
             }
             if light.light_type == LightType::Spot {
@@ -334,7 +338,7 @@ impl Renderer {
                 gl,
                 program,
                 &format!("{}[{}].color", attrib, index),
-                &light.color[..],
+                &light.color.into(),
             );
             set_f32(
                 gl,
@@ -343,10 +347,18 @@ impl Renderer {
                 light.intensity as f32,
             );
             match light.light_type {
-                LightType::Point => {num_l_point += 1;}
-                LightType::Spot => {num_l_spot += 1;}
-                LightType::Ambient => {num_l_amb += 1;}
-                LightType::Directional => {num_l_dir += 1;}
+                LightType::Point => {
+                    num_l_point += 1;
+                }
+                LightType::Spot => {
+                    num_l_spot += 1;
+                }
+                LightType::Ambient => {
+                    num_l_amb += 1;
+                }
+                LightType::Directional => {
+                    num_l_dir += 1;
+                }
             }
         }
         set_i32(gl, program, "num_l_amb", num_l_amb as i32);
@@ -360,13 +372,9 @@ impl Renderer {
                 let gl = &self.ctx;
                 gl.use_program(Some(&program));
                 if each == ShaderType::CubeMap {
-                    let rotation: nalgebra::Matrix4<f32> = viewport.isometry().rotation.to_homogeneous().into();
-                    set_mat4(
-                        gl,
-                        &program,
-                        "view",
-                        &rotation,
-                    );
+                    let rotation: nalgebra::Matrix4<f32> =
+                        viewport.isometry().rotation.to_homogeneous().into();
+                    set_mat4(gl, &program, "view", &rotation);
                 } else {
                     set_mat4(gl, &program, "view", &viewport.view());
                 }
@@ -383,7 +391,7 @@ impl Renderer {
                     set_mat4(gl, &program, "proj", &viewport.proj());
                 }
                 if each == ShaderType::Color {
-                    set_vec3(gl, program, "eye", &viewport.eye()[..]);
+                    set_vec3(gl, program, "eye", &viewport.eye());
                 }
             }
         }
@@ -442,7 +450,7 @@ impl Renderer {
                     &mesh
                         .material
                         .color
-                        .expect("Can't render a color materaial without a color!"),
+                        .expect("Can't render a color materaial without a color!").into(),
                 );
             }
             if shader_type == ShaderType::Color {
@@ -451,7 +459,7 @@ impl Renderer {
                 if let Some(color) = mesh.material.wire_overlay {
                     let w_color: [f32; 4] = color.into();
                     set_bool(gl, program, "wire_overlay", true);
-                    set_vec4(gl, program, "wire_color", &w_color[..]);
+                    set_vec4(gl, program, "wire_color", &w_color.into());
                 } else {
                     set_bool(gl, program, "wire_overlay", false);
                 }

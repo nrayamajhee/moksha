@@ -1,5 +1,6 @@
-use crate::{ Object, Events,
-    events::{ViewportEvent, CanvasEvent},
+use crate::{
+    events::{CanvasEvent, ViewportEvent},
+    Events, Object,
 };
 use nalgebra::{
     Isometry3, Matrix4, Orthographic3, Perspective3, Point3, Unit, UnitQuaternion, Vector3,
@@ -97,15 +98,15 @@ impl Viewport {
         match event.canvas {
             CanvasEvent::Grab => {
                 self.enable_rotation();
-            },
+            }
             CanvasEvent::Zoom => {
                 self.enable_zoom();
-            },
+            }
             CanvasEvent::Point => {
                 self.disable_zoom();
                 self.disable_rotation();
-            },
-            _=>()
+            }
+            _ => (),
         }
         match event.viewport {
             ViewportEvent::Rotate(dx, dy) => {
@@ -116,7 +117,7 @@ impl Viewport {
                 self.update_zoom(dw as f64 * dt);
                 self.disable_zoom();
             }
-            _=>()
+            _ => (),
         }
     }
     pub fn view(&self) -> Matrix4<f32> {
@@ -140,7 +141,7 @@ impl Viewport {
     fn uproject_point(&self, point: Point3<f32>) -> Point3<f32> {
         match self.projection {
             Projection::Orthographic => self.orthographic.unproject_point(&point.into()),
-            Projection::Perspective => self.perspective.unproject_point(&point.into())
+            Projection::Perspective => self.perspective.unproject_point(&point.into()),
         }
     }
     pub fn screen_to_ray(&self, point: [f32; 2]) -> [f32; 3] {
@@ -176,7 +177,8 @@ impl Viewport {
     pub fn update_zoom(&mut self, ds: f64) {
         if self.zoom && ds != 0. {
             let delta = if ds > 0. { 1.05 } else { 0.95 };
-            self.view.translation.vector = (self.speed * delta) as f32 * self.view.translation.vector;
+            self.view.translation.vector =
+                (self.speed * delta) as f32 * self.view.translation.vector;
             self.update_ortho();
         }
     }
@@ -236,7 +238,7 @@ impl Viewport {
         let v = (self.target * self.view.inverse()).translation.vector;
         [v.x, v.y, v.z]
     }
-    pub fn focus(&mut self, object: &Object) {
+    pub fn focus<O: Object>(&mut self, object: &O) {
         self.target = (object.parent_transform() * object.transform()).isometry;
     }
     fn update_ortho(&mut self) {

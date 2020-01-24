@@ -1,4 +1,5 @@
-use crate::{scene::LightInfo, Mesh, ObjectInfo, Transform};
+use super::{LightInfo, ObjectInfo};
+use crate::{Mesh, Transform};
 use std::rc::Rc;
 use web_sys::{WebGlTexture, WebGlVertexArrayObject};
 
@@ -10,7 +11,7 @@ pub type Id = usize;
 pub struct Storage {
     info: Vec<ObjectInfo>,
     children: Vec<Vec<Id>>,
-    parent: Vec<Id>,
+    parent: Vec<Option<Id>>,
     meshes: Vec<Option<Mesh>>,
     transforms: Vec<Transform>,
     parent_transforms: Vec<Transform>,
@@ -57,6 +58,7 @@ impl Storage {
         self.meshes.push(mesh);
         self.transforms.push(transform);
         self.parent_transforms.push(Default::default());
+        self.children.push(Vec::new());
         self.vaos.push(vao);
         self.info.push(info);
         index
@@ -123,7 +125,7 @@ impl Storage {
     pub fn mut_children(&mut self, index: Id) -> &mut Vec<Id> {
         self.children.get_mut(index).expect("No object found!")
     }
-    pub fn parent(&self, index: Id) -> Id {
-        *self.parent.get(index).expect("No parent found!")
+    pub fn parent(&self, index: Id) -> Option<Id> {
+        *self.parent.get(index).expect("No object found!")
     }
 }

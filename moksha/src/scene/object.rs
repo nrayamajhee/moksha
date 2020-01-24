@@ -1,219 +1,280 @@
+use super::Light;
 use crate::{
-    mesh::multiply, renderer::ShaderType, Color, Mesh, ObjectInfo, RcRcell, Storage, Transform,
+    mesh::multiply,
+    renderer::{DrawMode, RenderFlags},
+    Color, Id, Mesh, RcRcell, Storage, Transform,
 };
+use moksha_derive::Object;
 use nalgebra::{Isometry3, Point3, UnitQuaternion, Vector3};
 use ncollide3d::{query::Ray, query::RayCast, shape::ConvexHull};
 
+use prelude::*;
 
-/// An entity in the scene that holds reference to its props in Storage, keeps tracks of
-/// other nodes that are its children either borrowed or owned.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Object {
-    index: usize,
+#[derive(Object, Clone)]
+pub struct SceneObject {
+    obj_id: Id,
     storage: RcRcell<Storage>,
-    children: Vec<RcRcell<Object>>,
-    owned_children: Vec<Object>,
 }
 
-impl Object {
-    pub fn new(index: usize, storage: RcRcell<Storage>) -> Self {
-        Object {
-            index,
-            storage,
-            children: Vec::new(),
-            owned_children: Vec::new(),
+impl SceneObject {
+    pub fn new(storage: RcRcell<Storage>, obj_id: Id) -> Self {
+        Self { obj_id, storage }
+    }
+}
+
+impl From<&Light> for SceneObject {
+    fn from(light: &Light) -> Self {
+        SceneObject {
+            storage: light.storage(),
+            obj_id: light.obj_id(),
         }
     }
-    pub fn position(&self) -> Point3<f32> {
+}
+
+/// Information about an object in the scene (name, render flag, drawing mode)
+#[derive(Debug, Clone, PartialEq)]
+pub struct ObjectInfo {
+    pub name: String,
+    pub draw_mode: DrawMode,
+    pub render_flags: RenderFlags,
+}
+
+impl Default for ObjectInfo {
+    fn default() -> Self {
+        Self {
+            name: "object".into(),
+            draw_mode: DrawMode::Triangle,
+            render_flags: Default::default(),
+        }
+    }
+}
+
+pub mod prelude {
+    use crate::{Id, RcRcell, Storage};
+
+    #[derive(Debug)]
+    pub struct NodeIterator<N> {
+        index: usize,
+        node: N,
+    }
+
+    impl<N> NodeIterator<N> {
+        pub fn new(node: N) -> Self {
+            Self { index: 0, node }
+        }
+    }
+
+    pub trait Node: Clone {
+        fn storage(&self) -> RcRcell<Storage>;
+        fn obj_id(&self) -> Id;
+        fn update_id(&mut self, id: Id);
+        fn children(&self) -> NodeIterator<Self>;
+    }
+
+    impl<N: Node + Clone> Iterator for NodeIterator<N> {
+        type Item = N;
+        fn next(&mut self) -> Option<Self::Item> {
+            let storage = self.node.storage();
+            let storage = storage.borrow();
+            let children = storage.children(self.node.obj_id());
+            if self.index < children.len() {
+                let mut child = self.node.clone();
+                child.update_id(children[self.index]);
+                self.index += 1;
+                Some(child)
+            } else {
+                None
+            }
+        }
+    }
+}
+
+pub trait Object: Node {
+    fn transform(&self) -> Transform {
+        let storage = self.storage();
+        let storage = storage.borrow();
+        let index = self.obj_id();
+        storage.transform(index)
+    }
+    fn parent_transform(&self) -> Transform {
+        let storage = self.storage();
+        let storage = storage.borrow();
+        let index = self.obj_id();
+        storage.parent_transform(index)
+    }
+    fn position(&self) -> Point3<f32> {
         let transform = self.transform();
         let v = transform.isometry.translation.vector;
         Point3::new(v.x, v.y, v.z)
     }
-    pub fn global_position(&self) -> [f32; 3] {
+    fn global_position(&self) -> [f32; 3] {
         let transform = self.transform();
         let p_transform = self.parent_transform();
         let v = (p_transform * transform).isometry.translation.vector;
         [v.x, v.y, v.z]
     }
-    pub fn rotation(&self) -> UnitQuaternion<f32> {
+    fn rotation(&self) -> UnitQuaternion<f32> {
         let transform = self.transform();
         transform.isometry.rotation
     }
-    pub fn scale(&self) -> Vector3<f32> {
+    fn scale(&self) -> Vector3<f32> {
         let transform = self.transform();
         transform.scale
     }
-    pub fn set_position(&self, x: f32, y: f32, z: f32) {
+    fn info(&self) -> ObjectInfo {
+        let storage = self.storage();
+        let storage = storage.borrow();
+        let index = self.obj_id();
+        storage.info(index)
+    }
+    fn mesh(&self) -> Option<Mesh> {
+        let storage = self.storage();
+        let storage = storage.borrow();
+        let index = self.obj_id();
+        storage.mesh(index)
+    }
+    fn set_position(&self, x: f32, y: f32, z: f32) {
         let p_transform = {
-            let mut storage = self.storage.borrow_mut();
-            let transform = storage.mut_transform(self.index);
+            let storage = self.storage();
+            let mut storage = storage.borrow_mut();
+            let index = self.obj_id();
+            let transform = storage.mut_transform(index);
             transform.isometry.translation.vector = Vector3::new(x, y, z);
             *transform
         };
-        self.apply_parent_transform(self.parent_transform() * p_transform);
+        self.apply_transform_to_children(self.parent_transform() * p_transform);
     }
-    pub fn copy_location(&self, object: &Object) {
+    fn copy_location<O>(&self, object: &O)
+    where
+        O: Object,
+    {
         let v = object.global_position();
         self.set_position(v[0], v[1], v[2]);
     }
-    pub fn set_rotation(&self, rot: UnitQuaternion<f32>) {
+    fn set_rotation(&self, rot: UnitQuaternion<f32>) {
         let p_transform = {
-            let mut storage = self.storage.borrow_mut();
-            let mut transform = storage.mut_transform(self.index);
+            let storage = self.storage();
+            let mut storage = storage.borrow_mut();
+            let index = self.obj_id();
+            let mut transform = storage.mut_transform(index);
             transform.isometry.rotation = rot;
             *transform
         };
-        self.apply_parent_transform(self.parent_transform() * p_transform);
+        self.apply_transform_to_children(self.parent_transform() * p_transform);
     }
-    pub fn rotate_by(&self, rot: UnitQuaternion<f32>) {
+    fn rotate_by(&self, rot: UnitQuaternion<f32>) {
         let p_transform = {
-            let mut storage = self.storage.borrow_mut();
-            let transform = storage.mut_transform(self.index);
+            let storage = self.storage();
+            let mut storage = storage.borrow_mut();
+            let index = self.obj_id();
+            let transform = storage.mut_transform(index);
             transform.isometry.append_rotation_wrt_center_mut(&rot);
             *transform
         };
-        self.apply_parent_transform(self.parent_transform() * p_transform);
+        self.apply_transform_to_children(self.parent_transform() * p_transform);
     }
-    pub fn set_scale(&self, scale: f32) {
+    fn set_scale(&self, scale: f32) {
         self.set_scale_vec(scale, scale, scale);
     }
-    pub fn set_scale_vec(&self, x: f32, y: f32, z: f32) {
+    fn set_scale_vec(&self, x: f32, y: f32, z: f32) {
         let p_transform = {
-            let mut storage = self.storage.borrow_mut();
-            let transform = storage.mut_transform(self.index);
+            let storage = self.storage();
+            let mut storage = storage.borrow_mut();
+            let index = self.obj_id();
+            let transform = storage.mut_transform(index);
             transform.scale = Vector3::new(x, y, z);
             *transform
         };
-        self.apply_parent_transform(self.parent_transform() * p_transform);
+        self.apply_transform_to_children(self.parent_transform() * p_transform);
     }
-    pub fn apply_parent_transform(&self, transform: Transform) {
-        let apply_transform = |child: &Object, t: Transform| {
-            child.set_parent_transform(t);
-            let p_t = t * child.transform();
-            child.apply_parent_transform(p_t);
-        };
-        for child in self.children.iter() {
-            apply_transform(&child.borrow(), transform);
-        }
-        for child in self.owned_children.iter() {
-            apply_transform(&child, transform);
-        }
-    }
-    pub fn transform(&self) -> Transform {
-        let storage = self.storage.borrow();
-        storage.transform(self.index)
-    }
-    pub fn parent_transform(&self) -> Transform {
-        let storage = self.storage.borrow();
-        storage.parent_transform(self.index)
-    }
-    pub fn set_transform(&self, transform: Transform) {
+    fn set_transform(&self, transform: Transform) {
         let p_transform = {
-            let mut storage = self.storage.borrow_mut();
-            let t = storage.mut_transform(self.index);
+            let storage = self.storage();
+            let mut storage = storage.borrow_mut();
+            let index = self.obj_id();
+            let t = storage.mut_transform(index);
             *t = transform;
             *t
         };
-        self.apply_parent_transform(p_transform);
+        self.apply_transform_to_children(p_transform);
     }
-    pub fn set_parent_transform(&self, transform: Transform) {
-        let mut storage = self.storage.borrow_mut();
-        let t = storage.mut_parent_transform(self.index);
+    fn set_parent_transform(&self, transform: Transform) {
+        let storage = self.storage();
+        let mut storage = storage.borrow_mut();
+        let index = self.obj_id();
+        let t = storage.mut_parent_transform(index);
         *t = transform;
     }
-    pub fn info(&self) -> ObjectInfo {
-        let storage = self.storage.borrow();
-        storage.info(self.index)
+    fn set_info(&self, info: ObjectInfo) {
+        let storage = self.storage();
+        let mut storage = storage.borrow_mut();
+        let index = self.obj_id();
+        *storage.mut_info(index) = info;
     }
-    pub fn set_info(&self, info: ObjectInfo) {
-        let mut storage = self.storage.borrow_mut();
-        *storage.mut_info(self.index) = info;
-    }
-    pub fn mesh(&self) -> Option<Mesh> {
-        let storage = self.storage.borrow();
-        storage.mesh(self.index)
-    }
-    pub fn set_mesh(&self, mesh: Option<Mesh>) {
-        let mut storage = self.storage.borrow_mut();
-        let m = storage.mut_mesh(self.index);
+    fn set_mesh(&self, mesh: Option<Mesh>) {
+        let storage = self.storage();
+        let mut storage = storage.borrow_mut();
+        let index = self.obj_id();
+        let m = storage.mut_mesh(index);
         *m = mesh;
     }
-    pub fn index(&self) -> usize {
-        self.index
+    fn apply_parent_transform(&self, transform: Transform) {
+        self.set_parent_transform(transform);
+        let p_t = transform * self.transform();
+        self.apply_transform_to_children(p_t);
     }
-    pub fn add(&mut self, object: RcRcell<Object>) {
-        self.children.push(object);
-        self.children.sort_by_cached_key(|e| e.borrow().info().name);
-        self.apply_parent_transform(self.parent_transform() * self.transform());
+    fn apply_transform_to_children(&self, transform: Transform) {
+        for child in self.children() {
+            child.apply_parent_transform(transform);
+        }
     }
-    pub fn find_child(&self, name: &str) -> Option<usize> {
-        if let Ok(i) = self
-            .children
-            .binary_search_by_key(&String::from(name), |a| a.borrow().info().name)
+    fn add<N>(&self, object: &N)
+    where
+        N: Node,
+    {
+        let storage = self.storage();
+        let mut sto = storage.borrow_mut();
+        let mut children = sto.mut_children(self.obj_id());
+        children.push(object.obj_id());
+        children.sort_by_cached_key(|id| storage.borrow().info(*id).name);
+        self.apply_transform_to_children(self.parent_transform() * self.transform());
+    }
+    fn find_child(&self, name: &str) -> Option<(Id, usize)> {
+        let storage = self.storage();
+        let storage = storage.borrow();
+        let children = storage.children(self.obj_id());
+        if let Ok(i) =
+            children.binary_search_by_key(&String::from(name), |id| storage.info(*id).name)
         {
-            Some(i)
+            Some((children[i], i))
         } else {
             None
         }
     }
-    pub fn remove(&mut self, name: &str) {
-        if let Some(i) = self.find_child(name) {
-            self.children.remove(i);
+    fn remove(&self, name: &str) {
+        let storage = self.storage();
+        let mut storage = storage.borrow_mut();
+        let mut children = storage.mut_children(self.obj_id());
+        if let Some((_, i)) = self.find_child(name) {
+            children.remove(i);
         }
-        self.apply_parent_transform(Transform::identity());
+        self.apply_transform_to_children(Transform::identity());
     }
-    pub fn own(&mut self, object: Object) {
-        self.owned_children.push(object);
-        self.apply_parent_transform(self.parent_transform() * self.transform());
+    fn change_color(&self, color: Color) {
+        let mut mesh = self.mesh().unwrap();
+        mesh.material = mesh.material.color(color);
+        self.set_mesh(Some(mesh));
     }
-    pub fn storage(&self) -> RcRcell<Storage> {
-        self.storage.clone()
-    }
-    pub fn children(&self) -> &Vec<RcRcell<Object>> {
-        &self.children
-    }
-    pub fn owned_children(&self) -> &Vec<Object> {
-        &self.owned_children
-    }
-    pub fn collies_w_owned_children_recursive(&self, ray: &Ray<f32>) -> Option<Isometry3<f32>> {
-        if let Some(t) = self.collides_w_ray(ray) {
-            return Some(t);
+    fn set_outline(&self, outline_scale: Option<f32>) {
+        if let Some(mut mesh) = self.mesh() {
+            mesh.material.outline = outline_scale;
+            self.set_mesh(Some(mesh));
         }
-        for child in self.owned_children() {
-            if let Some(t) = child.collies_w_owned_children_recursive(ray) {
-                return Some(t);
-            }
-        }
-        None
-    }
-    fn collides_w_children_recursive(
-        ray: &Ray<f32>,
-        object: RcRcell<Object>,
-    ) -> Option<(RcRcell<Object>, Isometry3<f32>)> {
-        if let Some(t) = object.borrow().collides_w_ray(ray) {
-            return Some((object.clone(), t));
-        }
-        for child in object.borrow().children() {
-            if let Some(result) = Self::collides_w_children_recursive(ray, child.clone()) {
-                return Some(result);
-            }
-        }
-        for child in object.borrow().owned_children() {
-            if let Some(t) = child.collies_w_owned_children_recursive(ray) {
-                return Some((object.clone(), t));
-            }
-        }
-        None
-    }
-    pub fn collides_w_children(&self, ray: &Ray<f32>) -> Option<(RcRcell<Object>, Isometry3<f32>)> {
         for each in self.children() {
-            if let Some(result) = Self::collides_w_children_recursive(&ray, each.clone()) {
-                return Some(result);
-            }
+            each.set_outline(outline_scale);
         }
-        None
     }
-    pub fn collides_w_ray(&self, ray: &Ray<f32>) -> Option<Isometry3<f32>> {
+    fn collides_w_ray(&self, ray: &Ray<f32>) -> Option<Isometry3<f32>> {
         let t = self.transform();
         let p_t = self.parent_transform();
         let s = multiply(t.scale, p_t.scale);
@@ -233,18 +294,15 @@ impl Object {
         }
         None
     }
-    pub fn change_color(&self, color: [f32; 3]) {
-        let mut mesh = self.mesh().unwrap();
-        mesh.material = mesh.material.color(color[0], color[1], color[2], 1.);
-        self.set_mesh(Some(mesh));
-    }
-    pub fn set_outline(&self, outline_scale: Option<f32>) {
-        if let Some(mut mesh) = self.mesh() {
-            mesh.material.outline = outline_scale;
-            self.set_mesh(Some(mesh));
+    fn collies_w_children_recursive(&self, ray: &Ray<f32>) -> Option<Isometry3<f32>> {
+        if let Some(t) = self.collides_w_ray(ray) {
+            return Some(t);
         }
-        for each in self.owned_children() {
-            each.set_outline(outline_scale);
+        for child in self.children() {
+            if let Some(t) = child.collies_w_children_recursive(ray) {
+                return Some(t);
+            }
         }
+        None
     }
 }
