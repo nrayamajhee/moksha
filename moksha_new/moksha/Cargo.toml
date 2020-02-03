@@ -1,0 +1,36 @@
+[package]
+name = "moksha"
+version = "0.1.0"
+authors = ["nrayamajhee <nishan@rayamajhee.com>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+genmesh = "0.6.2"
+nalgebra = "0.19.0"
+wasm-bindgen = { version = "0.2.58", features = ["serde-serialize"] }
+serde = "1.0.104"
+serde_derive = "1.0.104"
+console_error_panic_hook = { version = "0.1.6", optional = true }
+wee_alloc = { version = "0.4.5", optional = true }
+
+[dependencies.web-sys]
+version = "0.3.35"
+features = [
+  'console',
+]
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.8"
+
+[profile.release]
+opt-level = "s"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
